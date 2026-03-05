@@ -60,6 +60,12 @@ where shared_value_id = :shared_value_id
 order by id
 limit :page_limit;
 
+-- name: get_current_revisions_by_shared_value_ids(shared_value_ids)
+select id, shared_value_id, service_id, environment_id, value, is_current, created_at
+from shared_value_revisions
+where shared_value_id = any(:shared_value_ids::uuid[])
+  and is_current = true;
+
 -- name: unset_current_revision(shared_value_id, service_id, environment_id)!
 update shared_value_revisions
 set is_current = false

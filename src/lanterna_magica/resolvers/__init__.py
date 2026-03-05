@@ -4,6 +4,7 @@ from ariadne import load_schema_from_path, make_executable_schema
 from ariadne.asgi import GraphQL
 
 from lanterna_magica.data.environments import Environments
+from lanterna_magica.data.loaders import create_loaders
 from lanterna_magica.data.services import Services
 from lanterna_magica.data.shared_values import SharedValues
 from lanterna_magica.resolvers.environment import get_environment_resolvers
@@ -31,5 +32,8 @@ def create_gql(pool) -> GraphQL:
     )
     return GraphQL(
         schema,
-        context_value=lambda request, _data=None: {"pool": pool},
+        context_value=lambda request, _data=None: {
+            "pool": pool,
+            **create_loaders(pool),
+        },
     )
