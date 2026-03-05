@@ -18,8 +18,7 @@ class EnvironmentsResolver:
         )
 
     async def resolve_environment(self, _obj, info, *, id):
-        rows = await self.environments.get_environments_by_ids([id])
-        return rows[0] if rows else None
+        return await info.context["environment_loader"].load(id)
 
     async def resolve_create_environment(self, _obj, info, *, input):
         return await self.environments.create_environment(

@@ -18,8 +18,7 @@ class ServicesResolver:
         )
 
     async def resolve_service(self, _obj, info, *, id):
-        rows = await self.services.get_services_by_ids([id])
-        return rows[0] if rows else None
+        return await info.context["service_loader"].load(id)
 
     async def resolve_create_service(self, _obj, info, *, input):
         return await self.services.create_service(

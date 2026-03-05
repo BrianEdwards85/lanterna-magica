@@ -18,8 +18,7 @@ class SharedValuesResolver:
         )
 
     async def resolve_shared_value(self, _obj, info, *, id):
-        rows = await self.shared_values.get_shared_values_by_ids([id])
-        return rows[0] if rows else None
+        return await info.context["shared_value_loader"].load(id)
 
     async def resolve_create_shared_value(self, _obj, info, *, input):
         return await self.shared_values.create_shared_value(name=input["name"])
