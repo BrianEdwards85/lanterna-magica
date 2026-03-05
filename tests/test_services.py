@@ -343,6 +343,23 @@ async def test_search_underscore_literal(client):
     assert_that(edges[0]["node"]["name"]).is_equal_to("my_service")
 
 
+async def test_pagination_with_underscore_search(client):
+    for i in range(3):
+        await create_service(client, f"my_svc_{i:02d}")
+    await create_service(client, "no-match")
+
+    body = await gql(client, SERVICES, {"search": "_svc_", "first": 2})
+    page1 = body["data"]["services"]
+    assert_that(page1["edges"]).described_as("underscore search page 1").is_length(2)
+    assert_that(page1["pageInfo"]["hasNextPage"]).is_true()
+
+    body = await gql(
+        client, SERVICES, {"search": "_svc_", "first": 2, "after": page1["pageInfo"]["endCursor"]}
+    )
+    page2 = body["data"]["services"]
+    assert_that(page2["edges"]).described_as("underscore search page 2").is_length(1)
+
+
 async def test_search_strips_invalid_chars(client):
     await create_service(client, "traefik")
 

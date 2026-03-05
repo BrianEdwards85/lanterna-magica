@@ -16,8 +16,8 @@ class Services:
         after: str | None = None,
     ) -> dict:
         limit = page_limit(first)
-        after_id = decode_cursor(after, search=search) if after else None
         search = sanitize_search(search) if search else None
+        after_id = decode_cursor(after, search=search) if after else None
 
         rows = [
             dict(r)
