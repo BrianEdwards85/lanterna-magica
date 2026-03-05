@@ -24,6 +24,7 @@ set name = coalesce(:name, name),
     description = coalesce(:description, description),
     updated_at = now()
 where id = :id
+  and archived_at is null
 returning id, name, description, created_at, updated_at, archived_at;
 
 -- name: archive_service(id)^
