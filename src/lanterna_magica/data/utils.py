@@ -12,11 +12,14 @@ queries = aiosql.from_path(str(SQL_DIR), "asyncpg")
 SENTINEL_UUID = "00000000-0000-0000-0000-000000000000"
 
 DEFAULT_PAGE_SIZE = 25
+MAX_PAGE_SIZE = 100
 
 
 def page_limit(first: int | None) -> int:
     if first is not None and first < 1:
         raise ValueError("first must be a positive integer")
+    if first is not None and first > MAX_PAGE_SIZE:
+        raise ValueError(f"first must not exceed {MAX_PAGE_SIZE}")
     return first if first is not None else DEFAULT_PAGE_SIZE
 
 INVALID_NAME_CHARS = re.compile(r'[%\\]')

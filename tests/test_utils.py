@@ -1,6 +1,6 @@
 import pytest
 
-from lanterna_magica.data.utils import DEFAULT_PAGE_SIZE, page_limit, sanitize_search, validate_name
+from lanterna_magica.data.utils import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, page_limit, sanitize_search, validate_name
 
 
 # -- validate_name --
@@ -88,3 +88,12 @@ def test_page_limit_zero_raises():
 def test_page_limit_negative_raises():
     with pytest.raises(ValueError, match="positive"):
         page_limit(-1)
+
+
+def test_page_limit_at_max_returns_value():
+    assert page_limit(MAX_PAGE_SIZE) == MAX_PAGE_SIZE
+
+
+def test_page_limit_exceeds_max_raises():
+    with pytest.raises(ValueError, match="exceed"):
+        page_limit(MAX_PAGE_SIZE + 1)
