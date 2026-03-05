@@ -1,44 +1,46 @@
-from datetime import datetime, timezone
-
 from ariadne import MutationType, QueryType
 
-_STUB_SERVICE = {
-    "id": "00000000-0000-0000-0000-000000000001",
-    "name": "stub-service",
-    "description": "Stubbed placeholder",
-    "created_at": datetime.now(timezone.utc),
-    "updated_at": datetime.now(timezone.utc),
-    "archived_at": None,
-}
-
-_STUB_CONNECTION = {
-    "edges": [{"node": _STUB_SERVICE, "cursor": "stub-cursor"}],
-    "page_info": {"has_next_page": False, "end_cursor": None},
-}
+from lanterna_magica.data.services import Services
 
 
 class ServicesResolver:
-    async def resolve_services(self, _obj, info, **kwargs):
-        return _STUB_CONNECTION
+    def __init__(self, services: Services):
+        self.services = services
+
+    async def resolve_services(
+        self, _obj, info, *, search=None, include_archived=False, first=None, after=None
+    ):
+        return await self.services.get_services(
+            search=search,
+            include_archived=include_archived,
+            first=first,
+            after=after,
+        )
 
     async def resolve_service(self, _obj, info, *, id):
-        return _STUB_SERVICE
+        rows = await self.services.get_services_by_ids([id])
+        return rows[0] if rows else None
 
     async def resolve_create_service(self, _obj, info, *, input):
-        return _STUB_SERVICE
+        return await self.services.create_service(
+            name=input["name"], description=input.get("description")
+        )
 
     async def resolve_update_service(self, _obj, info, *, input):
-        return _STUB_SERVICE
+        return await self.services.update_service(
+            id=input["id"], name=input.get("name"), description=input.get("description")
+        )
 
     async def resolve_archive_service(self, _obj, info, *, id):
-        return _STUB_SERVICE
+        return await self.services.archive_service(id)
 
     async def resolve_unarchive_service(self, _obj, info, *, id):
-        return _STUB_SERVICE
+        return await self.services.unarchive_service(id)
 
 
-def get_service_resolvers() -> list:
-    resolver = ServicesResolver()
+def get_service_resolvers(services: Services) -> list:
+    resolver = ServicesResolver(services)
+
     query = QueryType()
     mutation = MutationType()
 
