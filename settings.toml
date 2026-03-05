@@ -1,0 +1,24 @@
+[default]
+
+[default.db]
+host = "localhost"
+port = 5432
+name = "lanterna_magica"
+user = "lanterna_magica"
+password = "lanterna_magica"
+
+[default.server]
+host = "0.0.0.0"
+port = 8000
+
+[development]
+dynaconf_merge = true
+
+[testing]
+dynaconf_merge = true
+
+[testing.db]
+name = "lanterna_magica_test"
+
+[production]
+dynaconf_merge = true
