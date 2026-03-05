@@ -1,0 +1,78 @@
+type SharedValue {
+  id: ID!
+  name: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  archivedAt: DateTime
+  revisions(
+    serviceId: ID
+    environmentId: ID
+    currentOnly: Boolean
+    first: Int
+    after: String
+  ): SharedValueRevisionConnection!
+}
+
+type SharedValueEdge {
+  node: SharedValue!
+  cursor: String!
+}
+
+type SharedValueConnection {
+  edges: [SharedValueEdge!]!
+  pageInfo: PageInfo!
+}
+
+type SharedValueRevision {
+  id: ID!
+  sharedValueId: ID!
+  serviceId: ID!
+  environmentId: ID!
+  value: JSON!
+  isCurrent: Boolean!
+  createdAt: DateTime!
+}
+
+type SharedValueRevisionEdge {
+  node: SharedValueRevision!
+  cursor: String!
+}
+
+type SharedValueRevisionConnection {
+  edges: [SharedValueRevisionEdge!]!
+  pageInfo: PageInfo!
+}
+
+input CreateSharedValueInput {
+  name: String!
+}
+
+input UpdateSharedValueInput {
+  id: ID!
+  name: String
+}
+
+input CreateSharedValueRevisionInput {
+  sharedValueId: ID!
+  serviceId: ID!
+  environmentId: ID!
+  value: JSON!
+}
+
+extend type Query {
+  sharedValues(
+    includeArchived: Boolean
+    first: Int
+    after: String
+    search: String
+  ): SharedValueConnection!
+  sharedValue(id: ID!): SharedValue
+}
+
+extend type Mutation {
+  createSharedValue(input: CreateSharedValueInput!): SharedValue!
+  updateSharedValue(input: UpdateSharedValueInput!): SharedValue!
+  archiveSharedValue(id: ID!): SharedValue!
+  unarchiveSharedValue(id: ID!): SharedValue!
+  createSharedValueRevision(input: CreateSharedValueRevisionInput!): SharedValueRevision!
+}
