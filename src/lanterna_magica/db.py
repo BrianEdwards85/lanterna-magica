@@ -9,7 +9,12 @@ from lanterna_magica.config import settings
 
 logger = logging.getLogger(__name__)
 
-MIGRATIONS_DIR = Path(__file__).resolve().parent.parent.parent / "migrations"
+_DEFAULT_MIGRATIONS_DIR = Path(__file__).resolve().parent.parent.parent / "migrations"
+
+
+def _get_migrations_dir() -> Path:
+    configured = settings.get("migrations_dir")
+    return Path(configured) if configured else _DEFAULT_MIGRATIONS_DIR
 
 
 def get_dsn() -> str:
@@ -20,7 +25,7 @@ def get_dsn() -> str:
 def apply_migrations() -> None:
     dsn = get_dsn()
     backend = get_backend(dsn)
-    migrations = read_migrations(str(MIGRATIONS_DIR))
+    migrations = read_migrations(str(_get_migrations_dir()))
     with backend.lock():
         backend.apply_migrations(backend.to_apply(migrations))
     logger.info("Migrations applied")

@@ -1,4 +1,4 @@
-from pathlib import Path
+from importlib.resources import files
 
 from ariadne import load_schema_from_path, make_executable_schema
 from ariadne.asgi import GraphQL
@@ -14,7 +14,7 @@ from lanterna_magica.resolvers.scalars import datetime_scalar, json_scalar
 from lanterna_magica.resolvers.service import get_service_resolvers
 from lanterna_magica.resolvers.shared_value import get_shared_value_resolvers
 
-SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schema"
+SCHEMA_DIR = files("lanterna_magica").joinpath("schema")
 
 
 def create_gql(pool) -> GraphQL:

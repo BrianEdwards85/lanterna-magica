@@ -21,7 +21,7 @@ from lanterna_magica.resolvers import create_gql
 apply_migrations()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 async def pool():
     p = await create_pool()
     yield p
