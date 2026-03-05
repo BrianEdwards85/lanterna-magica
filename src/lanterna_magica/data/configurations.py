@@ -5,10 +5,6 @@ from lanterna_magica.errors import NotFoundError
 from .utils import build_connection, decode_cursor, page_limit, queries
 
 
-def _parse_row(row):
-    return dict(row)
-
-
 class Configurations:
     def __init__(self, pool: Pool):
         self.pool = pool
@@ -26,7 +22,7 @@ class Configurations:
         after_id = decode_cursor(after) if after else None
 
         rows = [
-            _parse_row(r)
+            dict(r)
             async for r in queries.get_configurations(
                 self.pool,
                 service_id=service_id,
@@ -59,7 +55,7 @@ class Configurations:
                     environment_id=environment_id,
                     body=body,
                 )
-                config = _parse_row(row)
+                config = dict(row)
 
                 created_subs = []
                 if substitutions:

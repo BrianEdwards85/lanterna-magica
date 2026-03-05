@@ -54,7 +54,6 @@ def create_gql(pool) -> GraphQL:
     return GraphQL(
         schema,
         context_value=lambda request, _data=None: {
-            "pool": pool,
             **create_loaders(pool),
         },
         error_formatter=format_error,
