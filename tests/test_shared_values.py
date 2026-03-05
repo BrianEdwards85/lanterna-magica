@@ -98,7 +98,7 @@ query SharedValueWithRevisions(
 # -- Shared Value CRUD Tests --
 
 
-async def testcreate_shared_value(client):
+async def test_create_shared_value(client):
     sv = await create_shared_value(client, "db_password")
     assert_that(sv["name"]).described_as("shared value name").is_equal_to("db_password")
     assert_that(sv["id"]).described_as("shared value id").is_not_none()
@@ -108,7 +108,7 @@ async def testcreate_shared_value(client):
     ).is_none()
 
 
-async def testcreate_shared_value_duplicate_name(client):
+async def test_create_shared_value_duplicate_name(client):
     await create_shared_value(client, "db_password")
     body = await gql(
         client,
@@ -428,14 +428,14 @@ async def test_revisions_filter_by_environment(client):
     ).contains("prod-val")
 
 
-async def testcreate_shared_value_with_percent_in_name_fails(client):
+async def test_create_shared_value_with_percent_in_name_fails(client):
     body = await gql(
         client, CREATE_SHARED_VALUE, {"input": {"name": "bad%name"}}, expect_errors=True
     )
     assert_that(body).described_as("percent in name rejected").contains_key("errors")
 
 
-async def testcreate_shared_value_with_backslash_in_name_fails(client):
+async def test_create_shared_value_with_backslash_in_name_fails(client):
     body = await gql(
         client, CREATE_SHARED_VALUE, {"input": {"name": "bad\\name"}}, expect_errors=True
     )

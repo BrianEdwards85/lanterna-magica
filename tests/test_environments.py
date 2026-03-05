@@ -62,7 +62,7 @@ query Environment($id: ID!) {
 # -- Tests --
 
 
-async def testcreate_environment(client):
+async def test_create_environment(client):
     env = await create_environment(client, "production", "prod cluster")
     assert_that(env["name"]).described_as("environment name").is_equal_to("production")
     assert_that(env["description"]).described_as("environment description").is_equal_to(
@@ -76,13 +76,13 @@ async def testcreate_environment(client):
     ).is_none()
 
 
-async def testcreate_environment_minimal(client):
+async def test_create_environment_minimal(client):
     env = await create_environment(client, "staging")
     assert_that(env["name"]).described_as("environment name").is_equal_to("staging")
     assert_that(env["description"]).described_as("description when not provided").is_none()
 
 
-async def testcreate_environment_duplicate_name(client):
+async def test_create_environment_duplicate_name(client):
     await create_environment(client, "production")
     body = await gql(
         client,
@@ -318,14 +318,14 @@ async def test_cursor_invalid_with_changed_search(client):
     assert_that(body).described_as("mismatched search cursor").contains_key("errors")
 
 
-async def testcreate_environment_with_percent_in_name_fails(client):
+async def test_create_environment_with_percent_in_name_fails(client):
     body = await gql(
         client, CREATE_ENVIRONMENT, {"input": {"name": "bad%name"}}, expect_errors=True
     )
     assert_that(body).described_as("percent in name rejected").contains_key("errors")
 
 
-async def testcreate_environment_with_backslash_in_name_fails(client):
+async def test_create_environment_with_backslash_in_name_fails(client):
     body = await gql(
         client, CREATE_ENVIRONMENT, {"input": {"name": "bad\\name"}}, expect_errors=True
     )

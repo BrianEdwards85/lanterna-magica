@@ -62,7 +62,7 @@ query Service($id: ID!) {
 # -- Tests --
 
 
-async def testcreate_service(client):
+async def test_create_service(client):
     svc = await create_service(client, "traefik", "reverse proxy")
     assert_that(svc["name"]).described_as("service name").is_equal_to("traefik")
     assert_that(svc["description"]).described_as("service description").is_equal_to("reverse proxy")
@@ -72,13 +72,13 @@ async def testcreate_service(client):
     assert_that(svc["archivedAt"]).described_as("new service should not be archived").is_none()
 
 
-async def testcreate_service_minimal(client):
+async def test_create_service_minimal(client):
     svc = await create_service(client, "nginx")
     assert_that(svc["name"]).described_as("service name").is_equal_to("nginx")
     assert_that(svc["description"]).described_as("description when not provided").is_none()
 
 
-async def testcreate_service_duplicate_name(client):
+async def test_create_service_duplicate_name(client):
     await create_service(client, "traefik")
     body = await gql(
         client,
@@ -314,14 +314,14 @@ async def test_cursor_invalid_with_changed_search(client):
     assert_that(body).described_as("mismatched search cursor").contains_key("errors")
 
 
-async def testcreate_service_with_percent_in_name_fails(client):
+async def test_create_service_with_percent_in_name_fails(client):
     body = await gql(
         client, CREATE_SERVICE, {"input": {"name": "bad%name"}}, expect_errors=True
     )
     assert_that(body).described_as("percent in name rejected").contains_key("errors")
 
 
-async def testcreate_service_with_backslash_in_name_fails(client):
+async def test_create_service_with_backslash_in_name_fails(client):
     body = await gql(
         client, CREATE_SERVICE, {"input": {"name": "bad\\name"}}, expect_errors=True
     )

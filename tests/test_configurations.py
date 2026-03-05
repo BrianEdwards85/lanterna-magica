@@ -1,5 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
+from lanterna_magica.data.configurations import Configurations
 from lanterna_magica.data.utils import SENTINEL_UUID
 from utils import create_environment, create_service, create_shared_value, nodes
 
@@ -392,3 +393,48 @@ async def test_configurations_exclude_global(client):
     items = nodes(body["data"]["configurations"]["edges"])
     assert_that(items).described_as("exclude global").is_length(1)
     assert_that(items[0]["body"]).is_equal_to({"scope": "specific"})
+
+
+# -- Data layer return value tests --
+
+
+async def test_create_configuration_data_layer_returns_substitutions(client, pool):
+    """The data layer must include created substitutions in its return value."""
+    configs = Configurations(pool)
+
+    svc = await create_service(client, "dl-test-svc")
+    env = await create_environment(client, "dl-test-env")
+    sv = await create_shared_value(client, "dl-test-sv")
+
+    result = await configs.create_configuration(
+        service_id=svc["id"],
+        environment_id=env["id"],
+        body={"key": "value"},
+        substitutions=[{"jsonpath": "$.key", "shared_value_id": sv["id"]}],
+    )
+
+    assert_that(result).described_as("result has substitutions key").contains_key("substitutions")
+    assert_that(result["substitutions"]).described_as("substitutions count").is_length(1)
+    assert_that(result["substitutions"][0]["jsonpath"]).described_as(
+        "substitution jsonpath"
+    ).is_equal_to("$.key")
+    assert_that(str(result["substitutions"][0]["shared_value_id"])).described_as(
+        "substitution shared_value_id"
+    ).is_equal_to(sv["id"])
+
+
+async def test_create_configuration_data_layer_returns_empty_substitutions(client, pool):
+    """When no substitutions are provided, the data layer returns an empty list."""
+    configs = Configurations(pool)
+
+    svc = await create_service(client, "dl-test-svc2")
+    env = await create_environment(client, "dl-test-env2")
+
+    result = await configs.create_configuration(
+        service_id=svc["id"],
+        environment_id=env["id"],
+        body={"key": "value"},
+    )
+
+    assert_that(result).described_as("result has substitutions key").contains_key("substitutions")
+    assert_that(result["substitutions"]).described_as("substitutions is empty").is_empty()

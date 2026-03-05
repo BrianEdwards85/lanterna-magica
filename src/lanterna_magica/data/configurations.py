@@ -64,14 +64,18 @@ class Configurations:
                 )
                 config = _parse_row(row)
 
+                created_subs = []
                 if substitutions:
                     for sub in substitutions:
-                        await queries.create_config_substitution(
+                        sub_row = await queries.create_config_substitution(
                             conn,
                             configuration_id=str(config["id"]),
                             jsonpath=sub["jsonpath"],
                             shared_value_id=sub["shared_value_id"],
                         )
+                        created_subs.append(dict(sub_row))
+
+                config["substitutions"] = created_subs
 
         return config
 
