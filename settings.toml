@@ -19,6 +19,8 @@ dynaconf_merge = true
 
 [testing.db]
 name = "lanterna_magica_test"
+user = "lanterna_magica_test"
+password = "lanterna_magica_test"
 
 [production]
 dynaconf_merge = true
