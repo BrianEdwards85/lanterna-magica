@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from assertpy import assert_that
 from conftest import gql
+from utils import nodes, parse_dt
 
 # -- Mutations --
 
@@ -63,14 +62,6 @@ query Service($id: ID!) {
 # -- Helpers --
 
 
-def _parse_dt(iso_string):
-    return datetime.fromisoformat(iso_string)
-
-
-def _nodes(edges):
-    return [e["node"] for e in edges]
-
-
 async def _create_service(client, name="traefik", description=None):
     body = await gql(
         client, CREATE_SERVICE, {"input": {"name": name, "description": description}}
@@ -126,14 +117,14 @@ async def test_services_list(client):
     await _create_service(client, "nginx")
 
     body = await gql(client, SERVICES)
-    assert_that(_nodes(body["data"]["services"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["services"]["edges"])).described_as(
         "services list"
     ).extracting("name").contains("traefik", "nginx")
 
 
 async def test_services_excludes_sentinel(client):
     body = await gql(client, SERVICES)
-    assert_that(_nodes(body["data"]["services"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["services"]["edges"])).described_as(
         "sentinel row should be hidden"
     ).extracting("name").does_not_contain("_global")
 
@@ -151,8 +142,8 @@ async def test_update_service(client):
     assert_that(updated["description"]).described_as("description updated").is_equal_to(
         "reverse proxy"
     )
-    assert_that(_parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
-        _parse_dt(svc["updatedAt"])
+    assert_that(parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
+        parse_dt(svc["updatedAt"])
     )
 
 
@@ -197,7 +188,7 @@ async def test_archive_hides_from_list(client):
     await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
 
     body = await gql(client, SERVICES)
-    assert_that(_nodes(body["data"]["services"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["services"]["edges"])).described_as(
         "archived service hidden from default list"
     ).extracting("id").does_not_contain(svc["id"])
 
@@ -207,7 +198,7 @@ async def test_include_archived(client):
     await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
 
     body = await gql(client, SERVICES, {"includeArchived": True})
-    assert_that(_nodes(body["data"]["services"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["services"]["edges"])).described_as(
         "archived service visible with includeArchived"
     ).extracting("id").contains(svc["id"])
 
@@ -223,7 +214,7 @@ async def test_unarchive_service(client):
     ).is_none()
 
     body = await gql(client, SERVICES)
-    assert_that(_nodes(body["data"]["services"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["services"]["edges"])).described_as(
         "unarchived service visible in default list"
     ).extracting("id").contains(svc["id"])
 

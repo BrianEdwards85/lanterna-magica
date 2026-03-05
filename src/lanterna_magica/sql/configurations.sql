@@ -12,13 +12,6 @@ select id, service_id, environment_id, body, is_current, created_at
 from configurations
 where id = any(:ids::uuid[]);
 
--- name: get_current_configuration(service_id, environment_id)^
-select id, service_id, environment_id, body, is_current, created_at
-from configurations
-where service_id = :service_id
-  and environment_id = :environment_id
-  and is_current = true;
-
 -- name: unset_current_configuration(service_id, environment_id)!
 update configurations
 set is_current = false

@@ -1,25 +1,8 @@
 from assertpy import assert_that
 from conftest import gql
+from utils import create_environment, create_service, create_shared_value, nodes
 
 # -- Mutations --
-
-CREATE_SERVICE = """
-mutation CreateService($input: CreateServiceInput!) {
-    createService(input: $input) { id name }
-}
-"""
-
-CREATE_ENVIRONMENT = """
-mutation CreateEnvironment($input: CreateEnvironmentInput!) {
-    createEnvironment(input: $input) { id name }
-}
-"""
-
-CREATE_SHARED_VALUE = """
-mutation CreateSharedValue($input: CreateSharedValueInput!) {
-    createSharedValue(input: $input) { id name }
-}
-"""
 
 CREATE_CONFIGURATION = """
 mutation CreateConfiguration($input: CreateConfigurationInput!) {
@@ -90,25 +73,6 @@ query Configuration($id: ID!) {
 # -- Helpers --
 
 
-def _nodes(edges):
-    return [e["node"] for e in edges]
-
-
-async def _create_service(client, name="traefik"):
-    body = await gql(client, CREATE_SERVICE, {"input": {"name": name}})
-    return body["data"]["createService"]
-
-
-async def _create_environment(client, name="production"):
-    body = await gql(client, CREATE_ENVIRONMENT, {"input": {"name": name}})
-    return body["data"]["createEnvironment"]
-
-
-async def _create_shared_value(client, name="db_password"):
-    body = await gql(client, CREATE_SHARED_VALUE, {"input": {"name": name}})
-    return body["data"]["createSharedValue"]
-
-
 async def _create_configuration(client, service_id, environment_id, body, substitutions=None):
     variables = {
         "input": {
@@ -127,8 +91,8 @@ async def _create_configuration(client, service_id, environment_id, body, substi
 
 
 async def test_create_configuration(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
     config_body = {"host": "localhost", "port": 8080}
 
     cfg = await _create_configuration(client, svc["id"], env["id"], config_body)
@@ -144,9 +108,9 @@ async def test_create_configuration(client):
 
 
 async def test_create_configuration_with_substitutions(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
-    sv = await _create_shared_value(client, "db_password")
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv = await create_shared_value(client, "db_password")
 
     config_body = {"database": {"password": "placeholder"}}
     substitutions = [{"jsonpath": "$.database.password", "sharedValueId": sv["id"]}]
@@ -163,8 +127,8 @@ async def test_create_configuration_with_substitutions(client):
 
 
 async def test_new_configuration_replaces_current(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     cfg1 = await _create_configuration(client, svc["id"], env["id"], {"version": 1})
     cfg2 = await _create_configuration(client, svc["id"], env["id"], {"version": 2})
@@ -179,8 +143,8 @@ async def test_new_configuration_replaces_current(client):
 
 
 async def test_configuration_by_id(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     cfg = await _create_configuration(client, svc["id"], env["id"], {"key": "value"})
     body = await gql(client, CONFIGURATION, {"id": cfg["id"]})
@@ -197,50 +161,50 @@ async def test_configuration_by_id_not_found(client):
 
 
 async def test_configurations_list(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     cfg1 = await _create_configuration(client, svc["id"], env["id"], {"version": 1})
     cfg2 = await _create_configuration(client, svc["id"], env["id"], {"version": 2})
 
     body = await gql(client, CONFIGURATIONS)
-    nodes = _nodes(body["data"]["configurations"]["edges"])
-    assert_that(nodes).described_as("configurations list").extracting("id").contains(
+    items = nodes(body["data"]["configurations"]["edges"])
+    assert_that(items).described_as("configurations list").extracting("id").contains(
         cfg1["id"], cfg2["id"]
     )
 
 
 async def test_configurations_filter_by_service(client):
-    svc1 = await _create_service(client, "traefik")
-    svc2 = await _create_service(client, "nginx")
-    env = await _create_environment(client)
+    svc1 = await create_service(client, "traefik")
+    svc2 = await create_service(client, "nginx")
+    env = await create_environment(client)
 
     await _create_configuration(client, svc1["id"], env["id"], {"app": "traefik"})
     await _create_configuration(client, svc2["id"], env["id"], {"app": "nginx"})
 
     body = await gql(client, CONFIGURATIONS, {"serviceId": svc1["id"]})
-    nodes = _nodes(body["data"]["configurations"]["edges"])
-    assert_that(nodes).described_as("configs filtered by service").is_length(1)
-    assert_that(nodes[0]["body"]).described_as("filtered config body").is_equal_to({"app": "traefik"})
+    items = nodes(body["data"]["configurations"]["edges"])
+    assert_that(items).described_as("configs filtered by service").is_length(1)
+    assert_that(items[0]["body"]).described_as("filtered config body").is_equal_to({"app": "traefik"})
 
 
 async def test_configurations_filter_by_environment(client):
-    svc = await _create_service(client)
-    env1 = await _create_environment(client, "production")
-    env2 = await _create_environment(client, "staging")
+    svc = await create_service(client)
+    env1 = await create_environment(client, "production")
+    env2 = await create_environment(client, "staging")
 
     await _create_configuration(client, svc["id"], env1["id"], {"env": "prod"})
     await _create_configuration(client, svc["id"], env2["id"], {"env": "staging"})
 
     body = await gql(client, CONFIGURATIONS, {"environmentId": env1["id"]})
-    nodes = _nodes(body["data"]["configurations"]["edges"])
-    assert_that(nodes).described_as("configs filtered by environment").is_length(1)
-    assert_that(nodes[0]["body"]).described_as("filtered config body").is_equal_to({"env": "prod"})
+    items = nodes(body["data"]["configurations"]["edges"])
+    assert_that(items).described_as("configs filtered by environment").is_length(1)
+    assert_that(items[0]["body"]).described_as("filtered config body").is_equal_to({"env": "prod"})
 
 
 async def test_configurations_pagination(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     for i in range(5):
         await _create_configuration(client, svc["id"], env["id"], {"version": i})
@@ -271,10 +235,10 @@ async def test_configurations_pagination(client):
 
 
 async def test_update_config_substitution(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
-    sv1 = await _create_shared_value(client, "db_password")
-    sv2 = await _create_shared_value(client, "db_password_v2")
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv1 = await create_shared_value(client, "db_password")
+    sv2 = await create_shared_value(client, "db_password_v2")
 
     cfg = await _create_configuration(
         client,
@@ -300,10 +264,10 @@ async def test_update_config_substitution(client):
 
 
 async def test_configuration_substitutions_field(client):
-    svc = await _create_service(client)
-    env = await _create_environment(client)
-    sv1 = await _create_shared_value(client, "db_host")
-    sv2 = await _create_shared_value(client, "db_port")
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv1 = await create_shared_value(client, "db_host")
+    sv2 = await create_shared_value(client, "db_port")
 
     cfg = await _create_configuration(
         client,
@@ -318,8 +282,8 @@ async def test_configuration_substitutions_field(client):
 
     # Query the configuration and verify substitutions are returned
     body = await gql(client, CONFIGURATIONS)
-    nodes = _nodes(body["data"]["configurations"]["edges"])
-    config_node = next(n for n in nodes if n["id"] == cfg["id"])
+    items = nodes(body["data"]["configurations"]["edges"])
+    config_node = next(n for n in items if n["id"] == cfg["id"])
     subs = config_node["substitutions"]
     assert_that(subs).described_as("substitutions count").is_length(2)
     assert_that(subs).extracting("jsonpath").described_as("substitution jsonpaths").contains(

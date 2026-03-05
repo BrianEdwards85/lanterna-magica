@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 from aiodataloader import DataLoader
 from asyncpg import Pool
 
@@ -66,31 +64,10 @@ class ConfigurationLoader(DataLoader):
         return [by_id.get(str(i)) for i in ids]
 
 
-class SharedValueRevisionLoader(DataLoader):
-    """Batches current revisions by shared_value_id. Returns a list per id."""
-
-    def __init__(self, pool: Pool):
-        super().__init__()
-        self.pool = pool
-
-    async def batch_load_fn(self, shared_value_ids):
-        rows = [
-            dict(r)
-            async for r in queries.get_current_revisions_by_shared_value_ids(
-                self.pool, shared_value_ids=list(shared_value_ids)
-            )
-        ]
-        by_sv_id = defaultdict(list)
-        for r in rows:
-            by_sv_id[str(r["shared_value_id"])].append(r)
-        return [by_sv_id.get(str(i), []) for i in shared_value_ids]
-
-
 def create_loaders(pool: Pool) -> dict:
     return {
         "configuration_loader": ConfigurationLoader(pool),
         "service_loader": ServiceLoader(pool),
         "environment_loader": EnvironmentLoader(pool),
         "shared_value_loader": SharedValueLoader(pool),
-        "shared_value_revision_loader": SharedValueRevisionLoader(pool),
     }

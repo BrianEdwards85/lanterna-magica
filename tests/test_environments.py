@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from assertpy import assert_that
 from conftest import gql
+from utils import nodes, parse_dt
 
 # -- Mutations --
 
@@ -63,14 +62,6 @@ query Environment($id: ID!) {
 # -- Helpers --
 
 
-def _parse_dt(iso_string):
-    return datetime.fromisoformat(iso_string)
-
-
-def _nodes(edges):
-    return [e["node"] for e in edges]
-
-
 async def _create_environment(client, name="production", description=None):
     body = await gql(
         client, CREATE_ENVIRONMENT, {"input": {"name": name, "description": description}}
@@ -130,14 +121,14 @@ async def test_environments_list(client):
     await _create_environment(client, "staging")
 
     body = await gql(client, ENVIRONMENTS)
-    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["environments"]["edges"])).described_as(
         "environments list"
     ).extracting("name").contains("production", "staging")
 
 
 async def test_environments_excludes_sentinel(client):
     body = await gql(client, ENVIRONMENTS)
-    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["environments"]["edges"])).described_as(
         "sentinel row should be hidden"
     ).extracting("name").does_not_contain("_global")
 
@@ -155,8 +146,8 @@ async def test_update_environment(client):
     assert_that(updated["description"]).described_as("description updated").is_equal_to(
         "prod cluster"
     )
-    assert_that(_parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
-        _parse_dt(env["updatedAt"])
+    assert_that(parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
+        parse_dt(env["updatedAt"])
     )
 
 
@@ -201,7 +192,7 @@ async def test_archive_hides_from_list(client):
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(client, ENVIRONMENTS)
-    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["environments"]["edges"])).described_as(
         "archived environment hidden from default list"
     ).extracting("id").does_not_contain(env["id"])
 
@@ -211,7 +202,7 @@ async def test_include_archived(client):
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(client, ENVIRONMENTS, {"includeArchived": True})
-    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["environments"]["edges"])).described_as(
         "archived environment visible with includeArchived"
     ).extracting("id").contains(env["id"])
 
@@ -227,7 +218,7 @@ async def test_unarchive_environment(client):
     ).is_none()
 
     body = await gql(client, ENVIRONMENTS)
-    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["environments"]["edges"])).described_as(
         "unarchived environment visible in default list"
     ).extracting("id").contains(env["id"])
 

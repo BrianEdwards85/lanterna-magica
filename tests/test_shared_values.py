@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from assertpy import assert_that
 from conftest import gql
+from utils import create_environment, create_service, nodes, parse_dt
 
 # -- Mutations --
 
@@ -42,18 +41,6 @@ mutation CreateSharedValueRevision($input: CreateSharedValueRevisionInput!) {
     createSharedValueRevision(input: $input) {
         id sharedValue { id } serviceId { id } environmentId { id } value isCurrent createdAt
     }
-}
-"""
-
-CREATE_SERVICE = """
-mutation CreateService($input: CreateServiceInput!) {
-    createService(input: $input) { id name }
-}
-"""
-
-CREATE_ENVIRONMENT = """
-mutation CreateEnvironment($input: CreateEnvironmentInput!) {
-    createEnvironment(input: $input) { id name }
 }
 """
 
@@ -111,27 +98,9 @@ query SharedValueWithRevisions(
 # -- Helpers --
 
 
-def _parse_dt(iso_string):
-    return datetime.fromisoformat(iso_string)
-
-
-def _nodes(edges):
-    return [e["node"] for e in edges]
-
-
 async def _create_shared_value(client, name="db_password"):
     body = await gql(client, CREATE_SHARED_VALUE, {"input": {"name": name}})
     return body["data"]["createSharedValue"]
-
-
-async def _create_service(client, name="traefik"):
-    body = await gql(client, CREATE_SERVICE, {"input": {"name": name}})
-    return body["data"]["createService"]
-
-
-async def _create_environment(client, name="production"):
-    body = await gql(client, CREATE_ENVIRONMENT, {"input": {"name": name}})
-    return body["data"]["createEnvironment"]
 
 
 async def _create_revision(client, shared_value_id, service_id, environment_id, value):
@@ -192,7 +161,7 @@ async def test_shared_values_list(client):
     await _create_shared_value(client, "api_key")
 
     body = await gql(client, SHARED_VALUES)
-    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["sharedValues"]["edges"])).described_as(
         "shared values list"
     ).extracting("name").contains("db_password", "api_key")
 
@@ -207,8 +176,8 @@ async def test_update_shared_value(client):
     )
     updated = body["data"]["updateSharedValue"]
     assert_that(updated["name"]).described_as("name updated").is_equal_to("db_pass")
-    assert_that(_parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
-        _parse_dt(sv["updatedAt"])
+    assert_that(parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
+        parse_dt(sv["updatedAt"])
     )
 
 
@@ -238,7 +207,7 @@ async def test_archive_hides_from_list(client):
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(client, SHARED_VALUES)
-    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["sharedValues"]["edges"])).described_as(
         "archived shared value hidden from default list"
     ).extracting("id").does_not_contain(sv["id"])
 
@@ -248,7 +217,7 @@ async def test_include_archived(client):
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(client, SHARED_VALUES, {"includeArchived": True})
-    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["sharedValues"]["edges"])).described_as(
         "archived shared value visible with includeArchived"
     ).extracting("id").contains(sv["id"])
 
@@ -264,7 +233,7 @@ async def test_unarchive_shared_value(client):
     ).is_none()
 
     body = await gql(client, SHARED_VALUES)
-    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+    assert_that(nodes(body["data"]["sharedValues"]["edges"])).described_as(
         "unarchived shared value visible in default list"
     ).extracting("id").contains(sv["id"])
 
@@ -308,8 +277,8 @@ async def test_pagination(client):
 
 async def test_create_revision(client):
     sv = await _create_shared_value(client)
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     rev = await _create_revision(client, sv["id"], svc["id"], env["id"], "secret123")
     assert_that(rev["sharedValue"]["id"]).described_as("revision shared value id").is_equal_to(
@@ -325,8 +294,8 @@ async def test_create_revision(client):
 
 async def test_new_revision_replaces_current(client):
     sv = await _create_shared_value(client)
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     rev1 = await _create_revision(client, sv["id"], svc["id"], env["id"], "v1")
     rev2 = await _create_revision(client, sv["id"], svc["id"], env["id"], "v2")
@@ -347,9 +316,9 @@ async def test_new_revision_replaces_current(client):
 
 async def test_revisions_scoped_by_service_and_environment(client):
     sv = await _create_shared_value(client)
-    svc1 = await _create_service(client, "traefik")
-    svc2 = await _create_service(client, "nginx")
-    env = await _create_environment(client)
+    svc1 = await create_service(client, "traefik")
+    svc2 = await create_service(client, "nginx")
+    env = await create_environment(client)
 
     await _create_revision(client, sv["id"], svc1["id"], env["id"], "val-svc1")
     await _create_revision(client, sv["id"], svc2["id"], env["id"], "val-svc2")
@@ -358,7 +327,7 @@ async def test_revisions_scoped_by_service_and_environment(client):
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "serviceId": svc1["id"]}
     )
-    revisions = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc1").is_length(1)
     assert_that(revisions).extracting("value").described_as(
         "svc1 revision value"
@@ -368,7 +337,7 @@ async def test_revisions_scoped_by_service_and_environment(client):
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "serviceId": svc2["id"]}
     )
-    revisions = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc2").is_length(1)
     assert_that(revisions).extracting("value").described_as(
         "svc2 revision value"
@@ -377,8 +346,8 @@ async def test_revisions_scoped_by_service_and_environment(client):
 
 async def test_revisions_current_only_filter(client):
     sv = await _create_shared_value(client)
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     await _create_revision(client, sv["id"], svc["id"], env["id"], "v1")
     await _create_revision(client, sv["id"], svc["id"], env["id"], "v2")
@@ -392,7 +361,7 @@ async def test_revisions_current_only_filter(client):
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "currentOnly": True}
     )
-    current_revs = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    current_revs = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(current_revs).described_as("current-only revisions count").is_length(1)
     assert_that(current_revs).extracting("value").described_as(
         "current revision value"
@@ -404,8 +373,8 @@ async def test_revisions_current_only_filter(client):
 
 async def test_revisions_pagination(client):
     sv = await _create_shared_value(client)
-    svc = await _create_service(client)
-    env = await _create_environment(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
 
     for i in range(5):
         await _create_revision(client, sv["id"], svc["id"], env["id"], f"v{i}")
@@ -444,9 +413,9 @@ async def test_revisions_pagination(client):
 
 async def test_revisions_filter_by_environment(client):
     sv = await _create_shared_value(client)
-    svc = await _create_service(client)
-    env1 = await _create_environment(client, "production")
-    env2 = await _create_environment(client, "staging")
+    svc = await create_service(client)
+    env1 = await create_environment(client, "production")
+    env2 = await create_environment(client, "staging")
 
     await _create_revision(client, sv["id"], svc["id"], env1["id"], "prod-val")
     await _create_revision(client, sv["id"], svc["id"], env2["id"], "staging-val")
@@ -454,7 +423,7 @@ async def test_revisions_filter_by_environment(client):
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "environmentId": env1["id"]}
     )
-    revisions = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by production env").is_length(1)
     assert_that(revisions).extracting("value").described_as(
         "production revision value"
