@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from assertpy import assert_that
 from conftest import gql
 
@@ -109,6 +111,14 @@ query SharedValueWithRevisions(
 # -- Helpers --
 
 
+def _parse_dt(iso_string):
+    return datetime.fromisoformat(iso_string)
+
+
+def _nodes(edges):
+    return [e["node"] for e in edges]
+
+
 async def _create_shared_value(client, name="db_password"):
     body = await gql(client, CREATE_SHARED_VALUE, {"input": {"name": name}})
     return body["data"]["createSharedValue"]
@@ -145,10 +155,12 @@ async def _create_revision(client, shared_value_id, service_id, environment_id, 
 
 async def test_create_shared_value(client):
     sv = await _create_shared_value(client, "db_password")
-    assert_that(sv["name"], "shared value name").is_equal_to("db_password")
-    assert_that(sv["id"], "shared value id").is_not_none()
-    assert_that(sv["createdAt"], "createdAt timestamp").is_not_none()
-    assert_that(sv["archivedAt"], "new shared value should not be archived").is_none()
+    assert_that(sv["name"]).described_as("shared value name").is_equal_to("db_password")
+    assert_that(sv["id"]).described_as("shared value id").is_not_none()
+    assert_that(sv["createdAt"]).described_as("createdAt timestamp").is_not_none()
+    assert_that(sv["archivedAt"]).described_as(
+        "new shared value should not be archived"
+    ).is_none()
 
 
 async def test_create_shared_value_duplicate_name(client):
@@ -159,20 +171,20 @@ async def test_create_shared_value_duplicate_name(client):
         {"input": {"name": "db_password"}},
         expect_errors=True,
     )
-    assert_that(body, "duplicate name should return errors").contains_key("errors")
+    assert_that(body).described_as("duplicate name should return errors").contains_key("errors")
 
 
 async def test_shared_value_by_id(client):
     sv = await _create_shared_value(client)
     body = await gql(client, SHARED_VALUE, {"id": sv["id"]})
     found = body["data"]["sharedValue"]
-    assert_that(found["id"], "fetched shared value id").is_equal_to(sv["id"])
-    assert_that(found["name"], "fetched shared value name").is_equal_to(sv["name"])
+    assert_that(found["id"]).described_as("fetched shared value id").is_equal_to(sv["id"])
+    assert_that(found["name"]).described_as("fetched shared value name").is_equal_to(sv["name"])
 
 
 async def test_shared_value_by_id_not_found(client):
     body = await gql(client, SHARED_VALUE, {"id": "00000000-0000-0000-0000-ffffffffffff"})
-    assert_that(body["data"]["sharedValue"], "non-existent id should return null").is_none()
+    assert_that(body["data"]["sharedValue"]).described_as("non-existent id").is_none()
 
 
 async def test_shared_values_list(client):
@@ -180,9 +192,9 @@ async def test_shared_values_list(client):
     await _create_shared_value(client, "api_key")
 
     body = await gql(client, SHARED_VALUES)
-    edges = body["data"]["sharedValues"]["edges"]
-    names = [e["node"]["name"] for e in edges]
-    assert_that(names, "shared values list").contains("db_password", "api_key")
+    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+        "shared values list"
+    ).extracting("name").contains("db_password", "api_key")
 
 
 async def test_update_shared_value(client):
@@ -194,8 +206,10 @@ async def test_update_shared_value(client):
         {"input": {"id": sv["id"], "name": "db_pass"}},
     )
     updated = body["data"]["updateSharedValue"]
-    assert_that(updated["name"], "name updated").is_equal_to("db_pass")
-    assert_that(updated["updatedAt"], "updatedAt advanced").is_greater_than_or_equal_to(sv["updatedAt"])
+    assert_that(updated["name"]).described_as("name updated").is_equal_to("db_pass")
+    assert_that(_parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
+        _parse_dt(sv["updatedAt"])
+    )
 
 
 async def test_update_archived_shared_value_fails(client):
@@ -208,7 +222,7 @@ async def test_update_archived_shared_value_fails(client):
         {"input": {"id": sv["id"], "name": "new_name"}},
         expect_errors=True,
     )
-    assert_that(body, "updating archived shared value should return errors").contains_key("errors")
+    assert_that(body).described_as("updating archived shared value").contains_key("errors")
 
 
 async def test_archive_shared_value(client):
@@ -216,7 +230,7 @@ async def test_archive_shared_value(client):
 
     body = await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
     archived = body["data"]["archiveSharedValue"]
-    assert_that(archived["archivedAt"], "archivedAt should be set").is_not_none()
+    assert_that(archived["archivedAt"]).described_as("archivedAt should be set").is_not_none()
 
 
 async def test_archive_hides_from_list(client):
@@ -224,8 +238,9 @@ async def test_archive_hides_from_list(client):
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(client, SHARED_VALUES)
-    ids = [e["node"]["id"] for e in body["data"]["sharedValues"]["edges"]]
-    assert_that(ids, "archived shared value hidden from default list").does_not_contain(sv["id"])
+    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+        "archived shared value hidden from default list"
+    ).extracting("id").does_not_contain(sv["id"])
 
 
 async def test_include_archived(client):
@@ -233,8 +248,9 @@ async def test_include_archived(client):
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(client, SHARED_VALUES, {"includeArchived": True})
-    ids = [e["node"]["id"] for e in body["data"]["sharedValues"]["edges"]]
-    assert_that(ids, "archived shared value visible with includeArchived").contains(sv["id"])
+    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+        "archived shared value visible with includeArchived"
+    ).extracting("id").contains(sv["id"])
 
 
 async def test_unarchive_shared_value(client):
@@ -243,11 +259,14 @@ async def test_unarchive_shared_value(client):
 
     body = await gql(client, UNARCHIVE_SHARED_VALUE, {"id": sv["id"]})
     restored = body["data"]["unarchiveSharedValue"]
-    assert_that(restored["archivedAt"], "archivedAt cleared after unarchive").is_none()
+    assert_that(restored["archivedAt"]).described_as(
+        "archivedAt cleared after unarchive"
+    ).is_none()
 
     body = await gql(client, SHARED_VALUES)
-    ids = [e["node"]["id"] for e in body["data"]["sharedValues"]["edges"]]
-    assert_that(ids, "unarchived shared value visible in default list").contains(sv["id"])
+    assert_that(_nodes(body["data"]["sharedValues"]["edges"])).described_as(
+        "unarchived shared value visible in default list"
+    ).extracting("id").contains(sv["id"])
 
 
 async def test_search_by_name(client):
@@ -256,8 +275,10 @@ async def test_search_by_name(client):
 
     body = await gql(client, SHARED_VALUES, {"search": "db_pass"})
     edges = body["data"]["sharedValues"]["edges"]
-    assert_that(edges, "search by name result count").is_length(1)
-    assert_that(edges[0]["node"]["name"], "matched shared value name").is_equal_to("db_password")
+    assert_that(edges).described_as("search by name result count").is_length(1)
+    assert_that(edges[0]["node"]["name"]).described_as("matched shared value name").is_equal_to(
+        "db_password"
+    )
 
 
 async def test_pagination(client):
@@ -266,18 +287,20 @@ async def test_pagination(client):
 
     body = await gql(client, SHARED_VALUES, {"first": 2})
     page1 = body["data"]["sharedValues"]
-    assert_that(page1["edges"], "page 1 edge count").is_length(2)
-    assert_that(page1["pageInfo"]["hasNextPage"], "page 1 has next page").is_true()
+    assert_that(page1["edges"]).described_as("page 1 edge count").is_length(2)
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as("page 1 has next page").is_true()
 
     body = await gql(client, SHARED_VALUES, {"first": 2, "after": page1["pageInfo"]["endCursor"]})
     page2 = body["data"]["sharedValues"]
-    assert_that(page2["edges"], "page 2 edge count").is_length(2)
-    assert_that(page2["pageInfo"]["hasNextPage"], "page 2 has next page").is_true()
+    assert_that(page2["edges"]).described_as("page 2 edge count").is_length(2)
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as("page 2 has next page").is_true()
 
     body = await gql(client, SHARED_VALUES, {"first": 2, "after": page2["pageInfo"]["endCursor"]})
     page3 = body["data"]["sharedValues"]
-    assert_that(page3["edges"], "page 3 edge count").is_length(1)
-    assert_that(page3["pageInfo"]["hasNextPage"], "page 3 has no next page").is_false()
+    assert_that(page3["edges"]).described_as("page 3 edge count").is_length(1)
+    assert_that(page3["pageInfo"]["hasNextPage"]).described_as(
+        "page 3 has no next page"
+    ).is_false()
 
 
 # -- Revision Tests --
@@ -289,11 +312,15 @@ async def test_create_revision(client):
     env = await _create_environment(client)
 
     rev = await _create_revision(client, sv["id"], svc["id"], env["id"], "secret123")
-    assert_that(rev["sharedValue"]["id"], "revision shared value id").is_equal_to(sv["id"])
-    assert_that(rev["serviceId"]["id"], "revision service id").is_equal_to(svc["id"])
-    assert_that(rev["environmentId"]["id"], "revision environment id").is_equal_to(env["id"])
-    assert_that(rev["value"], "revision value").is_equal_to("secret123")
-    assert_that(rev["isCurrent"], "new revision should be current").is_true()
+    assert_that(rev["sharedValue"]["id"]).described_as("revision shared value id").is_equal_to(
+        sv["id"]
+    )
+    assert_that(rev["serviceId"]["id"]).described_as("revision service id").is_equal_to(svc["id"])
+    assert_that(rev["environmentId"]["id"]).described_as("revision environment id").is_equal_to(
+        env["id"]
+    )
+    assert_that(rev["value"]).described_as("revision value").is_equal_to("secret123")
+    assert_that(rev["isCurrent"]).described_as("new revision should be current").is_true()
 
 
 async def test_new_revision_replaces_current(client):
@@ -304,14 +331,18 @@ async def test_new_revision_replaces_current(client):
     rev1 = await _create_revision(client, sv["id"], svc["id"], env["id"], "v1")
     rev2 = await _create_revision(client, sv["id"], svc["id"], env["id"], "v2")
 
-    assert_that(rev2["isCurrent"], "newest revision should be current").is_true()
+    assert_that(rev2["isCurrent"]).described_as("newest revision should be current").is_true()
 
     # Check all revisions — rev1 should no longer be current
     body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
     revisions = body["data"]["sharedValue"]["revisions"]["edges"]
     by_id = {e["node"]["id"]: e["node"] for e in revisions}
-    assert_that(by_id[rev1["id"]]["isCurrent"], "old revision no longer current").is_false()
-    assert_that(by_id[rev2["id"]]["isCurrent"], "new revision is current").is_true()
+    assert_that(by_id[rev1["id"]]["isCurrent"]).described_as(
+        "old revision no longer current"
+    ).is_false()
+    assert_that(by_id[rev2["id"]]["isCurrent"]).described_as(
+        "new revision is current"
+    ).is_true()
 
 
 async def test_revisions_scoped_by_service_and_environment(client):
@@ -327,17 +358,21 @@ async def test_revisions_scoped_by_service_and_environment(client):
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "serviceId": svc1["id"]}
     )
-    revisions = body["data"]["sharedValue"]["revisions"]["edges"]
-    assert_that(revisions, "revisions filtered by svc1").is_length(1)
-    assert_that(revisions[0]["node"]["value"], "svc1 revision value").is_equal_to("val-svc1")
+    revisions = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions).described_as("revisions filtered by svc1").is_length(1)
+    assert_that(revisions).extracting("value").described_as(
+        "svc1 revision value"
+    ).contains("val-svc1")
 
     # Filter by svc2
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "serviceId": svc2["id"]}
     )
-    revisions = body["data"]["sharedValue"]["revisions"]["edges"]
-    assert_that(revisions, "revisions filtered by svc2").is_length(1)
-    assert_that(revisions[0]["node"]["value"], "svc2 revision value").is_equal_to("val-svc2")
+    revisions = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions).described_as("revisions filtered by svc2").is_length(1)
+    assert_that(revisions).extracting("value").described_as(
+        "svc2 revision value"
+    ).contains("val-svc2")
 
 
 async def test_revisions_current_only_filter(client):
@@ -351,16 +386,20 @@ async def test_revisions_current_only_filter(client):
     # All revisions
     body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
     all_revs = body["data"]["sharedValue"]["revisions"]["edges"]
-    assert_that(all_revs, "all revisions count").is_length(2)
+    assert_that(all_revs).described_as("all revisions count").is_length(2)
 
     # Current only
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "currentOnly": True}
     )
-    current_revs = body["data"]["sharedValue"]["revisions"]["edges"]
-    assert_that(current_revs, "current-only revisions count").is_length(1)
-    assert_that(current_revs[0]["node"]["value"], "current revision value").is_equal_to("v2")
-    assert_that(current_revs[0]["node"]["isCurrent"], "current revision flag").is_true()
+    current_revs = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(current_revs).described_as("current-only revisions count").is_length(1)
+    assert_that(current_revs).extracting("value").described_as(
+        "current revision value"
+    ).contains("v2")
+    assert_that(current_revs).extracting("isCurrent").described_as(
+        "current revision flag"
+    ).contains(True)
 
 
 async def test_revisions_pagination(client):
@@ -375,8 +414,10 @@ async def test_revisions_pagination(client):
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "first": 2}
     )
     page1 = body["data"]["sharedValue"]["revisions"]
-    assert_that(page1["edges"], "revision page 1 edge count").is_length(2)
-    assert_that(page1["pageInfo"]["hasNextPage"], "revision page 1 has next page").is_true()
+    assert_that(page1["edges"]).described_as("revision page 1 edge count").is_length(2)
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
+        "revision page 1 has next page"
+    ).is_true()
 
     body = await gql(
         client,
@@ -384,8 +425,10 @@ async def test_revisions_pagination(client):
         {"id": sv["id"], "first": 2, "after": page1["pageInfo"]["endCursor"]},
     )
     page2 = body["data"]["sharedValue"]["revisions"]
-    assert_that(page2["edges"], "revision page 2 edge count").is_length(2)
-    assert_that(page2["pageInfo"]["hasNextPage"], "revision page 2 has next page").is_true()
+    assert_that(page2["edges"]).described_as("revision page 2 edge count").is_length(2)
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
+        "revision page 2 has next page"
+    ).is_true()
 
     body = await gql(
         client,
@@ -393,8 +436,10 @@ async def test_revisions_pagination(client):
         {"id": sv["id"], "first": 2, "after": page2["pageInfo"]["endCursor"]},
     )
     page3 = body["data"]["sharedValue"]["revisions"]
-    assert_that(page3["edges"], "revision page 3 edge count").is_length(1)
-    assert_that(page3["pageInfo"]["hasNextPage"], "revision page 3 has no next page").is_false()
+    assert_that(page3["edges"]).described_as("revision page 3 edge count").is_length(1)
+    assert_that(page3["pageInfo"]["hasNextPage"]).described_as(
+        "revision page 3 has no next page"
+    ).is_false()
 
 
 async def test_revisions_filter_by_environment(client):
@@ -409,6 +454,8 @@ async def test_revisions_filter_by_environment(client):
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "environmentId": env1["id"]}
     )
-    revisions = body["data"]["sharedValue"]["revisions"]["edges"]
-    assert_that(revisions, "revisions filtered by production env").is_length(1)
-    assert_that(revisions[0]["node"]["value"], "production revision value").is_equal_to("prod-val")
+    revisions = _nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions).described_as("revisions filtered by production env").is_length(1)
+    assert_that(revisions).extracting("value").described_as(
+        "production revision value"
+    ).contains("prod-val")

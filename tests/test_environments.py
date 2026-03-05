@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from assertpy import assert_that
 from conftest import gql
 
@@ -61,6 +63,14 @@ query Environment($id: ID!) {
 # -- Helpers --
 
 
+def _parse_dt(iso_string):
+    return datetime.fromisoformat(iso_string)
+
+
+def _nodes(edges):
+    return [e["node"] for e in edges]
+
+
 async def _create_environment(client, name="production", description=None):
     body = await gql(
         client, CREATE_ENVIRONMENT, {"input": {"name": name, "description": description}}
@@ -73,18 +83,22 @@ async def _create_environment(client, name="production", description=None):
 
 async def test_create_environment(client):
     env = await _create_environment(client, "production", "prod cluster")
-    assert_that(env["name"], "environment name").is_equal_to("production")
-    assert_that(env["description"], "environment description").is_equal_to("prod cluster")
-    assert_that(env["id"], "environment id").is_not_none()
-    assert_that(env["createdAt"], "createdAt timestamp").is_not_none()
-    assert_that(env["updatedAt"], "updatedAt timestamp").is_not_none()
-    assert_that(env["archivedAt"], "new environment should not be archived").is_none()
+    assert_that(env["name"]).described_as("environment name").is_equal_to("production")
+    assert_that(env["description"]).described_as("environment description").is_equal_to(
+        "prod cluster"
+    )
+    assert_that(env["id"]).described_as("environment id").is_not_none()
+    assert_that(env["createdAt"]).described_as("createdAt timestamp").is_not_none()
+    assert_that(env["updatedAt"]).described_as("updatedAt timestamp").is_not_none()
+    assert_that(env["archivedAt"]).described_as(
+        "new environment should not be archived"
+    ).is_none()
 
 
 async def test_create_environment_minimal(client):
     env = await _create_environment(client, "staging")
-    assert_that(env["name"], "environment name").is_equal_to("staging")
-    assert_that(env["description"], "description should be null when not provided").is_none()
+    assert_that(env["name"]).described_as("environment name").is_equal_to("staging")
+    assert_that(env["description"]).described_as("description when not provided").is_none()
 
 
 async def test_create_environment_duplicate_name(client):
@@ -95,20 +109,20 @@ async def test_create_environment_duplicate_name(client):
         {"input": {"name": "production"}},
         expect_errors=True,
     )
-    assert_that(body, "duplicate name should return errors").contains_key("errors")
+    assert_that(body).described_as("duplicate name should return errors").contains_key("errors")
 
 
 async def test_environment_by_id(client):
     env = await _create_environment(client)
     body = await gql(client, ENVIRONMENT, {"id": env["id"]})
     found = body["data"]["environment"]
-    assert_that(found["id"], "fetched environment id").is_equal_to(env["id"])
-    assert_that(found["name"], "fetched environment name").is_equal_to(env["name"])
+    assert_that(found["id"]).described_as("fetched environment id").is_equal_to(env["id"])
+    assert_that(found["name"]).described_as("fetched environment name").is_equal_to(env["name"])
 
 
 async def test_environment_by_id_not_found(client):
     body = await gql(client, ENVIRONMENT, {"id": "00000000-0000-0000-0000-ffffffffffff"})
-    assert_that(body["data"]["environment"], "non-existent id should return null").is_none()
+    assert_that(body["data"]["environment"]).described_as("non-existent id").is_none()
 
 
 async def test_environments_list(client):
@@ -116,16 +130,16 @@ async def test_environments_list(client):
     await _create_environment(client, "staging")
 
     body = await gql(client, ENVIRONMENTS)
-    edges = body["data"]["environments"]["edges"]
-    names = [e["node"]["name"] for e in edges]
-    assert_that(names, "environments list").contains("production", "staging")
+    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+        "environments list"
+    ).extracting("name").contains("production", "staging")
 
 
 async def test_environments_excludes_sentinel(client):
     body = await gql(client, ENVIRONMENTS)
-    edges = body["data"]["environments"]["edges"]
-    names = [e["node"]["name"] for e in edges]
-    assert_that(names, "sentinel row should be hidden").does_not_contain("_global")
+    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+        "sentinel row should be hidden"
+    ).extracting("name").does_not_contain("_global")
 
 
 async def test_update_environment(client):
@@ -137,9 +151,13 @@ async def test_update_environment(client):
         {"input": {"id": env["id"], "description": "prod cluster"}},
     )
     updated = body["data"]["updateEnvironment"]
-    assert_that(updated["name"], "name unchanged").is_equal_to("production")
-    assert_that(updated["description"], "description updated").is_equal_to("prod cluster")
-    assert_that(updated["updatedAt"], "updatedAt advanced").is_greater_than_or_equal_to(env["updatedAt"])
+    assert_that(updated["name"]).described_as("name unchanged").is_equal_to("production")
+    assert_that(updated["description"]).described_as("description updated").is_equal_to(
+        "prod cluster"
+    )
+    assert_that(_parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
+        _parse_dt(env["updatedAt"])
+    )
 
 
 async def test_update_environment_partial(client):
@@ -151,8 +169,10 @@ async def test_update_environment_partial(client):
         {"input": {"id": env["id"], "name": "prod"}},
     )
     updated = body["data"]["updateEnvironment"]
-    assert_that(updated["name"], "name updated").is_equal_to("prod")
-    assert_that(updated["description"], "description preserved").is_equal_to("original description")
+    assert_that(updated["name"]).described_as("name updated").is_equal_to("prod")
+    assert_that(updated["description"]).described_as("description preserved").is_equal_to(
+        "original description"
+    )
 
 
 async def test_update_archived_environment_fails(client):
@@ -165,7 +185,7 @@ async def test_update_archived_environment_fails(client):
         {"input": {"id": env["id"], "name": "new-name"}},
         expect_errors=True,
     )
-    assert_that(body, "updating archived environment should return errors").contains_key("errors")
+    assert_that(body).described_as("updating archived environment").contains_key("errors")
 
 
 async def test_archive_environment(client):
@@ -173,7 +193,7 @@ async def test_archive_environment(client):
 
     body = await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
     archived = body["data"]["archiveEnvironment"]
-    assert_that(archived["archivedAt"], "archivedAt should be set").is_not_none()
+    assert_that(archived["archivedAt"]).described_as("archivedAt should be set").is_not_none()
 
 
 async def test_archive_hides_from_list(client):
@@ -181,9 +201,9 @@ async def test_archive_hides_from_list(client):
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(client, ENVIRONMENTS)
-    edges = body["data"]["environments"]["edges"]
-    ids = [e["node"]["id"] for e in edges]
-    assert_that(ids, "archived environment hidden from default list").does_not_contain(env["id"])
+    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+        "archived environment hidden from default list"
+    ).extracting("id").does_not_contain(env["id"])
 
 
 async def test_include_archived(client):
@@ -191,9 +211,9 @@ async def test_include_archived(client):
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(client, ENVIRONMENTS, {"includeArchived": True})
-    edges = body["data"]["environments"]["edges"]
-    ids = [e["node"]["id"] for e in edges]
-    assert_that(ids, "archived environment visible with includeArchived").contains(env["id"])
+    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+        "archived environment visible with includeArchived"
+    ).extracting("id").contains(env["id"])
 
 
 async def test_unarchive_environment(client):
@@ -202,11 +222,14 @@ async def test_unarchive_environment(client):
 
     body = await gql(client, UNARCHIVE_ENVIRONMENT, {"id": env["id"]})
     restored = body["data"]["unarchiveEnvironment"]
-    assert_that(restored["archivedAt"], "archivedAt cleared after unarchive").is_none()
+    assert_that(restored["archivedAt"]).described_as(
+        "archivedAt cleared after unarchive"
+    ).is_none()
 
     body = await gql(client, ENVIRONMENTS)
-    ids = [e["node"]["id"] for e in body["data"]["environments"]["edges"]]
-    assert_that(ids, "unarchived environment visible in default list").contains(env["id"])
+    assert_that(_nodes(body["data"]["environments"]["edges"])).described_as(
+        "unarchived environment visible in default list"
+    ).extracting("id").contains(env["id"])
 
 
 async def test_search_by_name(client):
@@ -215,8 +238,10 @@ async def test_search_by_name(client):
 
     body = await gql(client, ENVIRONMENTS, {"search": "production"})
     edges = body["data"]["environments"]["edges"]
-    assert_that(edges, "search by name result count").is_length(1)
-    assert_that(edges[0]["node"]["name"], "matched environment name").is_equal_to("production")
+    assert_that(edges).described_as("search by name result count").is_length(1)
+    assert_that(edges[0]["node"]["name"]).described_as("matched environment name").is_equal_to(
+        "production"
+    )
 
 
 async def test_search_by_description(client):
@@ -225,8 +250,10 @@ async def test_search_by_description(client):
 
     body = await gql(client, ENVIRONMENTS, {"search": "test environment"})
     edges = body["data"]["environments"]["edges"]
-    assert_that(edges, "search by description result count").is_length(1)
-    assert_that(edges[0]["node"]["name"], "matched environment name").is_equal_to("staging")
+    assert_that(edges).described_as("search by description result count").is_length(1)
+    assert_that(edges[0]["node"]["name"]).described_as("matched environment name").is_equal_to(
+        "staging"
+    )
 
 
 async def test_search_case_insensitive(client):
@@ -234,7 +261,7 @@ async def test_search_case_insensitive(client):
 
     body = await gql(client, ENVIRONMENTS, {"search": "production"})
     edges = body["data"]["environments"]["edges"]
-    assert_that(edges, "case-insensitive search result count").is_length(1)
+    assert_that(edges).described_as("case-insensitive search result count").is_length(1)
 
 
 async def test_pagination(client):
@@ -243,18 +270,20 @@ async def test_pagination(client):
 
     body = await gql(client, ENVIRONMENTS, {"first": 2})
     page1 = body["data"]["environments"]
-    assert_that(page1["edges"], "page 1 edge count").is_length(2)
-    assert_that(page1["pageInfo"]["hasNextPage"], "page 1 has next page").is_true()
+    assert_that(page1["edges"]).described_as("page 1 edge count").is_length(2)
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as("page 1 has next page").is_true()
 
     body = await gql(client, ENVIRONMENTS, {"first": 2, "after": page1["pageInfo"]["endCursor"]})
     page2 = body["data"]["environments"]
-    assert_that(page2["edges"], "page 2 edge count").is_length(2)
-    assert_that(page2["pageInfo"]["hasNextPage"], "page 2 has next page").is_true()
+    assert_that(page2["edges"]).described_as("page 2 edge count").is_length(2)
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as("page 2 has next page").is_true()
 
     body = await gql(client, ENVIRONMENTS, {"first": 2, "after": page2["pageInfo"]["endCursor"]})
     page3 = body["data"]["environments"]
-    assert_that(page3["edges"], "page 3 edge count").is_length(1)
-    assert_that(page3["pageInfo"]["hasNextPage"], "page 3 has no next page").is_false()
+    assert_that(page3["edges"]).described_as("page 3 edge count").is_length(1)
+    assert_that(page3["pageInfo"]["hasNextPage"]).described_as(
+        "page 3 has no next page"
+    ).is_false()
 
 
 async def test_pagination_with_search(client):
@@ -264,15 +293,21 @@ async def test_pagination_with_search(client):
 
     body = await gql(client, ENVIRONMENTS, {"search": "alpha", "first": 2})
     page1 = body["data"]["environments"]
-    assert_that(page1["edges"], "search page 1 edge count").is_length(2)
-    assert_that(page1["pageInfo"]["hasNextPage"], "search page 1 has next page").is_true()
+    assert_that(page1["edges"]).described_as("search page 1 edge count").is_length(2)
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
+        "search page 1 has next page"
+    ).is_true()
 
     body = await gql(
-        client, ENVIRONMENTS, {"search": "alpha", "first": 2, "after": page1["pageInfo"]["endCursor"]}
+        client,
+        ENVIRONMENTS,
+        {"search": "alpha", "first": 2, "after": page1["pageInfo"]["endCursor"]},
     )
     page2 = body["data"]["environments"]
-    assert_that(page2["edges"], "search page 2 edge count").is_length(2)
-    assert_that(page2["pageInfo"]["hasNextPage"], "search page 2 has no next page").is_false()
+    assert_that(page2["edges"]).described_as("search page 2 edge count").is_length(2)
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
+        "search page 2 has no next page"
+    ).is_false()
 
 
 async def test_cursor_invalid_with_changed_search(client):
@@ -288,4 +323,4 @@ async def test_cursor_invalid_with_changed_search(client):
         {"search": "other", "first": 1, "after": cursor},
         expect_errors=True,
     )
-    assert_that(body, "mismatched search cursor should return errors").contains_key("errors")
+    assert_that(body).described_as("mismatched search cursor").contains_key("errors")
