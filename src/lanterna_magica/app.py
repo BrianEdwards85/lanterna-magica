@@ -1,18 +1,14 @@
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-from ariadne import QueryType, load_schema_from_path, make_executable_schema
-from ariadne.asgi import GraphQL
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.types import Receive, Scope, Send
 
 from lanterna_magica.db import apply_migrations, create_pool
+from lanterna_magica.resolvers import create_gql
 
 logger = logging.getLogger(__name__)
-
-SCHEMA_DIR = Path(__file__).resolve().parent / "schema"
 
 
 class _GraphQLProxy:
@@ -25,29 +21,12 @@ class _GraphQLProxy:
         await self._app.state.graphql(scope, receive, send)
 
 
-def _create_graphql(pool) -> GraphQL:
-    type_defs = load_schema_from_path(str(SCHEMA_DIR))
-    query = QueryType()
-
-    @query.field("hello")
-    async def resolve_hello(_obj, info):
-        async with info.context["pool"].acquire() as conn:
-            row = await conn.fetchval("SELECT 1")
-        return f"lanterna-magica is alive (db={row})"
-
-    schema = make_executable_schema(type_defs, query, convert_names_case=True)
-    return GraphQL(
-        schema,
-        context_value=lambda request, _data=None: {"pool": pool},
-    )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     apply_migrations()
     pool = await create_pool()
     app.state.pool = pool
-    app.state.graphql = _create_graphql(pool)
+    app.state.graphql = create_gql(pool)
     logger.info("lanterna-magica started")
     yield
     await pool.close()

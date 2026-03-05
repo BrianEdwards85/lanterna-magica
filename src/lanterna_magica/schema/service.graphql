@@ -1,0 +1,46 @@
+type Service {
+  id: ID!
+  name: String!
+  description: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  archivedAt: DateTime
+}
+
+type ServiceEdge {
+  node: Service!
+  cursor: String!
+}
+
+type ServiceConnection {
+  edges: [ServiceEdge!]!
+  pageInfo: PageInfo!
+}
+
+input CreateServiceInput {
+  name: String!
+  description: String
+}
+
+input UpdateServiceInput {
+  id: ID!
+  name: String
+  description: String
+}
+
+extend type Query {
+  services(
+    includeArchived: Boolean
+    first: Int
+    after: String
+    search: String
+  ): ServiceConnection!
+  service(id: ID!): Service
+}
+
+extend type Mutation {
+  createService(input: CreateServiceInput!): Service!
+  updateService(input: UpdateServiceInput!): Service!
+  archiveService(id: ID!): Service!
+  unarchiveService(id: ID!): Service!
+}
