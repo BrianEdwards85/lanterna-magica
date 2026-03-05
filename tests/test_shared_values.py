@@ -1,6 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
-from utils import create_environment, create_service, nodes, parse_dt
+from utils import create_environment, create_revision, create_service, nodes, parse_dt
 
 # -- Mutations --
 
@@ -32,14 +32,6 @@ UNARCHIVE_SHARED_VALUE = """
 mutation UnarchiveSharedValue($id: ID!) {
     unarchiveSharedValue(id: $id) {
         id name archivedAt
-    }
-}
-"""
-
-CREATE_REVISION = """
-mutation CreateSharedValueRevision($input: CreateSharedValueRevisionInput!) {
-    createSharedValueRevision(input: $input) {
-        id sharedValue { id } serviceId { id } environmentId { id } value isCurrent createdAt
     }
 }
 """
@@ -103,20 +95,6 @@ async def _create_shared_value(client, name="db_password"):
     return body["data"]["createSharedValue"]
 
 
-async def _create_revision(client, shared_value_id, service_id, environment_id, value):
-    body = await gql(
-        client,
-        CREATE_REVISION,
-        {
-            "input": {
-                "sharedValueId": shared_value_id,
-                "serviceId": service_id,
-                "environmentId": environment_id,
-                "value": value,
-            }
-        },
-    )
-    return body["data"]["createSharedValueRevision"]
 
 
 # -- Shared Value CRUD Tests --
@@ -275,12 +253,12 @@ async def test_pagination(client):
 # -- Revision Tests --
 
 
-async def test_create_revision(client):
+async def testcreate_revision(client):
     sv = await _create_shared_value(client)
     svc = await create_service(client)
     env = await create_environment(client)
 
-    rev = await _create_revision(client, sv["id"], svc["id"], env["id"], "secret123")
+    rev = await create_revision(client, sv["id"], svc["id"], env["id"], "secret123")
     assert_that(rev["sharedValue"]["id"]).described_as("revision shared value id").is_equal_to(
         sv["id"]
     )
@@ -297,8 +275,8 @@ async def test_new_revision_replaces_current(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    rev1 = await _create_revision(client, sv["id"], svc["id"], env["id"], "v1")
-    rev2 = await _create_revision(client, sv["id"], svc["id"], env["id"], "v2")
+    rev1 = await create_revision(client, sv["id"], svc["id"], env["id"], "v1")
+    rev2 = await create_revision(client, sv["id"], svc["id"], env["id"], "v2")
 
     assert_that(rev2["isCurrent"]).described_as("newest revision should be current").is_true()
 
@@ -320,8 +298,8 @@ async def test_revisions_scoped_by_service_and_environment(client):
     svc2 = await create_service(client, "nginx")
     env = await create_environment(client)
 
-    await _create_revision(client, sv["id"], svc1["id"], env["id"], "val-svc1")
-    await _create_revision(client, sv["id"], svc2["id"], env["id"], "val-svc2")
+    await create_revision(client, sv["id"], svc1["id"], env["id"], "val-svc1")
+    await create_revision(client, sv["id"], svc2["id"], env["id"], "val-svc2")
 
     # Filter by svc1
     body = await gql(
@@ -349,8 +327,8 @@ async def test_revisions_current_only_filter(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    await _create_revision(client, sv["id"], svc["id"], env["id"], "v1")
-    await _create_revision(client, sv["id"], svc["id"], env["id"], "v2")
+    await create_revision(client, sv["id"], svc["id"], env["id"], "v1")
+    await create_revision(client, sv["id"], svc["id"], env["id"], "v2")
 
     # All revisions
     body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
@@ -377,7 +355,7 @@ async def test_revisions_pagination(client):
     env = await create_environment(client)
 
     for i in range(5):
-        await _create_revision(client, sv["id"], svc["id"], env["id"], f"v{i}")
+        await create_revision(client, sv["id"], svc["id"], env["id"], f"v{i}")
 
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "first": 2}
@@ -417,8 +395,8 @@ async def test_revisions_filter_by_environment(client):
     env1 = await create_environment(client, "production")
     env2 = await create_environment(client, "staging")
 
-    await _create_revision(client, sv["id"], svc["id"], env1["id"], "prod-val")
-    await _create_revision(client, sv["id"], svc["id"], env2["id"], "staging-val")
+    await create_revision(client, sv["id"], svc["id"], env1["id"], "prod-val")
+    await create_revision(client, sv["id"], svc["id"], env2["id"], "staging-val")
 
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "environmentId": env1["id"]}

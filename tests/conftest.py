@@ -18,8 +18,6 @@ from lanterna_magica.app import app
 from lanterna_magica.db import apply_migrations, create_pool
 from lanterna_magica.resolvers import create_gql
 
-TABLES = ["services"]
-
 apply_migrations()
 
 
