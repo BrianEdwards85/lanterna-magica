@@ -25,9 +25,9 @@ type SharedValueConnection {
 
 type SharedValueRevision {
   id: ID!
-  sharedValueId: ID!
-  serviceId: ID!
-  environmentId: ID!
+  sharedValue: SharedValue!
+  serviceId: Service!
+  environmentId: Environment!
   value: JSON!
   isCurrent: Boolean!
   createdAt: DateTime!

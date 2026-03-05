@@ -36,9 +36,9 @@ class SharedValuesResolver:
 
     async def resolve_create_shared_value_revision(self, _obj, info, *, input):
         return await self.shared_values.create_revision(
-            shared_value_id=input["sharedValueId"],
-            service_id=input["serviceId"],
-            environment_id=input["environmentId"],
+            shared_value_id=input["shared_value_id"],
+            service_id=input["service_id"],
+            environment_id=input["environment_id"],
             value=input["value"],
         )
 
@@ -54,6 +54,17 @@ class SharedValuesResolver:
             after=after,
         )
 
+    # -- SharedValueRevision field resolvers --
+
+    async def resolve_revision_shared_value(self, obj, info):
+        return await info.context["shared_value_loader"].load(str(obj["shared_value_id"]))
+
+    async def resolve_revision_service(self, obj, info):
+        return await info.context["service_loader"].load(str(obj["service_id"]))
+
+    async def resolve_revision_environment(self, obj, info):
+        return await info.context["environment_loader"].load(str(obj["environment_id"]))
+
 
 def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     resolver = SharedValuesResolver(shared_values)
@@ -61,6 +72,7 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     query = QueryType()
     mutation = MutationType()
     shared_value_type = ObjectType("SharedValue")
+    revision_type = ObjectType("SharedValueRevision")
 
     query.set_field("sharedValues", resolver.resolve_shared_values)
     query.set_field("sharedValue", resolver.resolve_shared_value)
@@ -70,5 +82,8 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     mutation.set_field("unarchiveSharedValue", resolver.resolve_unarchive_shared_value)
     mutation.set_field("createSharedValueRevision", resolver.resolve_create_shared_value_revision)
     shared_value_type.set_field("revisions", resolver.resolve_revisions)
+    revision_type.set_field("sharedValue", resolver.resolve_revision_shared_value)
+    revision_type.set_field("serviceId", resolver.resolve_revision_service)
+    revision_type.set_field("environmentId", resolver.resolve_revision_environment)
 
-    return [query, mutation, shared_value_type]
+    return [query, mutation, shared_value_type, revision_type]

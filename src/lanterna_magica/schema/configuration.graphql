@@ -1,0 +1,59 @@
+type Configuration {
+  id: ID!
+  service: Service!
+  environment: Environment!
+  body: JSON!
+  isCurrent: Boolean!
+  createdAt: DateTime!
+  substitutions: [ConfigSubstitution!]!
+}
+
+type ConfigurationEdge {
+  node: Configuration!
+  cursor: String!
+}
+
+type ConfigurationConnection {
+  edges: [ConfigurationEdge!]!
+  pageInfo: PageInfo!
+}
+
+type ConfigSubstitution {
+  id: ID!
+  configuration: Configuration!
+  jsonpath: String!
+  sharedValue: SharedValue!
+  createdAt: DateTime!
+}
+
+input ConfigSubstitutionInput {
+  jsonpath: String!
+  sharedValueId: ID!
+}
+
+input CreateConfigurationInput {
+  serviceId: ID!
+  environmentId: ID!
+  body: JSON!
+  substitutions: [ConfigSubstitutionInput!]
+}
+
+input SetConfigSubstitutionInput {
+  configurationId: ID!
+  sharedValueId: ID!
+}
+
+extend type Query {
+  configurations(
+    serviceId: ID
+    environmentId: ID
+    first: Int
+    after: String
+  ): ConfigurationConnection!
+  configuration(id: ID!): Configuration
+}
+
+extend type Mutation {
+  createConfiguration(input: CreateConfigurationInput!): Configuration!
+  updateConfigSubstitution(input: SetConfigSubstitutionInput!): ConfigSubstitution!
+}
