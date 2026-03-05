@@ -1,4 +1,5 @@
 import json
+import re
 from base64 import b64decode, b64encode
 from pathlib import Path
 
@@ -9,6 +10,18 @@ SQL_DIR = Path(__file__).parent.parent / "sql"
 queries = aiosql.from_path(str(SQL_DIR), "asyncpg")
 
 DEFAULT_PAGE_SIZE = 25
+
+INVALID_NAME_CHARS = re.compile(r'[%\\]')
+
+
+def validate_name(name: str) -> None:
+    if INVALID_NAME_CHARS.search(name):
+        raise ValueError("Name must not contain '%' or '\\' characters")
+
+
+def sanitize_search(search: str) -> str:
+    cleaned = INVALID_NAME_CHARS.sub('', search)
+    return cleaned.replace('_', r'\_')
 
 
 class InvalidCursorError(Exception):

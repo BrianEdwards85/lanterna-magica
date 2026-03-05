@@ -1,6 +1,6 @@
 from asyncpg import Pool
 
-from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries
+from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries, sanitize_search, validate_name
 
 
 class Services:
@@ -17,6 +17,7 @@ class Services:
     ) -> dict:
         limit = first or DEFAULT_PAGE_SIZE
         after_id = decode_cursor(after, search=search) if after else None
+        search = sanitize_search(search) if search else None
 
         rows = [
             dict(r)
@@ -38,12 +39,15 @@ class Services:
         return rows
 
     async def create_service(self, *, name: str, description: str | None = None) -> dict:
+        validate_name(name)
         row = await queries.create_service(self.pool, name=name, description=description)
         return dict(row)
 
     async def update_service(
         self, *, id: str, name: str | None = None, description: str | None = None
     ) -> dict:
+        if name is not None:
+            validate_name(name)
         row = await queries.update_service(
             self.pool, id=id, name=name, description=description
         )

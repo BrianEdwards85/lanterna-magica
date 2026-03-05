@@ -311,3 +311,52 @@ async def test_cursor_invalid_with_changed_search(client):
         expect_errors=True,
     )
     assert_that(body).described_as("mismatched search cursor").contains_key("errors")
+
+
+async def test_create_service_with_percent_in_name_fails(client):
+    body = await gql(
+        client, CREATE_SERVICE, {"input": {"name": "bad%name"}}, expect_errors=True
+    )
+    assert_that(body).described_as("percent in name rejected").contains_key("errors")
+
+
+async def test_create_service_with_backslash_in_name_fails(client):
+    body = await gql(
+        client, CREATE_SERVICE, {"input": {"name": "bad\\name"}}, expect_errors=True
+    )
+    assert_that(body).described_as("backslash in name rejected").contains_key("errors")
+
+
+async def test_update_service_with_percent_in_name_fails(client):
+    svc = await _create_service(client)
+    body = await gql(
+        client,
+        UPDATE_SERVICE,
+        {"input": {"id": svc["id"], "name": "bad%name"}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("percent in update name rejected").contains_key("errors")
+
+
+async def test_service_name_with_underscore_allowed(client):
+    svc = await _create_service(client, "my_service")
+    assert_that(svc["name"]).described_as("underscore in name").is_equal_to("my_service")
+
+
+async def test_search_underscore_literal(client):
+    await _create_service(client, "my_service")
+    await _create_service(client, "myXservice")
+
+    body = await gql(client, SERVICES, {"search": "_"})
+    edges = body["data"]["services"]["edges"]
+    assert_that(edges).described_as("underscore search matches only literal _").is_length(1)
+    assert_that(edges[0]["node"]["name"]).is_equal_to("my_service")
+
+
+async def test_search_strips_invalid_chars(client):
+    await _create_service(client, "traefik")
+
+    body = await gql(client, SERVICES, {"search": "%traefik"})
+    edges = body["data"]["services"]["edges"]
+    assert_that(edges).described_as("search with stripped % still finds result").is_length(1)
+    assert_that(edges[0]["node"]["name"]).is_equal_to("traefik")

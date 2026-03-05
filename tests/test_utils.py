@@ -1,0 +1,69 @@
+import pytest
+
+from lanterna_magica.data.utils import sanitize_search, validate_name
+
+
+# -- validate_name --
+
+
+def test_validate_name_allows_plain_text():
+    validate_name("traefik")
+
+
+def test_validate_name_allows_underscores():
+    validate_name("db_password")
+
+
+def test_validate_name_allows_hyphens_and_dots():
+    validate_name("my-service.v2")
+
+
+def test_validate_name_rejects_percent():
+    with pytest.raises(ValueError, match="%"):
+        validate_name("bad%name")
+
+
+def test_validate_name_rejects_backslash():
+    with pytest.raises(ValueError, match=r"\\"):
+        validate_name("bad\\name")
+
+
+def test_validate_name_rejects_percent_at_start():
+    with pytest.raises(ValueError, match="%"):
+        validate_name("%leading")
+
+
+def test_validate_name_rejects_backslash_at_end():
+    with pytest.raises(ValueError, match=r"\\"):
+        validate_name("trailing\\")
+
+
+# -- sanitize_search --
+
+
+def test_sanitize_search_plain_text():
+    assert sanitize_search("traefik") == "traefik"
+
+
+def test_sanitize_search_escapes_underscore():
+    assert sanitize_search("db_password") == r"db\_password"
+
+
+def test_sanitize_search_strips_percent():
+    assert sanitize_search("bad%term") == "badterm"
+
+
+def test_sanitize_search_strips_backslash():
+    assert sanitize_search("bad\\term") == "badterm"
+
+
+def test_sanitize_search_strips_and_escapes_combined():
+    assert sanitize_search("%my_val\\ue") == r"my\_value"
+
+
+def test_sanitize_search_all_invalid_returns_empty():
+    assert sanitize_search("%\\") == ""
+
+
+def test_sanitize_search_only_underscore():
+    assert sanitize_search("_") == r"\_"

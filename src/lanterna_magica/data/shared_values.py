@@ -1,6 +1,6 @@
 from asyncpg import Pool
 
-from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries
+from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries, validate_name
 
 
 class SharedValues:
@@ -53,10 +53,13 @@ class SharedValues:
         return rows
 
     async def create_shared_value(self, *, name: str) -> dict:
+        validate_name(name)
         row = await queries.create_shared_value(self.pool, name=name)
         return dict(row)
 
     async def update_shared_value(self, *, id: str, name: str | None = None) -> dict:
+        if name is not None:
+            validate_name(name)
         row = await queries.update_shared_value(self.pool, id=id, name=name)
         if not row:
             raise ValueError("Shared value not found or is archived")

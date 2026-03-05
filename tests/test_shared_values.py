@@ -425,3 +425,33 @@ async def test_revisions_filter_by_environment(client):
     assert_that(revisions).extracting("value").described_as(
         "production revision value"
     ).contains("prod-val")
+
+
+async def test_create_shared_value_with_percent_in_name_fails(client):
+    body = await gql(
+        client, CREATE_SHARED_VALUE, {"input": {"name": "bad%name"}}, expect_errors=True
+    )
+    assert_that(body).described_as("percent in name rejected").contains_key("errors")
+
+
+async def test_create_shared_value_with_backslash_in_name_fails(client):
+    body = await gql(
+        client, CREATE_SHARED_VALUE, {"input": {"name": "bad\\name"}}, expect_errors=True
+    )
+    assert_that(body).described_as("backslash in name rejected").contains_key("errors")
+
+
+async def test_update_shared_value_with_percent_in_name_fails(client):
+    sv = await _create_shared_value(client)
+    body = await gql(
+        client,
+        UPDATE_SHARED_VALUE,
+        {"input": {"id": sv["id"], "name": "bad%name"}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("percent in update name rejected").contains_key("errors")
+
+
+async def test_shared_value_name_with_underscore_allowed(client):
+    sv = await _create_shared_value(client, "my_value")
+    assert_that(sv["name"]).described_as("underscore in name").is_equal_to("my_value")
