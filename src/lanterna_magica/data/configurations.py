@@ -1,5 +1,3 @@
-import json
-
 from asyncpg import Pool
 
 from lanterna_magica.errors import NotFoundError
@@ -8,10 +6,7 @@ from .utils import build_connection, decode_cursor, page_limit, queries
 
 
 def _parse_row(row):
-    d = dict(row)
-    if isinstance(d.get("body"), str):
-        d["body"] = json.loads(d["body"])
-    return d
+    return dict(row)
 
 
 class Configurations:
@@ -62,7 +57,7 @@ class Configurations:
                     conn,
                     service_id=service_id,
                     environment_id=environment_id,
-                    body=json.dumps(body),
+                    body=body,
                 )
                 config = _parse_row(row)
 

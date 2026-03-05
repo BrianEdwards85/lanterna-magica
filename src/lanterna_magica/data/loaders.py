@@ -1,4 +1,3 @@
-import json
 from collections import defaultdict
 
 from aiodataloader import DataLoader
@@ -34,16 +33,6 @@ class SharedValueLoader(_ByIdLoader):
 
 class ConfigurationLoader(_ByIdLoader):
     query_fn = queries.get_configurations_by_ids
-
-    async def batch_load_fn(self, ids):
-        rows = []
-        async for r in self.query_fn(self.pool, ids=list(ids)):
-            d = dict(r)
-            if isinstance(d.get("body"), str):
-                d["body"] = json.loads(d["body"])
-            rows.append(d)
-        by_id = {str(r["id"]): r for r in rows}
-        return [by_id.get(str(i)) for i in ids]
 
 
 class SubstitutionsByConfigLoader(DataLoader):
