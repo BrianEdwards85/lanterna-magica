@@ -3,6 +3,8 @@ from collections import defaultdict
 from aiodataloader import DataLoader
 from asyncpg import Pool
 
+import json
+
 from .utils import queries
 
 
@@ -54,10 +56,12 @@ class ConfigurationLoader(DataLoader):
         self.pool = pool
 
     async def batch_load_fn(self, ids):
-        rows = [
-            dict(r)
-            async for r in queries.get_configurations_by_ids(self.pool, ids=list(ids))
-        ]
+        rows = []
+        async for r in queries.get_configurations_by_ids(self.pool, ids=list(ids)):
+            d = dict(r)
+            if isinstance(d.get("body"), str):
+                d["body"] = json.loads(d["body"])
+            rows.append(d)
         by_id = {str(r["id"]): r for r in rows}
         return [by_id.get(str(i)) for i in ids]
 

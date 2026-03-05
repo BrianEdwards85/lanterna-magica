@@ -44,6 +44,8 @@ async def _clean_db(pool):
     """Truncate services table after each test, preserving the sentinel row."""
     yield
     async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM config_substitutions")
+        await conn.execute("DELETE FROM configurations")
         await conn.execute("DELETE FROM shared_value_revisions")
         await conn.execute("DELETE FROM shared_values")
         await conn.execute(

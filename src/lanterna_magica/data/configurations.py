@@ -1,15 +1,98 @@
+import json
+
+from asyncpg import Pool
+
+from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries
+
+
+def _parse_row(row):
+    d = dict(row)
+    if isinstance(d.get("body"), str):
+        d["body"] = json.loads(d["body"])
+    return d
+
+
 class Configurations:
-    def __init__(self, pool):
+    def __init__(self, pool: Pool):
         self.pool = pool
 
-    async def get_configurations(self, *, service_id=None, environment_id=None, first=None, after=None):
-        raise NotImplementedError
+    async def get_configurations(
+        self,
+        *,
+        service_id: str | None = None,
+        environment_id: str | None = None,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> dict:
+        limit = first or DEFAULT_PAGE_SIZE
+        after_id = decode_cursor(after) if after else None
 
-    async def create_configuration(self, *, service_id, environment_id, body, substitutions=None):
-        raise NotImplementedError
+        rows = [
+            _parse_row(r)
+            async for r in queries.get_configurations(
+                self.pool,
+                service_id=service_id,
+                environment_id=environment_id,
+                after_id=after_id,
+                page_limit=limit + 1,
+            )
+        ]
+        return build_connection(rows, "id", limit)
 
-    async def update_config_substitution(self, *, configuration_id, shared_value_id):
-        raise NotImplementedError
+    async def create_configuration(
+        self,
+        *,
+        service_id: str,
+        environment_id: str,
+        body,
+        substitutions: list[dict] | None = None,
+    ) -> dict:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await queries.unset_current_configuration(
+                    conn,
+                    service_id=service_id,
+                    environment_id=environment_id,
+                )
+                row = await queries.create_configuration(
+                    conn,
+                    service_id=service_id,
+                    environment_id=environment_id,
+                    body=json.dumps(body),
+                )
+                config = _parse_row(row)
 
-    async def get_substitutions(self, *, configuration_id):
-        raise NotImplementedError
+                if substitutions:
+                    for sub in substitutions:
+                        await queries.create_config_substitution(
+                            conn,
+                            configuration_id=str(config["id"]),
+                            jsonpath=sub["jsonpath"],
+                            shared_value_id=sub["shared_value_id"],
+                        )
+
+        return config
+
+    async def update_config_substitution(
+        self,
+        *,
+        configuration_id: str,
+        shared_value_id: str,
+    ) -> dict:
+        row = await queries.update_config_substitution(
+            self.pool,
+            configuration_id=configuration_id,
+            shared_value_id=shared_value_id,
+        )
+        if not row:
+            raise ValueError("Config substitution not found")
+        return dict(row)
+
+    async def get_substitutions(self, *, configuration_id: str) -> list[dict]:
+        rows = [
+            dict(r)
+            async for r in queries.get_substitutions_for_config(
+                self.pool, configuration_id=configuration_id
+            )
+        ]
+        return rows
