@@ -39,13 +39,21 @@ mutation UnarchiveSharedValue($id: ID!) {
 # -- Queries --
 
 SHARED_VALUES = """
-query SharedValues($includeArchived: Boolean, $first: Int, $after: String, $search: String) {
-    sharedValues(includeArchived: $includeArchived, first: $first, after: $after, search: $search) {
+query SharedValues($includeArchived: Boolean, $first: Int, $after: String) {
+    sharedValues(includeArchived: $includeArchived, first: $first, after: $after) {
         edges {
             node { id name createdAt updatedAt archivedAt }
             cursor
         }
         pageInfo { hasNextPage endCursor }
+    }
+}
+"""
+
+SEARCH_SHARED_VALUES = """
+query SearchSharedValues($search: String!, $includeArchived: Boolean, $limit: Int) {
+    searchSharedValues(search: $search, includeArchived: $includeArchived, limit: $limit) {
+        id name createdAt updatedAt archivedAt
     }
 }
 """
@@ -220,12 +228,23 @@ async def test_search_by_name(client):
     await _create_shared_value(client, "db_password")
     await _create_shared_value(client, "api_key")
 
-    body = await gql(client, SHARED_VALUES, {"search": "db_pass"})
-    edges = body["data"]["sharedValues"]["edges"]
-    assert_that(edges).described_as("search by name result count").is_length(1)
-    assert_that(edges[0]["node"]["name"]).described_as("matched shared value name").is_equal_to(
+    body = await gql(client, SEARCH_SHARED_VALUES, {"search": "db_pass"})
+    results = body["data"]["searchSharedValues"]
+    assert_that(results).described_as("search by name result count").is_length(1)
+    assert_that(results[0]["name"]).described_as("matched shared value name").is_equal_to(
         "db_password"
     )
+
+
+async def test_search_respects_limit(client):
+    """Search should return up to `limit` results."""
+    for i in range(5):
+        await _create_shared_value(client, f"db_val_{i:02d}")
+    await _create_shared_value(client, "api_key")
+
+    body = await gql(client, SEARCH_SHARED_VALUES, {"search": "db_val", "limit": 3})
+    results = body["data"]["searchSharedValues"]
+    assert_that(results).described_as("search limited to limit").is_length(3)
 
 
 async def test_pagination(client):

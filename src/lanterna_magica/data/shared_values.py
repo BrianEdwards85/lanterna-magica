@@ -10,36 +10,40 @@ class SharedValues:
     async def get_shared_values(
         self,
         *,
-        search: str | None = None,
         include_archived: bool = False,
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
         limit = first or DEFAULT_PAGE_SIZE
-        after_id = decode_cursor(after, search=search) if after else None
+        after_id = decode_cursor(after) if after else None
+        rows = [
+            dict(r)
+            async for r in queries.get_shared_values(
+                self.pool,
+                include_archived=include_archived,
+                after_id=after_id,
+                page_limit=limit + 1,
+            )
+        ]
+        return build_connection(rows, "id", limit)
 
-        if search:
-            rows = [
-                dict(r)
-                async for r in queries.search_shared_values(
-                    self.pool,
-                    query=search,
-                    include_archived=include_archived,
-                    after_id=after_id,
-                    page_limit=limit + 1,
-                )
-            ]
-        else:
-            rows = [
-                dict(r)
-                async for r in queries.get_shared_values(
-                    self.pool,
-                    include_archived=include_archived,
-                    after_id=after_id,
-                    page_limit=limit + 1,
-                )
-            ]
-        return build_connection(rows, "id", limit, search=search)
+    async def search_shared_values(
+        self,
+        *,
+        search: str,
+        include_archived: bool = False,
+        limit: int | None = None,
+    ) -> list[dict]:
+        page_limit = limit or DEFAULT_PAGE_SIZE
+        return [
+            dict(r)
+            async for r in queries.search_shared_values(
+                self.pool,
+                query=search,
+                include_archived=include_archived,
+                page_limit=page_limit,
+            )
+        ]
 
     async def get_shared_values_by_ids(self, ids: list[str]) -> list[dict]:
         rows = [

@@ -64,8 +64,12 @@ extend type Query {
     includeArchived: Boolean
     first: Int
     after: String
-    search: String
   ): SharedValueConnection!
+  searchSharedValues(
+    search: String!
+    includeArchived: Boolean
+    limit: Int
+  ): [SharedValue!]!
   sharedValue(id: ID!): SharedValue
 }
 

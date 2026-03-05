@@ -6,12 +6,11 @@ where (:include_archived::boolean OR archived_at IS NULL)
 order by id desc
 limit :page_limit;
 
--- name: search_shared_values(query, include_archived, after_id, page_limit)
+-- name: search_shared_values(query, include_archived, page_limit)
 select id, name, created_at, updated_at, archived_at
 from shared_values
 where name % :query
   and (:include_archived::boolean OR archived_at IS NULL)
-  and (:after_id::uuid IS NULL OR id > :after_id)
 order by similarity(name, :query) desc, id
 limit :page_limit;
 
