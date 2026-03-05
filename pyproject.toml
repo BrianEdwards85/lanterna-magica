@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lanterna-magica"
+version = "0.1.0"
+description = "Configuration management service"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "ariadne>=0.24",
+    "asyncpg>=0.30",
+    "yoyo-migrations>=9",
+    "psycopg2-binary>=2.9",
+    "dynaconf>=3.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.28",
+    "ruff>=0.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lanterna_magica"]
+
+[tool.poe.tasks]
+dev = "uvicorn lanterna_magica.app:app --reload --host 0.0.0.0 --port 8000"
+lint = "ruff check src/"
+format = "ruff format src/"
+test = "pytest tests/ -v"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["src"]
