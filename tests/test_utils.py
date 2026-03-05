@@ -1,6 +1,7 @@
 import pytest
 
 from lanterna_magica.data.utils import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, page_limit, sanitize_search, validate_name
+from lanterna_magica.errors import ValidationError
 
 
 # -- validate_name --
@@ -19,22 +20,22 @@ def test_validate_name_allows_hyphens_and_dots():
 
 
 def test_validate_name_rejects_percent():
-    with pytest.raises(ValueError, match="%"):
+    with pytest.raises(ValidationError, match="%"):
         validate_name("bad%name")
 
 
 def test_validate_name_rejects_backslash():
-    with pytest.raises(ValueError, match=r"\\"):
+    with pytest.raises(ValidationError, match=r"\\"):
         validate_name("bad\\name")
 
 
 def test_validate_name_rejects_percent_at_start():
-    with pytest.raises(ValueError, match="%"):
+    with pytest.raises(ValidationError, match="%"):
         validate_name("%leading")
 
 
 def test_validate_name_rejects_backslash_at_end():
-    with pytest.raises(ValueError, match=r"\\"):
+    with pytest.raises(ValidationError, match=r"\\"):
         validate_name("trailing\\")
 
 
@@ -81,12 +82,12 @@ def test_page_limit_positive_returns_value():
 
 
 def test_page_limit_zero_raises():
-    with pytest.raises(ValueError, match="positive"):
+    with pytest.raises(ValidationError, match="positive"):
         page_limit(0)
 
 
 def test_page_limit_negative_raises():
-    with pytest.raises(ValueError, match="positive"):
+    with pytest.raises(ValidationError, match="positive"):
         page_limit(-1)
 
 
@@ -95,5 +96,5 @@ def test_page_limit_at_max_returns_value():
 
 
 def test_page_limit_exceeds_max_raises():
-    with pytest.raises(ValueError, match="exceed"):
+    with pytest.raises(ValidationError, match="exceed"):
         page_limit(MAX_PAGE_SIZE + 1)

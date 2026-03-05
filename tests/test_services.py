@@ -378,3 +378,36 @@ async def test_search_strips_invalid_chars(client):
     edges = body["data"]["services"]["edges"]
     assert_that(edges).described_as("search with stripped % still finds result").is_length(1)
     assert_that(edges[0]["node"]["name"]).is_equal_to("traefik")
+
+
+# -- Error extension tests --
+
+
+async def test_validation_error_has_extension_code(client):
+    svc = await create_service(client)
+    body = await gql(
+        client,
+        UPDATE_SERVICE,
+        {"input": {"id": svc["id"]}},
+        expect_errors=True,
+    )
+    error = body["errors"][0]
+    assert_that(error["extensions"]["code"]).described_as(
+        "validation error code"
+    ).is_equal_to("VALIDATION_ERROR")
+
+
+async def test_not_found_error_has_extension_code(client):
+    svc = await create_service(client)
+    await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
+
+    body = await gql(
+        client,
+        UPDATE_SERVICE,
+        {"input": {"id": svc["id"], "name": "new-name"}},
+        expect_errors=True,
+    )
+    error = body["errors"][0]
+    assert_that(error["extensions"]["code"]).described_as(
+        "not found error code"
+    ).is_equal_to("NOT_FOUND")

@@ -2,6 +2,8 @@ import json
 
 from asyncpg import Pool
 
+from lanterna_magica.errors import NotFoundError
+
 from .utils import build_connection, decode_cursor, page_limit, queries
 
 
@@ -93,7 +95,7 @@ class Configurations:
             shared_value_id=shared_value_id,
         )
         if not row:
-            raise ValueError("Config substitution not found")
+            raise NotFoundError("Config substitution not found")
         return dict(row)
 
     async def get_substitutions(self, *, configuration_id: str) -> list[dict]:

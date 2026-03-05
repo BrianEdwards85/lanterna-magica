@@ -1,5 +1,7 @@
 from asyncpg import Pool
 
+from lanterna_magica.errors import NotFoundError, ValidationError
+
 from .utils import build_connection, decode_cursor, page_limit, queries, sanitize_search, validate_name
 
 
@@ -47,24 +49,24 @@ class Services:
         self, *, id: str, name: str | None = None, description: str | None = None
     ) -> dict:
         if name is None and description is None:
-            raise ValueError("At least one field must be provided")
+            raise ValidationError("At least one field must be provided")
         if name is not None:
             validate_name(name)
         row = await queries.update_service(
             self.pool, id=id, name=name, description=description
         )
         if not row:
-            raise ValueError("Service not found")
+            raise NotFoundError("Service not found")
         return dict(row)
 
     async def archive_service(self, id: str) -> dict:
         row = await queries.archive_service(self.pool, id=id)
         if not row:
-            raise ValueError("Service not found or already archived")
+            raise NotFoundError("Service not found or already archived")
         return dict(row)
 
     async def unarchive_service(self, id: str) -> dict:
         row = await queries.unarchive_service(self.pool, id=id)
         if not row:
-            raise ValueError("Service not found or not archived")
+            raise NotFoundError("Service not found or not archived")
         return dict(row)

@@ -5,6 +5,8 @@ from pathlib import Path
 
 import aiosql
 
+from lanterna_magica.errors import ValidationError
+
 SQL_DIR = Path(__file__).parent.parent / "sql"
 
 queries = aiosql.from_path(str(SQL_DIR), "asyncpg")
@@ -17,9 +19,9 @@ MAX_PAGE_SIZE = 100
 
 def page_limit(first: int | None) -> int:
     if first is not None and first < 1:
-        raise ValueError("first must be a positive integer")
+        raise ValidationError("first must be a positive integer")
     if first is not None and first > MAX_PAGE_SIZE:
-        raise ValueError(f"first must not exceed {MAX_PAGE_SIZE}")
+        raise ValidationError(f"first must not exceed {MAX_PAGE_SIZE}")
     return first if first is not None else DEFAULT_PAGE_SIZE
 
 INVALID_NAME_CHARS = re.compile(r'[%\\]')
@@ -27,7 +29,7 @@ INVALID_NAME_CHARS = re.compile(r'[%\\]')
 
 def validate_name(name: str) -> None:
     if INVALID_NAME_CHARS.search(name):
-        raise ValueError("Name must not contain '%' or '\\' characters")
+        raise ValidationError("Name must not contain '%' or '\\' characters")
 
 
 def sanitize_search(search: str) -> str:
