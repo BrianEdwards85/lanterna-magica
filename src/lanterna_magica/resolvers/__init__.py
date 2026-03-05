@@ -7,7 +7,7 @@ from lanterna_magica.data.environments import Environments
 from lanterna_magica.data.services import Services
 from lanterna_magica.data.shared_values import SharedValues
 from lanterna_magica.resolvers.environment import get_environment_resolvers
-from lanterna_magica.resolvers.scalars import datetime_scalar
+from lanterna_magica.resolvers.scalars import datetime_scalar, json_scalar
 from lanterna_magica.resolvers.service import get_service_resolvers
 from lanterna_magica.resolvers.shared_value import get_shared_value_resolvers
 
@@ -26,6 +26,7 @@ def create_gql(pool) -> GraphQL:
         *get_service_resolvers(services),
         *get_shared_value_resolvers(shared_values),
         datetime_scalar,
+        json_scalar,
         convert_names_case=True,
     )
     return GraphQL(
