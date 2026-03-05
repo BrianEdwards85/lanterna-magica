@@ -8,11 +8,12 @@ class ConfigurationsResolver:
     # -- Query resolvers --
 
     async def resolve_configurations(
-        self, _obj, info, *, service_id=None, environment_id=None, first=None, after=None
+        self, _obj, info, *, service_id=None, environment_id=None, include_global=None, first=None, after=None
     ):
         return await self.configurations.get_configurations(
             service_id=service_id,
             environment_id=environment_id,
+            include_global=include_global if include_global is not None else True,
             first=first,
             after=after,
         )

@@ -21,6 +21,7 @@ class Configurations:
         *,
         service_id: str | None = None,
         environment_id: str | None = None,
+        include_global: bool = True,
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
@@ -33,6 +34,7 @@ class Configurations:
                 self.pool,
                 service_id=service_id,
                 environment_id=environment_id,
+                include_global=include_global,
                 after_id=after_id,
                 page_limit=limit + 1,
             )

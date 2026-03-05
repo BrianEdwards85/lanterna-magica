@@ -15,6 +15,7 @@ import pytest
 from httpx import ASGITransport
 
 from lanterna_magica.app import app
+from lanterna_magica.data.utils import SENTINEL_UUID
 from lanterna_magica.db import apply_migrations, create_pool
 from lanterna_magica.resolvers import create_gql
 
@@ -49,10 +50,10 @@ async def _clean_db(pool):
         await conn.execute("DELETE FROM shared_value_revisions")
         await conn.execute("DELETE FROM shared_values")
         await conn.execute(
-            "DELETE FROM environments WHERE id != '00000000-0000-0000-0000-000000000000'"
+            "DELETE FROM environments WHERE id != $1", SENTINEL_UUID
         )
         await conn.execute(
-            "DELETE FROM services WHERE id != '00000000-0000-0000-0000-000000000000'"
+            "DELETE FROM services WHERE id != $1", SENTINEL_UUID
         )
 
 

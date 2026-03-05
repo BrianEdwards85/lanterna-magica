@@ -48,6 +48,7 @@ extend type Query {
   configurations(
     serviceId: ID
     environmentId: ID
+    includeGlobal: Boolean
     first: Int
     after: String
   ): ConfigurationConnection!

@@ -51,12 +51,13 @@ class SharedValuesResolver:
         )
 
     async def resolve_revisions(
-        self, obj, info, *, service_id=None, environment_id=None, current_only=None, first=None, after=None
+        self, obj, info, *, service_id=None, environment_id=None, include_global=None, current_only=None, first=None, after=None
     ):
         return await self.shared_values.get_revisions(
             shared_value_id=str(obj["id"]),
             service_id=service_id,
             environment_id=environment_id,
+            include_global=include_global if include_global is not None else True,
             current_only=current_only or False,
             first=first,
             after=after,

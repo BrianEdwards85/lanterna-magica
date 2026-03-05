@@ -1,5 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
+from lanterna_magica.data.utils import SENTINEL_UUID
 from utils import create_environment, create_service, create_shared_value, nodes
 
 # -- Mutations --
@@ -47,8 +48,8 @@ query Configuration($id: ID!) {
 # -- Queries --
 
 CONFIGURATIONS = """
-query Configurations($serviceId: ID, $environmentId: ID, $first: Int, $after: String) {
-    configurations(serviceId: $serviceId, environmentId: $environmentId, first: $first, after: $after) {
+query Configurations($serviceId: ID, $environmentId: ID, $includeGlobal: Boolean, $first: Int, $after: String) {
+    configurations(serviceId: $serviceId, environmentId: $environmentId, includeGlobal: $includeGlobal, first: $first, after: $after) {
         edges {
             node {
                 id
@@ -356,3 +357,38 @@ async def test_configuration_substitutions_field(client):
     assert_that(subs).extracting("jsonpath").described_as("substitution jsonpaths").contains(
         "$.database.host", "$.database.port"
     )
+
+
+# -- includeGlobal Tests --
+
+
+async def test_configurations_include_global_default(client):
+    """By default, filtering by service includes global (sentinel) configs."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    await _create_configuration(client, svc["id"], env["id"], {"scope": "specific"})
+    await _create_configuration(client, SENTINEL_UUID, env["id"], {"scope": "global"})
+
+    body = await gql(client, CONFIGURATIONS, {"serviceId": svc["id"]})
+    items = nodes(body["data"]["configurations"]["edges"])
+    bodies = [i["body"] for i in items]
+    assert_that(bodies).described_as("default includes global").contains(
+        {"scope": "specific"}, {"scope": "global"}
+    )
+
+
+async def test_configurations_exclude_global(client):
+    """includeGlobal=false filters out sentinel-scoped configs."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    await _create_configuration(client, svc["id"], env["id"], {"scope": "specific"})
+    await _create_configuration(client, SENTINEL_UUID, env["id"], {"scope": "global"})
+
+    body = await gql(
+        client, CONFIGURATIONS, {"serviceId": svc["id"], "includeGlobal": False}
+    )
+    items = nodes(body["data"]["configurations"]["edges"])
+    assert_that(items).described_as("exclude global").is_length(1)
+    assert_that(items[0]["body"]).is_equal_to({"scope": "specific"})

@@ -9,6 +9,8 @@ SQL_DIR = Path(__file__).parent.parent / "sql"
 
 queries = aiosql.from_path(str(SQL_DIR), "asyncpg")
 
+SENTINEL_UUID = "00000000-0000-0000-0000-000000000000"
+
 DEFAULT_PAGE_SIZE = 25
 
 

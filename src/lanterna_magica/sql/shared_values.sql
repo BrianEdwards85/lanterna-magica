@@ -48,12 +48,12 @@ where id = :id
   and archived_at is not null
 returning id, name, created_at, updated_at, archived_at;
 
--- name: get_revisions(shared_value_id, service_id, environment_id, current_only, after_id, page_limit)
+-- name: get_revisions(shared_value_id, service_id, environment_id, include_global, current_only, after_id, page_limit)
 select id, shared_value_id, service_id, environment_id, value, is_current, created_at
 from shared_value_revisions
 where shared_value_id = :shared_value_id
-  and (:service_id::uuid IS NULL OR service_id = :service_id OR service_id = '00000000-0000-0000-0000-000000000000')
-  and (:environment_id::uuid IS NULL OR environment_id = :environment_id OR environment_id = '00000000-0000-0000-0000-000000000000')
+  and (:service_id::uuid IS NULL OR service_id = :service_id OR (:include_global::boolean AND service_id = '00000000-0000-0000-0000-000000000000'))
+  and (:environment_id::uuid IS NULL OR environment_id = :environment_id OR (:include_global::boolean AND environment_id = '00000000-0000-0000-0000-000000000000'))
   and (:current_only::boolean IS FALSE OR is_current = true)
   and (:after_id::uuid IS NULL OR id < :after_id)
 order by id desc

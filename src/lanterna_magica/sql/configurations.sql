@@ -1,8 +1,8 @@
--- name: get_configurations(service_id, environment_id, after_id, page_limit)
+-- name: get_configurations(service_id, environment_id, include_global, after_id, page_limit)
 select id, service_id, environment_id, body, is_current, created_at
 from configurations
-where (:service_id::uuid IS NULL OR service_id = :service_id OR service_id = '00000000-0000-0000-0000-000000000000')
-  and (:environment_id::uuid IS NULL OR environment_id = :environment_id OR environment_id = '00000000-0000-0000-0000-000000000000')
+where (:service_id::uuid IS NULL OR service_id = :service_id OR (:include_global::boolean AND service_id = '00000000-0000-0000-0000-000000000000'))
+  and (:environment_id::uuid IS NULL OR environment_id = :environment_id OR (:include_global::boolean AND environment_id = '00000000-0000-0000-0000-000000000000'))
   and (:after_id::uuid IS NULL OR id < :after_id)
 order by id desc
 limit :page_limit;
