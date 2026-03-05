@@ -48,6 +48,20 @@ class SharedValueLoader(DataLoader):
         return [by_id.get(str(i)) for i in ids]
 
 
+class ConfigurationLoader(DataLoader):
+    def __init__(self, pool: Pool):
+        super().__init__()
+        self.pool = pool
+
+    async def batch_load_fn(self, ids):
+        rows = [
+            dict(r)
+            async for r in queries.get_configurations_by_ids(self.pool, ids=list(ids))
+        ]
+        by_id = {str(r["id"]): r for r in rows}
+        return [by_id.get(str(i)) for i in ids]
+
+
 class SharedValueRevisionLoader(DataLoader):
     """Batches current revisions by shared_value_id. Returns a list per id."""
 
@@ -70,6 +84,7 @@ class SharedValueRevisionLoader(DataLoader):
 
 def create_loaders(pool: Pool) -> dict:
     return {
+        "configuration_loader": ConfigurationLoader(pool),
         "service_loader": ServiceLoader(pool),
         "environment_loader": EnvironmentLoader(pool),
         "shared_value_loader": SharedValueLoader(pool),
