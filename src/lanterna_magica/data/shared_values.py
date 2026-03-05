@@ -1,6 +1,6 @@
 from asyncpg import Pool
 
-from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries, validate_name
+from .utils import build_connection, decode_cursor, page_limit, queries, validate_name
 
 
 class SharedValues:
@@ -14,7 +14,7 @@ class SharedValues:
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
-        limit = first or DEFAULT_PAGE_SIZE
+        limit = page_limit(first)
         after_id = decode_cursor(after) if after else None
         rows = [
             dict(r)
@@ -34,14 +34,14 @@ class SharedValues:
         include_archived: bool = False,
         limit: int | None = None,
     ) -> list[dict]:
-        page_limit = limit or DEFAULT_PAGE_SIZE
+        effective_limit = page_limit(limit)
         return [
             dict(r)
             async for r in queries.search_shared_values(
                 self.pool,
                 query=search,
                 include_archived=include_archived,
-                page_limit=page_limit,
+                page_limit=effective_limit,
             )
         ]
 
@@ -87,7 +87,7 @@ class SharedValues:
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
-        limit = first or DEFAULT_PAGE_SIZE
+        limit = page_limit(first)
         after_id = decode_cursor(after) if after else None
 
         rows = [

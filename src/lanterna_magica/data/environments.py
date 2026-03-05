@@ -1,6 +1,6 @@
 from asyncpg import Pool
 
-from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries, sanitize_search, validate_name
+from .utils import build_connection, decode_cursor, page_limit, queries, sanitize_search, validate_name
 
 
 class Environments:
@@ -15,7 +15,7 @@ class Environments:
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
-        limit = first or DEFAULT_PAGE_SIZE
+        limit = page_limit(first)
         after_id = decode_cursor(after, search=search) if after else None
         search = sanitize_search(search) if search else None
 

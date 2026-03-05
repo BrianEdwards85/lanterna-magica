@@ -11,6 +11,12 @@ queries = aiosql.from_path(str(SQL_DIR), "asyncpg")
 
 DEFAULT_PAGE_SIZE = 25
 
+
+def page_limit(first: int | None) -> int:
+    if first is not None and first < 1:
+        raise ValueError("first must be a positive integer")
+    return first if first is not None else DEFAULT_PAGE_SIZE
+
 INVALID_NAME_CHARS = re.compile(r'[%\\]')
 
 

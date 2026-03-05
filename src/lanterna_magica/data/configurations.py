@@ -2,7 +2,7 @@ import json
 
 from asyncpg import Pool
 
-from .utils import DEFAULT_PAGE_SIZE, build_connection, decode_cursor, queries
+from .utils import build_connection, decode_cursor, page_limit, queries
 
 
 def _parse_row(row):
@@ -24,7 +24,7 @@ class Configurations:
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
-        limit = first or DEFAULT_PAGE_SIZE
+        limit = page_limit(first)
         after_id = decode_cursor(after) if after else None
 
         rows = [

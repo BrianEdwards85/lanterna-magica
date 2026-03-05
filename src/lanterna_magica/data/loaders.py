@@ -1,7 +1,7 @@
+import json
+
 from aiodataloader import DataLoader
 from asyncpg import Pool
-
-import json
 
 from .utils import queries
 

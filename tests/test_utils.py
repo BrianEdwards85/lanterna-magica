@@ -1,6 +1,6 @@
 import pytest
 
-from lanterna_magica.data.utils import sanitize_search, validate_name
+from lanterna_magica.data.utils import DEFAULT_PAGE_SIZE, page_limit, sanitize_search, validate_name
 
 
 # -- validate_name --
@@ -67,3 +67,24 @@ def test_sanitize_search_all_invalid_returns_empty():
 
 def test_sanitize_search_only_underscore():
     assert sanitize_search("_") == r"\_"
+
+
+# -- page_limit --
+
+
+def test_page_limit_none_returns_default():
+    assert page_limit(None) == DEFAULT_PAGE_SIZE
+
+
+def test_page_limit_positive_returns_value():
+    assert page_limit(10) == 10
+
+
+def test_page_limit_zero_raises():
+    with pytest.raises(ValueError, match="positive"):
+        page_limit(0)
+
+
+def test_page_limit_negative_raises():
+    with pytest.raises(ValueError, match="positive"):
+        page_limit(-1)
