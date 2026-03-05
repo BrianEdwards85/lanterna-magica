@@ -92,7 +92,7 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     mutation.set_field("createSharedValueRevision", resolver.resolve_create_shared_value_revision)
     shared_value_type.set_field("revisions", resolver.resolve_revisions)
     revision_type.set_field("sharedValue", resolver.resolve_revision_shared_value)
-    revision_type.set_field("serviceId", resolver.resolve_revision_service)
-    revision_type.set_field("environmentId", resolver.resolve_revision_environment)
+    revision_type.set_field("service", resolver.resolve_revision_service)
+    revision_type.set_field("environment", resolver.resolve_revision_environment)
 
     return [query, mutation, shared_value_type, revision_type]

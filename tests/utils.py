@@ -25,7 +25,7 @@ mutation CreateSharedValue($input: CreateSharedValueInput!) {
 _CREATE_REVISION = """
 mutation CreateSharedValueRevision($input: CreateSharedValueRevisionInput!) {
     createSharedValueRevision(input: $input) {
-        id sharedValue { id } serviceId { id } environmentId { id } value isCurrent createdAt
+        id sharedValue { id } service { id } environment { id } value isCurrent createdAt
     }
 }
 """

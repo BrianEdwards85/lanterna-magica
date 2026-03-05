@@ -85,7 +85,7 @@ query SharedValueWithRevisions(
             after: $after
         ) {
             edges {
-                node { id sharedValue { id } serviceId { id } environmentId { id } value isCurrent createdAt }
+                node { id sharedValue { id } service { id } environment { id } value isCurrent createdAt }
                 cursor
             }
             pageInfo { hasNextPage endCursor }
@@ -281,8 +281,8 @@ async def test_create_revision(client):
     assert_that(rev["sharedValue"]["id"]).described_as("revision shared value id").is_equal_to(
         sv["id"]
     )
-    assert_that(rev["serviceId"]["id"]).described_as("revision service id").is_equal_to(svc["id"])
-    assert_that(rev["environmentId"]["id"]).described_as("revision environment id").is_equal_to(
+    assert_that(rev["service"]["id"]).described_as("revision service id").is_equal_to(svc["id"])
+    assert_that(rev["environment"]["id"]).described_as("revision environment id").is_equal_to(
         env["id"]
     )
     assert_that(rev["value"]).described_as("revision value").is_equal_to("secret123")
