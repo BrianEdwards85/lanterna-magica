@@ -18,11 +18,13 @@ from lanterna_magica.app import app
 from lanterna_magica.db import apply_migrations, create_pool
 from lanterna_magica.resolvers import create_gql
 
-apply_migrations()
+@pytest.fixture(scope="session", autouse=True)
+def _migrations():
+    apply_migrations()
 
 
 @pytest.fixture(scope="session")
-async def pool():
+async def pool(_migrations):
     p = await create_pool()
     yield p
     await p.close()

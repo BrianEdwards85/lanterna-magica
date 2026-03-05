@@ -1,6 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
-from utils import nodes, parse_dt
+from utils import create_service, nodes, parse_dt
 
 # -- Mutations --
 
@@ -59,21 +59,11 @@ query Service($id: ID!) {
 """
 
 
-# -- Helpers --
-
-
-async def _create_service(client, name="traefik", description=None):
-    body = await gql(
-        client, CREATE_SERVICE, {"input": {"name": name, "description": description}}
-    )
-    return body["data"]["createService"]
-
-
 # -- Tests --
 
 
-async def test_create_service(client):
-    svc = await _create_service(client, "traefik", "reverse proxy")
+async def testcreate_service(client):
+    svc = await create_service(client, "traefik", "reverse proxy")
     assert_that(svc["name"]).described_as("service name").is_equal_to("traefik")
     assert_that(svc["description"]).described_as("service description").is_equal_to("reverse proxy")
     assert_that(svc["id"]).described_as("service id").is_not_none()
@@ -82,14 +72,14 @@ async def test_create_service(client):
     assert_that(svc["archivedAt"]).described_as("new service should not be archived").is_none()
 
 
-async def test_create_service_minimal(client):
-    svc = await _create_service(client, "nginx")
+async def testcreate_service_minimal(client):
+    svc = await create_service(client, "nginx")
     assert_that(svc["name"]).described_as("service name").is_equal_to("nginx")
     assert_that(svc["description"]).described_as("description when not provided").is_none()
 
 
-async def test_create_service_duplicate_name(client):
-    await _create_service(client, "traefik")
+async def testcreate_service_duplicate_name(client):
+    await create_service(client, "traefik")
     body = await gql(
         client,
         CREATE_SERVICE,
@@ -100,7 +90,7 @@ async def test_create_service_duplicate_name(client):
 
 
 async def test_service_by_id(client):
-    svc = await _create_service(client)
+    svc = await create_service(client)
     body = await gql(client, SERVICE, {"id": svc["id"]})
     found = body["data"]["service"]
     assert_that(found["id"]).described_as("fetched service id").is_equal_to(svc["id"])
@@ -113,8 +103,8 @@ async def test_service_by_id_not_found(client):
 
 
 async def test_services_list(client):
-    await _create_service(client, "traefik")
-    await _create_service(client, "nginx")
+    await create_service(client, "traefik")
+    await create_service(client, "nginx")
 
     body = await gql(client, SERVICES)
     assert_that(nodes(body["data"]["services"]["edges"])).described_as(
@@ -130,7 +120,7 @@ async def test_services_excludes_sentinel(client):
 
 
 async def test_update_service(client):
-    svc = await _create_service(client, "traefik")
+    svc = await create_service(client, "traefik")
 
     body = await gql(
         client,
@@ -148,7 +138,7 @@ async def test_update_service(client):
 
 
 async def test_update_service_partial(client):
-    svc = await _create_service(client, "traefik", "original description")
+    svc = await create_service(client, "traefik", "original description")
 
     body = await gql(
         client,
@@ -163,7 +153,7 @@ async def test_update_service_partial(client):
 
 
 async def test_update_archived_service_fails(client):
-    svc = await _create_service(client)
+    svc = await create_service(client)
     await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
 
     body = await gql(
@@ -176,7 +166,7 @@ async def test_update_archived_service_fails(client):
 
 
 async def test_archive_service(client):
-    svc = await _create_service(client)
+    svc = await create_service(client)
 
     body = await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
     archived = body["data"]["archiveService"]
@@ -184,7 +174,7 @@ async def test_archive_service(client):
 
 
 async def test_archive_hides_from_list(client):
-    svc = await _create_service(client)
+    svc = await create_service(client)
     await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
 
     body = await gql(client, SERVICES)
@@ -194,7 +184,7 @@ async def test_archive_hides_from_list(client):
 
 
 async def test_include_archived(client):
-    svc = await _create_service(client)
+    svc = await create_service(client)
     await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
 
     body = await gql(client, SERVICES, {"includeArchived": True})
@@ -204,7 +194,7 @@ async def test_include_archived(client):
 
 
 async def test_unarchive_service(client):
-    svc = await _create_service(client)
+    svc = await create_service(client)
     await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
 
     body = await gql(client, UNARCHIVE_SERVICE, {"id": svc["id"]})
@@ -220,8 +210,8 @@ async def test_unarchive_service(client):
 
 
 async def test_search_by_name(client):
-    await _create_service(client, "traefik", "reverse proxy")
-    await _create_service(client, "nginx", "web server")
+    await create_service(client, "traefik", "reverse proxy")
+    await create_service(client, "nginx", "web server")
 
     body = await gql(client, SERVICES, {"search": "traefik"})
     edges = body["data"]["services"]["edges"]
@@ -232,8 +222,8 @@ async def test_search_by_name(client):
 
 
 async def test_search_by_description(client):
-    await _create_service(client, "traefik", "reverse proxy")
-    await _create_service(client, "nginx", "web server")
+    await create_service(client, "traefik", "reverse proxy")
+    await create_service(client, "nginx", "web server")
 
     body = await gql(client, SERVICES, {"search": "web server"})
     edges = body["data"]["services"]["edges"]
@@ -242,7 +232,7 @@ async def test_search_by_description(client):
 
 
 async def test_search_case_insensitive(client):
-    await _create_service(client, "Traefik")
+    await create_service(client, "Traefik")
 
     body = await gql(client, SERVICES, {"search": "traefik"})
     edges = body["data"]["services"]["edges"]
@@ -251,7 +241,7 @@ async def test_search_case_insensitive(client):
 
 async def test_pagination(client):
     for i in range(5):
-        await _create_service(client, f"svc-{i:02d}")
+        await create_service(client, f"svc-{i:02d}")
 
     # First page
     body = await gql(client, SERVICES, {"first": 2})
@@ -276,8 +266,8 @@ async def test_pagination(client):
 
 async def test_pagination_with_search(client):
     for i in range(4):
-        await _create_service(client, f"alpha-{i:02d}")
-    await _create_service(client, "beta-00")
+        await create_service(client, f"alpha-{i:02d}")
+    await create_service(client, "beta-00")
 
     body = await gql(client, SERVICES, {"search": "alpha", "first": 2})
     page1 = body["data"]["services"]
@@ -298,7 +288,7 @@ async def test_pagination_with_search(client):
 
 async def test_cursor_invalid_with_changed_search(client):
     for i in range(3):
-        await _create_service(client, f"svc-{i:02d}")
+        await create_service(client, f"svc-{i:02d}")
 
     body = await gql(client, SERVICES, {"search": "svc", "first": 1})
     cursor = body["data"]["services"]["pageInfo"]["endCursor"]
@@ -313,14 +303,14 @@ async def test_cursor_invalid_with_changed_search(client):
     assert_that(body).described_as("mismatched search cursor").contains_key("errors")
 
 
-async def test_create_service_with_percent_in_name_fails(client):
+async def testcreate_service_with_percent_in_name_fails(client):
     body = await gql(
         client, CREATE_SERVICE, {"input": {"name": "bad%name"}}, expect_errors=True
     )
     assert_that(body).described_as("percent in name rejected").contains_key("errors")
 
 
-async def test_create_service_with_backslash_in_name_fails(client):
+async def testcreate_service_with_backslash_in_name_fails(client):
     body = await gql(
         client, CREATE_SERVICE, {"input": {"name": "bad\\name"}}, expect_errors=True
     )
@@ -328,7 +318,7 @@ async def test_create_service_with_backslash_in_name_fails(client):
 
 
 async def test_update_service_with_percent_in_name_fails(client):
-    svc = await _create_service(client)
+    svc = await create_service(client)
     body = await gql(
         client,
         UPDATE_SERVICE,
@@ -339,13 +329,13 @@ async def test_update_service_with_percent_in_name_fails(client):
 
 
 async def test_service_name_with_underscore_allowed(client):
-    svc = await _create_service(client, "my_service")
+    svc = await create_service(client, "my_service")
     assert_that(svc["name"]).described_as("underscore in name").is_equal_to("my_service")
 
 
 async def test_search_underscore_literal(client):
-    await _create_service(client, "my_service")
-    await _create_service(client, "myXservice")
+    await create_service(client, "my_service")
+    await create_service(client, "myXservice")
 
     body = await gql(client, SERVICES, {"search": "_"})
     edges = body["data"]["services"]["edges"]
@@ -354,7 +344,7 @@ async def test_search_underscore_literal(client):
 
 
 async def test_search_strips_invalid_chars(client):
-    await _create_service(client, "traefik")
+    await create_service(client, "traefik")
 
     body = await gql(client, SERVICES, {"search": "%traefik"})
     edges = body["data"]["services"]["edges"]

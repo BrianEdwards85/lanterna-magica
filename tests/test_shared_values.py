@@ -1,6 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
-from utils import create_environment, create_revision, create_service, nodes, parse_dt
+from utils import create_environment, create_revision, create_service, create_shared_value, nodes, parse_dt
 
 # -- Mutations --
 
@@ -95,21 +95,11 @@ query SharedValueWithRevisions(
 """
 
 
-# -- Helpers --
-
-
-async def _create_shared_value(client, name="db_password"):
-    body = await gql(client, CREATE_SHARED_VALUE, {"input": {"name": name}})
-    return body["data"]["createSharedValue"]
-
-
-
-
 # -- Shared Value CRUD Tests --
 
 
-async def test_create_shared_value(client):
-    sv = await _create_shared_value(client, "db_password")
+async def testcreate_shared_value(client):
+    sv = await create_shared_value(client, "db_password")
     assert_that(sv["name"]).described_as("shared value name").is_equal_to("db_password")
     assert_that(sv["id"]).described_as("shared value id").is_not_none()
     assert_that(sv["createdAt"]).described_as("createdAt timestamp").is_not_none()
@@ -118,8 +108,8 @@ async def test_create_shared_value(client):
     ).is_none()
 
 
-async def test_create_shared_value_duplicate_name(client):
-    await _create_shared_value(client, "db_password")
+async def testcreate_shared_value_duplicate_name(client):
+    await create_shared_value(client, "db_password")
     body = await gql(
         client,
         CREATE_SHARED_VALUE,
@@ -130,7 +120,7 @@ async def test_create_shared_value_duplicate_name(client):
 
 
 async def test_shared_value_by_id(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     body = await gql(client, SHARED_VALUE, {"id": sv["id"]})
     found = body["data"]["sharedValue"]
     assert_that(found["id"]).described_as("fetched shared value id").is_equal_to(sv["id"])
@@ -143,8 +133,8 @@ async def test_shared_value_by_id_not_found(client):
 
 
 async def test_shared_values_list(client):
-    await _create_shared_value(client, "db_password")
-    await _create_shared_value(client, "api_key")
+    await create_shared_value(client, "db_password")
+    await create_shared_value(client, "api_key")
 
     body = await gql(client, SHARED_VALUES)
     assert_that(nodes(body["data"]["sharedValues"]["edges"])).described_as(
@@ -153,7 +143,7 @@ async def test_shared_values_list(client):
 
 
 async def test_update_shared_value(client):
-    sv = await _create_shared_value(client, "db_password")
+    sv = await create_shared_value(client, "db_password")
 
     body = await gql(
         client,
@@ -168,7 +158,7 @@ async def test_update_shared_value(client):
 
 
 async def test_update_archived_shared_value_fails(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(
@@ -181,7 +171,7 @@ async def test_update_archived_shared_value_fails(client):
 
 
 async def test_archive_shared_value(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
 
     body = await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
     archived = body["data"]["archiveSharedValue"]
@@ -189,7 +179,7 @@ async def test_archive_shared_value(client):
 
 
 async def test_archive_hides_from_list(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(client, SHARED_VALUES)
@@ -199,7 +189,7 @@ async def test_archive_hides_from_list(client):
 
 
 async def test_include_archived(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(client, SHARED_VALUES, {"includeArchived": True})
@@ -209,7 +199,7 @@ async def test_include_archived(client):
 
 
 async def test_unarchive_shared_value(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
 
     body = await gql(client, UNARCHIVE_SHARED_VALUE, {"id": sv["id"]})
@@ -225,8 +215,8 @@ async def test_unarchive_shared_value(client):
 
 
 async def test_search_by_name(client):
-    await _create_shared_value(client, "db_password")
-    await _create_shared_value(client, "api_key")
+    await create_shared_value(client, "db_password")
+    await create_shared_value(client, "api_key")
 
     body = await gql(client, SEARCH_SHARED_VALUES, {"search": "db_pass"})
     results = body["data"]["searchSharedValues"]
@@ -239,8 +229,8 @@ async def test_search_by_name(client):
 async def test_search_respects_limit(client):
     """Search should return up to `limit` results."""
     for i in range(5):
-        await _create_shared_value(client, f"db_val_{i:02d}")
-    await _create_shared_value(client, "api_key")
+        await create_shared_value(client, f"db_val_{i:02d}")
+    await create_shared_value(client, "api_key")
 
     body = await gql(client, SEARCH_SHARED_VALUES, {"search": "db_val", "limit": 3})
     results = body["data"]["searchSharedValues"]
@@ -249,7 +239,7 @@ async def test_search_respects_limit(client):
 
 async def test_pagination(client):
     for i in range(5):
-        await _create_shared_value(client, f"val-{i:02d}")
+        await create_shared_value(client, f"val-{i:02d}")
 
     body = await gql(client, SHARED_VALUES, {"first": 2})
     page1 = body["data"]["sharedValues"]
@@ -273,7 +263,7 @@ async def test_pagination(client):
 
 
 async def test_create_revision(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     svc = await create_service(client)
     env = await create_environment(client)
 
@@ -290,7 +280,7 @@ async def test_create_revision(client):
 
 
 async def test_new_revision_replaces_current(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     svc = await create_service(client)
     env = await create_environment(client)
 
@@ -312,7 +302,7 @@ async def test_new_revision_replaces_current(client):
 
 
 async def test_revisions_scoped_by_service_and_environment(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     svc1 = await create_service(client, "traefik")
     svc2 = await create_service(client, "nginx")
     env = await create_environment(client)
@@ -342,7 +332,7 @@ async def test_revisions_scoped_by_service_and_environment(client):
 
 
 async def test_revisions_current_only_filter(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     svc = await create_service(client)
     env = await create_environment(client)
 
@@ -369,7 +359,7 @@ async def test_revisions_current_only_filter(client):
 
 
 async def test_revisions_pagination(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     svc = await create_service(client)
     env = await create_environment(client)
 
@@ -409,7 +399,7 @@ async def test_revisions_pagination(client):
 
 
 async def test_revisions_filter_by_environment(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     svc = await create_service(client)
     env1 = await create_environment(client, "production")
     env2 = await create_environment(client, "staging")
@@ -427,14 +417,14 @@ async def test_revisions_filter_by_environment(client):
     ).contains("prod-val")
 
 
-async def test_create_shared_value_with_percent_in_name_fails(client):
+async def testcreate_shared_value_with_percent_in_name_fails(client):
     body = await gql(
         client, CREATE_SHARED_VALUE, {"input": {"name": "bad%name"}}, expect_errors=True
     )
     assert_that(body).described_as("percent in name rejected").contains_key("errors")
 
 
-async def test_create_shared_value_with_backslash_in_name_fails(client):
+async def testcreate_shared_value_with_backslash_in_name_fails(client):
     body = await gql(
         client, CREATE_SHARED_VALUE, {"input": {"name": "bad\\name"}}, expect_errors=True
     )
@@ -442,7 +432,7 @@ async def test_create_shared_value_with_backslash_in_name_fails(client):
 
 
 async def test_update_shared_value_with_percent_in_name_fails(client):
-    sv = await _create_shared_value(client)
+    sv = await create_shared_value(client)
     body = await gql(
         client,
         UPDATE_SHARED_VALUE,
@@ -453,5 +443,5 @@ async def test_update_shared_value_with_percent_in_name_fails(client):
 
 
 async def test_shared_value_name_with_underscore_allowed(client):
-    sv = await _create_shared_value(client, "my_value")
+    sv = await create_shared_value(client, "my_value")
     assert_that(sv["name"]).described_as("underscore in name").is_equal_to("my_value")

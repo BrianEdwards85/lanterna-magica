@@ -2,23 +2,29 @@ from datetime import datetime
 
 from conftest import gql
 
-# -- Shared GQL Mutations (minimal field sets for test setup) --
+# -- Shared GQL Mutations --
 
 _CREATE_SERVICE = """
 mutation CreateService($input: CreateServiceInput!) {
-    createService(input: $input) { id name }
+    createService(input: $input) {
+        id name description createdAt updatedAt archivedAt
+    }
 }
 """
 
 _CREATE_ENVIRONMENT = """
 mutation CreateEnvironment($input: CreateEnvironmentInput!) {
-    createEnvironment(input: $input) { id name }
+    createEnvironment(input: $input) {
+        id name description createdAt updatedAt archivedAt
+    }
 }
 """
 
 _CREATE_SHARED_VALUE = """
 mutation CreateSharedValue($input: CreateSharedValueInput!) {
-    createSharedValue(input: $input) { id name }
+    createSharedValue(input: $input) {
+        id name createdAt updatedAt archivedAt
+    }
 }
 """
 

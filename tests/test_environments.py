@@ -1,6 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
-from utils import nodes, parse_dt
+from utils import create_environment, nodes, parse_dt
 
 # -- Mutations --
 
@@ -59,21 +59,11 @@ query Environment($id: ID!) {
 """
 
 
-# -- Helpers --
-
-
-async def _create_environment(client, name="production", description=None):
-    body = await gql(
-        client, CREATE_ENVIRONMENT, {"input": {"name": name, "description": description}}
-    )
-    return body["data"]["createEnvironment"]
-
-
 # -- Tests --
 
 
-async def test_create_environment(client):
-    env = await _create_environment(client, "production", "prod cluster")
+async def testcreate_environment(client):
+    env = await create_environment(client, "production", "prod cluster")
     assert_that(env["name"]).described_as("environment name").is_equal_to("production")
     assert_that(env["description"]).described_as("environment description").is_equal_to(
         "prod cluster"
@@ -86,14 +76,14 @@ async def test_create_environment(client):
     ).is_none()
 
 
-async def test_create_environment_minimal(client):
-    env = await _create_environment(client, "staging")
+async def testcreate_environment_minimal(client):
+    env = await create_environment(client, "staging")
     assert_that(env["name"]).described_as("environment name").is_equal_to("staging")
     assert_that(env["description"]).described_as("description when not provided").is_none()
 
 
-async def test_create_environment_duplicate_name(client):
-    await _create_environment(client, "production")
+async def testcreate_environment_duplicate_name(client):
+    await create_environment(client, "production")
     body = await gql(
         client,
         CREATE_ENVIRONMENT,
@@ -104,7 +94,7 @@ async def test_create_environment_duplicate_name(client):
 
 
 async def test_environment_by_id(client):
-    env = await _create_environment(client)
+    env = await create_environment(client)
     body = await gql(client, ENVIRONMENT, {"id": env["id"]})
     found = body["data"]["environment"]
     assert_that(found["id"]).described_as("fetched environment id").is_equal_to(env["id"])
@@ -117,8 +107,8 @@ async def test_environment_by_id_not_found(client):
 
 
 async def test_environments_list(client):
-    await _create_environment(client, "production")
-    await _create_environment(client, "staging")
+    await create_environment(client, "production")
+    await create_environment(client, "staging")
 
     body = await gql(client, ENVIRONMENTS)
     assert_that(nodes(body["data"]["environments"]["edges"])).described_as(
@@ -134,7 +124,7 @@ async def test_environments_excludes_sentinel(client):
 
 
 async def test_update_environment(client):
-    env = await _create_environment(client, "production")
+    env = await create_environment(client, "production")
 
     body = await gql(
         client,
@@ -152,7 +142,7 @@ async def test_update_environment(client):
 
 
 async def test_update_environment_partial(client):
-    env = await _create_environment(client, "production", "original description")
+    env = await create_environment(client, "production", "original description")
 
     body = await gql(
         client,
@@ -167,7 +157,7 @@ async def test_update_environment_partial(client):
 
 
 async def test_update_archived_environment_fails(client):
-    env = await _create_environment(client)
+    env = await create_environment(client)
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(
@@ -180,7 +170,7 @@ async def test_update_archived_environment_fails(client):
 
 
 async def test_archive_environment(client):
-    env = await _create_environment(client)
+    env = await create_environment(client)
 
     body = await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
     archived = body["data"]["archiveEnvironment"]
@@ -188,7 +178,7 @@ async def test_archive_environment(client):
 
 
 async def test_archive_hides_from_list(client):
-    env = await _create_environment(client)
+    env = await create_environment(client)
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(client, ENVIRONMENTS)
@@ -198,7 +188,7 @@ async def test_archive_hides_from_list(client):
 
 
 async def test_include_archived(client):
-    env = await _create_environment(client)
+    env = await create_environment(client)
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(client, ENVIRONMENTS, {"includeArchived": True})
@@ -208,7 +198,7 @@ async def test_include_archived(client):
 
 
 async def test_unarchive_environment(client):
-    env = await _create_environment(client)
+    env = await create_environment(client)
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
 
     body = await gql(client, UNARCHIVE_ENVIRONMENT, {"id": env["id"]})
@@ -224,8 +214,8 @@ async def test_unarchive_environment(client):
 
 
 async def test_search_by_name(client):
-    await _create_environment(client, "production", "prod cluster")
-    await _create_environment(client, "staging", "staging cluster")
+    await create_environment(client, "production", "prod cluster")
+    await create_environment(client, "staging", "staging cluster")
 
     body = await gql(client, ENVIRONMENTS, {"search": "production"})
     edges = body["data"]["environments"]["edges"]
@@ -236,8 +226,8 @@ async def test_search_by_name(client):
 
 
 async def test_search_by_description(client):
-    await _create_environment(client, "production", "prod cluster")
-    await _create_environment(client, "staging", "test environment")
+    await create_environment(client, "production", "prod cluster")
+    await create_environment(client, "staging", "test environment")
 
     body = await gql(client, ENVIRONMENTS, {"search": "test environment"})
     edges = body["data"]["environments"]["edges"]
@@ -248,7 +238,7 @@ async def test_search_by_description(client):
 
 
 async def test_search_case_insensitive(client):
-    await _create_environment(client, "Production")
+    await create_environment(client, "Production")
 
     body = await gql(client, ENVIRONMENTS, {"search": "production"})
     edges = body["data"]["environments"]["edges"]
@@ -257,7 +247,7 @@ async def test_search_case_insensitive(client):
 
 async def test_pagination(client):
     for i in range(5):
-        await _create_environment(client, f"env-{i:02d}")
+        await create_environment(client, f"env-{i:02d}")
 
     body = await gql(client, ENVIRONMENTS, {"first": 2})
     page1 = body["data"]["environments"]
@@ -279,8 +269,8 @@ async def test_pagination(client):
 
 async def test_pagination_with_search(client):
     for i in range(4):
-        await _create_environment(client, f"alpha-{i:02d}")
-    await _create_environment(client, "beta-00")
+        await create_environment(client, f"alpha-{i:02d}")
+    await create_environment(client, "beta-00")
 
     body = await gql(client, ENVIRONMENTS, {"search": "alpha", "first": 2})
     page1 = body["data"]["environments"]
@@ -303,7 +293,7 @@ async def test_pagination_with_search(client):
 
 async def test_cursor_invalid_with_changed_search(client):
     for i in range(3):
-        await _create_environment(client, f"env-{i:02d}")
+        await create_environment(client, f"env-{i:02d}")
 
     body = await gql(client, ENVIRONMENTS, {"search": "env", "first": 1})
     cursor = body["data"]["environments"]["pageInfo"]["endCursor"]
@@ -317,14 +307,14 @@ async def test_cursor_invalid_with_changed_search(client):
     assert_that(body).described_as("mismatched search cursor").contains_key("errors")
 
 
-async def test_create_environment_with_percent_in_name_fails(client):
+async def testcreate_environment_with_percent_in_name_fails(client):
     body = await gql(
         client, CREATE_ENVIRONMENT, {"input": {"name": "bad%name"}}, expect_errors=True
     )
     assert_that(body).described_as("percent in name rejected").contains_key("errors")
 
 
-async def test_create_environment_with_backslash_in_name_fails(client):
+async def testcreate_environment_with_backslash_in_name_fails(client):
     body = await gql(
         client, CREATE_ENVIRONMENT, {"input": {"name": "bad\\name"}}, expect_errors=True
     )
@@ -332,7 +322,7 @@ async def test_create_environment_with_backslash_in_name_fails(client):
 
 
 async def test_update_environment_with_percent_in_name_fails(client):
-    env = await _create_environment(client)
+    env = await create_environment(client)
     body = await gql(
         client,
         UPDATE_ENVIRONMENT,
@@ -343,13 +333,13 @@ async def test_update_environment_with_percent_in_name_fails(client):
 
 
 async def test_environment_name_with_underscore_allowed(client):
-    env = await _create_environment(client, "my_env")
+    env = await create_environment(client, "my_env")
     assert_that(env["name"]).described_as("underscore in name").is_equal_to("my_env")
 
 
 async def test_search_underscore_literal(client):
-    await _create_environment(client, "my_env")
-    await _create_environment(client, "myXenv")
+    await create_environment(client, "my_env")
+    await create_environment(client, "myXenv")
 
     body = await gql(client, ENVIRONMENTS, {"search": "_"})
     edges = body["data"]["environments"]["edges"]
@@ -358,7 +348,7 @@ async def test_search_underscore_literal(client):
 
 
 async def test_search_strips_invalid_chars(client):
-    await _create_environment(client, "production")
+    await create_environment(client, "production")
 
     body = await gql(client, ENVIRONMENTS, {"search": "%production"})
     edges = body["data"]["environments"]["edges"]
