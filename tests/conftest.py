@@ -8,6 +8,7 @@ Prerequisites:
 
 import os
 
+# Must be set before importing app so Dynaconf loads the [testing] environment
 os.environ["LANTERNA_ENV"] = "testing"
 
 import httpx
@@ -42,18 +43,23 @@ async def client(pool):
 
 @pytest.fixture(autouse=True)
 async def _clean_db(pool):
-    """Truncate services table after each test, preserving the sentinel row."""
+    """Truncate all tables after each test, then re-insert sentinel rows."""
     yield
     async with pool.acquire() as conn:
-        await conn.execute("DELETE FROM config_substitutions")
-        await conn.execute("DELETE FROM configurations")
-        await conn.execute("DELETE FROM shared_value_revisions")
-        await conn.execute("DELETE FROM shared_values")
         await conn.execute(
-            "DELETE FROM environments WHERE id != $1", SENTINEL_UUID
+            "TRUNCATE services, environments, configurations,"
+            " shared_values, shared_value_revisions, config_substitutions"
+            " CASCADE"
         )
         await conn.execute(
-            "DELETE FROM services WHERE id != $1", SENTINEL_UUID
+            "INSERT INTO services (id, name, description)"
+            " VALUES ($1, '_global', 'Sentinel for unscoped configurations')",
+            SENTINEL_UUID,
+        )
+        await conn.execute(
+            "INSERT INTO environments (id, name, description)"
+            " VALUES ($1, '_global', 'Sentinel for unscoped configurations')",
+            SENTINEL_UUID,
         )
 
 

@@ -113,7 +113,7 @@ class SharedValues:
         shared_value_id: str,
         service_id: str,
         environment_id: str,
-        value,
+        value: dict | list | str | int | float | bool | None,
     ) -> dict:
         async with self.pool.acquire() as conn:
             async with conn.transaction():

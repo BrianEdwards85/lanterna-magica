@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
+import asyncpg
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
@@ -32,7 +33,7 @@ async def health():
         async with pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
         return JSONResponse({"status": "ok"})
-    except Exception:
+    except (asyncpg.PostgresError, OSError):
         logger.exception("Health check failed")
         return JSONResponse({"status": "degraded"}, status_code=503)
 

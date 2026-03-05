@@ -46,7 +46,7 @@ class Configurations:
         *,
         service_id: str,
         environment_id: str,
-        body,
+        body: dict | list,
         substitutions: list[dict] | None = None,
     ) -> dict:
         async with self.pool.acquire() as conn:

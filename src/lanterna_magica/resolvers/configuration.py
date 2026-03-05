@@ -1,8 +1,10 @@
 from ariadne import MutationType, ObjectType, QueryType
 
+from lanterna_magica.data.configurations import Configurations
+
 
 class ConfigurationsResolver:
-    def __init__(self, configurations):
+    def __init__(self, configurations: Configurations):
         self.configurations = configurations
 
     # -- Query resolvers --
