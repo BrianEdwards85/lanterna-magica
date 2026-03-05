@@ -411,3 +411,26 @@ async def test_not_found_error_has_extension_code(client):
     assert_that(error["extensions"]["code"]).described_as(
         "not found error code"
     ).is_equal_to("NOT_FOUND")
+
+
+# -- Edge case tests --
+
+
+async def test_update_service_invalid_uuid(client):
+    body = await gql(
+        client,
+        UPDATE_SERVICE,
+        {"input": {"id": "not-a-uuid", "name": "test"}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("invalid uuid rejected").contains_key("errors")
+
+
+async def test_archive_service_invalid_uuid(client):
+    body = await gql(
+        client,
+        ARCHIVE_SERVICE,
+        {"id": "not-a-uuid"},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("invalid uuid rejected").contains_key("errors")

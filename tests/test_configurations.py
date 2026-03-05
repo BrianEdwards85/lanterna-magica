@@ -438,3 +438,57 @@ async def test_create_configuration_data_layer_returns_empty_substitutions(clien
 
     assert_that(result).described_as("result has substitutions key").contains_key("substitutions")
     assert_that(result["substitutions"]).described_as("substitutions is empty").is_empty()
+
+
+# -- Edge case tests --
+
+
+async def test_create_configuration_with_empty_object_body(client):
+    """An empty JSON object should be accepted as a configuration body."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    cfg = await _create_configuration(client, svc["id"], env["id"], {})
+    assert_that(cfg["body"]).described_as("empty object body").is_equal_to({})
+
+
+async def test_create_configuration_with_array_body(client):
+    """A JSON array should be accepted as a configuration body."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    cfg = await _create_configuration(client, svc["id"], env["id"], [1, 2, 3])
+    assert_that(cfg["body"]).described_as("array body").is_equal_to([1, 2, 3])
+
+
+async def test_create_configuration_invalid_service_uuid(client):
+    env = await create_environment(client)
+    body = await gql(
+        client,
+        CREATE_CONFIGURATION,
+        {"input": {"serviceId": "not-a-uuid", "environmentId": env["id"], "body": {}}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("invalid service uuid rejected").contains_key("errors")
+
+
+async def test_create_configuration_nonexistent_service(client):
+    env = await create_environment(client)
+    body = await gql(
+        client,
+        CREATE_CONFIGURATION,
+        {
+            "input": {
+                "serviceId": "00000000-0000-0000-0000-ffffffffffff",
+                "environmentId": env["id"],
+                "body": {"key": "value"},
+            }
+        },
+        expect_errors=True,
+    )
+    assert_that(body).described_as("nonexistent service rejected").contains_key("errors")
+
+
+async def test_configuration_by_invalid_uuid(client):
+    body = await gql(client, CONFIGURATION, {"id": "not-a-uuid"}, expect_errors=True)
+    assert_that(body).described_as("invalid uuid rejected").contains_key("errors")
