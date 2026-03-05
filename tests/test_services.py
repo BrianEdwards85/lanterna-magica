@@ -155,6 +155,19 @@ async def test_update_service_partial(client):
     assert updated["description"] == "original description"
 
 
+async def test_update_archived_service_fails(client):
+    svc = await _create_service(client)
+    await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
+
+    body = await gql(
+        client,
+        UPDATE_SERVICE,
+        {"input": {"id": svc["id"], "name": "new-name"}},
+        expect_errors=True,
+    )
+    assert "errors" in body
+
+
 async def test_archive_service(client):
     svc = await _create_service(client)
 

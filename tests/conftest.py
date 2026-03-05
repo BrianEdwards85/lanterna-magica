@@ -45,6 +45,9 @@ async def _clean_db(pool):
     yield
     async with pool.acquire() as conn:
         await conn.execute(
+            "DELETE FROM environments WHERE id != '00000000-0000-0000-0000-000000000000'"
+        )
+        await conn.execute(
             "DELETE FROM services WHERE id != '00000000-0000-0000-0000-000000000000'"
         )
 
