@@ -1,3 +1,4 @@
+from assertpy import assert_that
 from conftest import gql
 
 # -- Mutations --
@@ -72,18 +73,18 @@ async def _create_service(client, name="traefik", description=None):
 
 async def test_create_service(client):
     svc = await _create_service(client, "traefik", "reverse proxy")
-    assert svc["name"] == "traefik"
-    assert svc["description"] == "reverse proxy"
-    assert svc["id"] is not None
-    assert svc["createdAt"] is not None
-    assert svc["updatedAt"] is not None
-    assert svc["archivedAt"] is None
+    assert_that(svc["name"], "service name").is_equal_to("traefik")
+    assert_that(svc["description"], "service description").is_equal_to("reverse proxy")
+    assert_that(svc["id"], "service id").is_not_none()
+    assert_that(svc["createdAt"], "createdAt timestamp").is_not_none()
+    assert_that(svc["updatedAt"], "updatedAt timestamp").is_not_none()
+    assert_that(svc["archivedAt"], "new service should not be archived").is_none()
 
 
 async def test_create_service_minimal(client):
     svc = await _create_service(client, "nginx")
-    assert svc["name"] == "nginx"
-    assert svc["description"] is None
+    assert_that(svc["name"], "service name").is_equal_to("nginx")
+    assert_that(svc["description"], "description should be null when not provided").is_none()
 
 
 async def test_create_service_duplicate_name(client):
@@ -94,20 +95,20 @@ async def test_create_service_duplicate_name(client):
         {"input": {"name": "traefik"}},
         expect_errors=True,
     )
-    assert "errors" in body
+    assert_that(body, "duplicate name should return errors").contains_key("errors")
 
 
 async def test_service_by_id(client):
     svc = await _create_service(client)
     body = await gql(client, SERVICE, {"id": svc["id"]})
     found = body["data"]["service"]
-    assert found["id"] == svc["id"]
-    assert found["name"] == svc["name"]
+    assert_that(found["id"], "fetched service id").is_equal_to(svc["id"])
+    assert_that(found["name"], "fetched service name").is_equal_to(svc["name"])
 
 
 async def test_service_by_id_not_found(client):
     body = await gql(client, SERVICE, {"id": "00000000-0000-0000-0000-ffffffffffff"})
-    assert body["data"]["service"] is None
+    assert_that(body["data"]["service"], "non-existent id should return null").is_none()
 
 
 async def test_services_list(client):
@@ -117,15 +118,14 @@ async def test_services_list(client):
     body = await gql(client, SERVICES)
     edges = body["data"]["services"]["edges"]
     names = [e["node"]["name"] for e in edges]
-    assert "traefik" in names
-    assert "nginx" in names
+    assert_that(names, "services list").contains("traefik", "nginx")
 
 
 async def test_services_excludes_sentinel(client):
     body = await gql(client, SERVICES)
     edges = body["data"]["services"]["edges"]
     names = [e["node"]["name"] for e in edges]
-    assert "_global" not in names
+    assert_that(names, "sentinel row should be hidden").does_not_contain("_global")
 
 
 async def test_update_service(client):
@@ -137,9 +137,9 @@ async def test_update_service(client):
         {"input": {"id": svc["id"], "description": "reverse proxy"}},
     )
     updated = body["data"]["updateService"]
-    assert updated["name"] == "traefik"
-    assert updated["description"] == "reverse proxy"
-    assert updated["updatedAt"] >= svc["updatedAt"]
+    assert_that(updated["name"], "name unchanged").is_equal_to("traefik")
+    assert_that(updated["description"], "description updated").is_equal_to("reverse proxy")
+    assert_that(updated["updatedAt"], "updatedAt advanced").is_greater_than_or_equal_to(svc["updatedAt"])
 
 
 async def test_update_service_partial(client):
@@ -151,8 +151,8 @@ async def test_update_service_partial(client):
         {"input": {"id": svc["id"], "name": "traefik-v2"}},
     )
     updated = body["data"]["updateService"]
-    assert updated["name"] == "traefik-v2"
-    assert updated["description"] == "original description"
+    assert_that(updated["name"], "name updated").is_equal_to("traefik-v2")
+    assert_that(updated["description"], "description preserved").is_equal_to("original description")
 
 
 async def test_update_archived_service_fails(client):
@@ -165,7 +165,7 @@ async def test_update_archived_service_fails(client):
         {"input": {"id": svc["id"], "name": "new-name"}},
         expect_errors=True,
     )
-    assert "errors" in body
+    assert_that(body, "updating archived service should return errors").contains_key("errors")
 
 
 async def test_archive_service(client):
@@ -173,7 +173,7 @@ async def test_archive_service(client):
 
     body = await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})
     archived = body["data"]["archiveService"]
-    assert archived["archivedAt"] is not None
+    assert_that(archived["archivedAt"], "archivedAt should be set").is_not_none()
 
 
 async def test_archive_hides_from_list(client):
@@ -183,7 +183,7 @@ async def test_archive_hides_from_list(client):
     body = await gql(client, SERVICES)
     edges = body["data"]["services"]["edges"]
     ids = [e["node"]["id"] for e in edges]
-    assert svc["id"] not in ids
+    assert_that(ids, "archived service hidden from default list").does_not_contain(svc["id"])
 
 
 async def test_include_archived(client):
@@ -193,7 +193,7 @@ async def test_include_archived(client):
     body = await gql(client, SERVICES, {"includeArchived": True})
     edges = body["data"]["services"]["edges"]
     ids = [e["node"]["id"] for e in edges]
-    assert svc["id"] in ids
+    assert_that(ids, "archived service visible with includeArchived").contains(svc["id"])
 
 
 async def test_unarchive_service(client):
@@ -202,11 +202,11 @@ async def test_unarchive_service(client):
 
     body = await gql(client, UNARCHIVE_SERVICE, {"id": svc["id"]})
     restored = body["data"]["unarchiveService"]
-    assert restored["archivedAt"] is None
+    assert_that(restored["archivedAt"], "archivedAt cleared after unarchive").is_none()
 
     body = await gql(client, SERVICES)
     ids = [e["node"]["id"] for e in body["data"]["services"]["edges"]]
-    assert svc["id"] in ids
+    assert_that(ids, "unarchived service visible in default list").contains(svc["id"])
 
 
 async def test_search_by_name(client):
@@ -215,8 +215,8 @@ async def test_search_by_name(client):
 
     body = await gql(client, SERVICES, {"search": "traefik"})
     edges = body["data"]["services"]["edges"]
-    assert len(edges) == 1
-    assert edges[0]["node"]["name"] == "traefik"
+    assert_that(edges, "search by name result count").is_length(1)
+    assert_that(edges[0]["node"]["name"], "matched service name").is_equal_to("traefik")
 
 
 async def test_search_by_description(client):
@@ -225,8 +225,8 @@ async def test_search_by_description(client):
 
     body = await gql(client, SERVICES, {"search": "web server"})
     edges = body["data"]["services"]["edges"]
-    assert len(edges) == 1
-    assert edges[0]["node"]["name"] == "nginx"
+    assert_that(edges, "search by description result count").is_length(1)
+    assert_that(edges[0]["node"]["name"], "matched service name").is_equal_to("nginx")
 
 
 async def test_search_case_insensitive(client):
@@ -234,7 +234,7 @@ async def test_search_case_insensitive(client):
 
     body = await gql(client, SERVICES, {"search": "traefik"})
     edges = body["data"]["services"]["edges"]
-    assert len(edges) == 1
+    assert_that(edges, "case-insensitive search result count").is_length(1)
 
 
 async def test_pagination(client):
@@ -244,20 +244,20 @@ async def test_pagination(client):
     # First page
     body = await gql(client, SERVICES, {"first": 2})
     page1 = body["data"]["services"]
-    assert len(page1["edges"]) == 2
-    assert page1["pageInfo"]["hasNextPage"] is True
+    assert_that(page1["edges"], "page 1 edge count").is_length(2)
+    assert_that(page1["pageInfo"]["hasNextPage"], "page 1 has next page").is_true()
 
     # Second page
     body = await gql(client, SERVICES, {"first": 2, "after": page1["pageInfo"]["endCursor"]})
     page2 = body["data"]["services"]
-    assert len(page2["edges"]) == 2
-    assert page2["pageInfo"]["hasNextPage"] is True
+    assert_that(page2["edges"], "page 2 edge count").is_length(2)
+    assert_that(page2["pageInfo"]["hasNextPage"], "page 2 has next page").is_true()
 
     # Third page
     body = await gql(client, SERVICES, {"first": 2, "after": page2["pageInfo"]["endCursor"]})
     page3 = body["data"]["services"]
-    assert len(page3["edges"]) == 1
-    assert page3["pageInfo"]["hasNextPage"] is False
+    assert_that(page3["edges"], "page 3 edge count").is_length(1)
+    assert_that(page3["pageInfo"]["hasNextPage"], "page 3 has no next page").is_false()
 
 
 async def test_pagination_with_search(client):
@@ -267,15 +267,15 @@ async def test_pagination_with_search(client):
 
     body = await gql(client, SERVICES, {"search": "alpha", "first": 2})
     page1 = body["data"]["services"]
-    assert len(page1["edges"]) == 2
-    assert page1["pageInfo"]["hasNextPage"] is True
+    assert_that(page1["edges"], "search page 1 edge count").is_length(2)
+    assert_that(page1["pageInfo"]["hasNextPage"], "search page 1 has next page").is_true()
 
     body = await gql(
         client, SERVICES, {"search": "alpha", "first": 2, "after": page1["pageInfo"]["endCursor"]}
     )
     page2 = body["data"]["services"]
-    assert len(page2["edges"]) == 2
-    assert page2["pageInfo"]["hasNextPage"] is False
+    assert_that(page2["edges"], "search page 2 edge count").is_length(2)
+    assert_that(page2["pageInfo"]["hasNextPage"], "search page 2 has no next page").is_false()
 
 
 async def test_cursor_invalid_with_changed_search(client):
@@ -292,4 +292,4 @@ async def test_cursor_invalid_with_changed_search(client):
         {"search": "other", "first": 1, "after": cursor},
         expect_errors=True,
     )
-    assert "errors" in body
+    assert_that(body, "mismatched search cursor should return errors").contains_key("errors")
