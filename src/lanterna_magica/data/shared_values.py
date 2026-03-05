@@ -58,8 +58,9 @@ class SharedValues:
         return dict(row)
 
     async def update_shared_value(self, *, id: str, name: str | None = None) -> dict:
-        if name is not None:
-            validate_name(name)
+        if name is None:
+            raise ValueError("At least one field must be provided")
+        validate_name(name)
         row = await queries.update_shared_value(self.pool, id=id, name=name)
         if not row:
             raise ValueError("Shared value not found or is archived")

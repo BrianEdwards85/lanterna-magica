@@ -46,6 +46,8 @@ class Services:
     async def update_service(
         self, *, id: str, name: str | None = None, description: str | None = None
     ) -> dict:
+        if name is None and description is None:
+            raise ValueError("At least one field must be provided")
         if name is not None:
             validate_name(name)
         row = await queries.update_service(

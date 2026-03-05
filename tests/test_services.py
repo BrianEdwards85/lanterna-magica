@@ -152,6 +152,17 @@ async def test_update_service_partial(client):
     )
 
 
+async def test_update_service_no_fields_fails(client):
+    svc = await create_service(client)
+    body = await gql(
+        client,
+        UPDATE_SERVICE,
+        {"input": {"id": svc["id"]}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("no-op update rejected").contains_key("errors")
+
+
 async def test_update_archived_service_fails(client):
     svc = await create_service(client)
     await gql(client, ARCHIVE_SERVICE, {"id": svc["id"]})

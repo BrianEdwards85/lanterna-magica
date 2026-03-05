@@ -157,6 +157,17 @@ async def test_update_shared_value(client):
     )
 
 
+async def test_update_shared_value_no_fields_fails(client):
+    sv = await create_shared_value(client)
+    body = await gql(
+        client,
+        UPDATE_SHARED_VALUE,
+        {"input": {"id": sv["id"]}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("no-op update rejected").contains_key("errors")
+
+
 async def test_update_archived_shared_value_fails(client):
     sv = await create_shared_value(client)
     await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})

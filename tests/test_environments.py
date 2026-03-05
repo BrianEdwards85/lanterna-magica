@@ -156,6 +156,17 @@ async def test_update_environment_partial(client):
     )
 
 
+async def test_update_environment_no_fields_fails(client):
+    env = await create_environment(client)
+    body = await gql(
+        client,
+        UPDATE_ENVIRONMENT,
+        {"input": {"id": env["id"]}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("no-op update rejected").contains_key("errors")
+
+
 async def test_update_archived_environment_fails(client):
     env = await create_environment(client)
     await gql(client, ARCHIVE_ENVIRONMENT, {"id": env["id"]})
