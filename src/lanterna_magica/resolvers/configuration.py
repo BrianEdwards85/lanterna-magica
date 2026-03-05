@@ -49,9 +49,7 @@ class ConfigurationsResolver:
         return await info.context["environment_loader"].load(str(obj["environment_id"]))
 
     async def resolve_config_substitutions(self, obj, info):
-        return await self.configurations.get_substitutions(
-            configuration_id=str(obj["id"])
-        )
+        return await info.context["substitution_loader"].load(str(obj["id"]))
 
     # -- ConfigSubstitution field resolvers --
 

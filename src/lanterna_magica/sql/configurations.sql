@@ -30,6 +30,12 @@ from config_substitutions
 where configuration_id = :configuration_id
 order by jsonpath;
 
+-- name: get_substitutions_by_config_ids(ids)
+select id, configuration_id, jsonpath, shared_value_id, created_at
+from config_substitutions
+where configuration_id = any(:ids::uuid[])
+order by configuration_id, jsonpath;
+
 -- name: create_config_substitution(configuration_id, jsonpath, shared_value_id)^
 insert into config_substitutions (configuration_id, jsonpath, shared_value_id)
 values (:configuration_id, :jsonpath, :shared_value_id)

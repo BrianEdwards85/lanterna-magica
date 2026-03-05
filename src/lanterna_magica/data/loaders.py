@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 
 from aiodataloader import DataLoader
 from asyncpg import Pool
@@ -45,10 +46,28 @@ class ConfigurationLoader(_ByIdLoader):
         return [by_id.get(str(i)) for i in ids]
 
 
+class SubstitutionsByConfigLoader(DataLoader):
+    """One-to-many loader: configuration_id -> list of substitution rows."""
+
+    def __init__(self, pool: Pool):
+        super().__init__()
+        self.pool = pool
+
+    async def batch_load_fn(self, config_ids):
+        by_config = defaultdict(list)
+        async for r in queries.get_substitutions_by_config_ids(
+            self.pool, ids=list(config_ids)
+        ):
+            d = dict(r)
+            by_config[str(d["configuration_id"])].append(d)
+        return [by_config.get(str(cid), []) for cid in config_ids]
+
+
 def create_loaders(pool: Pool) -> dict:
     return {
         "configuration_loader": ConfigurationLoader(pool),
         "service_loader": ServiceLoader(pool),
         "environment_loader": EnvironmentLoader(pool),
         "shared_value_loader": SharedValueLoader(pool),
+        "substitution_loader": SubstitutionsByConfigLoader(pool),
     }
