@@ -2,8 +2,8 @@
 select id, name, created_at, updated_at, archived_at
 from shared_values
 where (:include_archived::boolean OR archived_at IS NULL)
-  and (:after_id::uuid IS NULL OR id > :after_id)
-order by id
+  and (:after_id::uuid IS NULL OR id < :after_id)
+order by id desc
 limit :page_limit;
 
 -- name: search_shared_values(query, include_archived, after_id, page_limit)
@@ -53,11 +53,11 @@ returning id, name, created_at, updated_at, archived_at;
 select id, shared_value_id, service_id, environment_id, value, is_current, created_at
 from shared_value_revisions
 where shared_value_id = :shared_value_id
-  and (:service_id::uuid IS NULL OR service_id = :service_id)
-  and (:environment_id::uuid IS NULL OR environment_id = :environment_id)
+  and (:service_id::uuid IS NULL OR service_id = :service_id OR service_id = '00000000-0000-0000-0000-000000000000')
+  and (:environment_id::uuid IS NULL OR environment_id = :environment_id OR environment_id = '00000000-0000-0000-0000-000000000000')
   and (:current_only::boolean IS FALSE OR is_current = true)
-  and (:after_id::uuid IS NULL OR id > :after_id)
-order by id
+  and (:after_id::uuid IS NULL OR id < :after_id)
+order by id desc
 limit :page_limit;
 
 -- name: get_current_revisions_by_shared_value_ids(shared_value_ids)

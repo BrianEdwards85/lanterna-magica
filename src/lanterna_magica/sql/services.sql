@@ -4,8 +4,8 @@ from services
 where id != '00000000-0000-0000-0000-000000000000'
   and (:include_archived::boolean OR archived_at IS NULL)
   and (:search::text IS NULL OR name ILIKE '%' || :search || '%' OR description ILIKE '%' || :search || '%')
-  and (:after_id::uuid IS NULL OR id > :after_id)
-order by id
+  and (:after_id::uuid IS NULL OR id < :after_id)
+order by id desc
 limit :page_limit;
 
 -- name: get_services_by_ids(ids)
