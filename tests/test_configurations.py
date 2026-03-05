@@ -32,6 +32,18 @@ mutation UpdateConfigSubstitution($input: SetConfigSubstitutionInput!) {
 }
 """
 
+# Substitution query helper for verifying updates
+CONFIGURATION_WITH_SUBS = """
+query Configuration($id: ID!) {
+    configuration(id: $id) {
+        id
+        substitutions {
+            id jsonpath sharedValue { id }
+        }
+    }
+}
+"""
+
 # -- Queries --
 
 CONFIGURATIONS = """
@@ -248,11 +260,16 @@ async def test_update_config_substitution(client):
         [{"jsonpath": "$.database.password", "sharedValueId": sv1["id"]}],
     )
 
-    sub_id = cfg["substitutions"][0]["id"]
     body = await gql(
         client,
         UPDATE_CONFIG_SUBSTITUTION,
-        {"input": {"configurationId": cfg["id"], "sharedValueId": sv2["id"]}},
+        {
+            "input": {
+                "configurationId": cfg["id"],
+                "jsonpath": "$.database.password",
+                "sharedValueId": sv2["id"],
+            }
+        },
     )
     updated = body["data"]["updateConfigSubstitution"]
     assert_that(updated["sharedValue"]["id"]).described_as(
@@ -261,6 +278,56 @@ async def test_update_config_substitution(client):
     assert_that(updated["jsonpath"]).described_as("jsonpath unchanged").is_equal_to(
         "$.database.password"
     )
+
+
+async def test_update_config_substitution_targets_single_jsonpath(client):
+    """Updating one substitution by jsonpath must not affect other substitutions."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv_host = await create_shared_value(client, "db_host")
+    sv_port = await create_shared_value(client, "db_port")
+    sv_host_v2 = await create_shared_value(client, "db_host_v2")
+
+    cfg = await _create_configuration(
+        client,
+        svc["id"],
+        env["id"],
+        {"database": {"host": "placeholder", "port": 0}},
+        [
+            {"jsonpath": "$.database.host", "sharedValueId": sv_host["id"]},
+            {"jsonpath": "$.database.port", "sharedValueId": sv_port["id"]},
+        ],
+    )
+
+    # Update only the host substitution
+    body = await gql(
+        client,
+        UPDATE_CONFIG_SUBSTITUTION,
+        {
+            "input": {
+                "configurationId": cfg["id"],
+                "jsonpath": "$.database.host",
+                "sharedValueId": sv_host_v2["id"],
+            }
+        },
+    )
+    updated = body["data"]["updateConfigSubstitution"]
+    assert_that(updated["sharedValue"]["id"]).described_as(
+        "host substitution updated"
+    ).is_equal_to(sv_host_v2["id"])
+
+    # Verify the port substitution was NOT changed
+    body = await gql(client, CONFIGURATIONS)
+    items = nodes(body["data"]["configurations"]["edges"])
+    config_node = next(n for n in items if n["id"] == cfg["id"])
+    subs_by_path = {s["jsonpath"]: s for s in config_node["substitutions"]}
+
+    assert_that(subs_by_path["$.database.port"]["sharedValue"]["id"]).described_as(
+        "port substitution should be unchanged"
+    ).is_equal_to(sv_port["id"])
+    assert_that(subs_by_path["$.database.host"]["sharedValue"]["id"]).described_as(
+        "host substitution should be updated"
+    ).is_equal_to(sv_host_v2["id"])
 
 
 async def test_configuration_substitutions_field(client):

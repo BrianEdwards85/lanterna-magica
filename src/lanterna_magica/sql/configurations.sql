@@ -35,8 +35,9 @@ insert into config_substitutions (configuration_id, jsonpath, shared_value_id)
 values (:configuration_id, :jsonpath, :shared_value_id)
 returning id, configuration_id, jsonpath, shared_value_id, created_at;
 
--- name: update_config_substitution(configuration_id, shared_value_id)^
+-- name: update_config_substitution(configuration_id, jsonpath, shared_value_id)^
 update config_substitutions
 set shared_value_id = :shared_value_id
 where configuration_id = :configuration_id
+  and jsonpath = :jsonpath
 returning id, configuration_id, jsonpath, shared_value_id, created_at;

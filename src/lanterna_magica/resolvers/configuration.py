@@ -33,6 +33,7 @@ class ConfigurationsResolver:
     async def resolve_update_config_substitution(self, _obj, info, *, input):
         return await self.configurations.update_config_substitution(
             configuration_id=input["configuration_id"],
+            jsonpath=input["jsonpath"],
             shared_value_id=input["shared_value_id"],
         )
 

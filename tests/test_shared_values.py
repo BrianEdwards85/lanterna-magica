@@ -253,7 +253,7 @@ async def test_pagination(client):
 # -- Revision Tests --
 
 
-async def testcreate_revision(client):
+async def test_create_revision(client):
     sv = await _create_shared_value(client)
     svc = await create_service(client)
     env = await create_environment(client)

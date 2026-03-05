@@ -40,6 +40,7 @@ input CreateConfigurationInput {
 
 input SetConfigSubstitutionInput {
   configurationId: ID!
+  jsonpath: String!
   sharedValueId: ID!
 }
 

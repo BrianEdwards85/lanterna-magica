@@ -77,11 +77,13 @@ class Configurations:
         self,
         *,
         configuration_id: str,
+        jsonpath: str,
         shared_value_id: str,
     ) -> dict:
         row = await queries.update_config_substitution(
             self.pool,
             configuration_id=configuration_id,
+            jsonpath=jsonpath,
             shared_value_id=shared_value_id,
         )
         if not row:
