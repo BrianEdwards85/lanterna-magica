@@ -30,18 +30,16 @@
 
           [:div.mb-4
            [:label.bp6-label "Name"]
-           [bp/input-group {:value       (or (:name service) "")
-                            :placeholder "my-service"
-                            :disabled    (and editing archived?)
-                            :on-change   #(rf/dispatch [::events/set-service-field
-                                                        :name (.. % -target -value)])}]]
+           [comp/local-input {:value       (or (:name service) "")
+                              :placeholder "my-service"
+                              :disabled    (and editing archived?)
+                              :on-change   #(rf/dispatch [::events/set-service-field :name %])}]]
           [:div.mb-4
            [:label.bp6-label "Description " [:span.text-tn-fg-dim "(optional)"]]
-           [bp/input-group {:value       (or (:description service) "")
-                            :placeholder "What this service does..."
-                            :disabled    (and editing archived?)
-                            :on-change   #(rf/dispatch [::events/set-service-field
-                                                        :description (.. % -target -value)])}]]
+           [comp/local-input {:value       (or (:description service) "")
+                              :placeholder "What this service does..."
+                              :disabled    (and editing archived?)
+                              :on-change   #(rf/dispatch [::events/set-service-field :description %])}]]
 
           (when save-error
             [comp/error-banner "Failed to save service."])

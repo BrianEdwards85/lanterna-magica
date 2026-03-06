@@ -1,6 +1,7 @@
 (ns lanterna-magica.views.components
   "Shared, reusable UI components for lanterna-magica."
-  (:require [lanterna-magica.bp :as bp]))
+  (:require [lanterna-magica.bp :as bp]
+            [reagent.core :as r]))
 
 ;; ---------------------------------------------------------------------------
 ;; Search Input
@@ -12,6 +13,41 @@
                    :placeholder (or placeholder "Search...")
                    :value       (or value "")
                    :on-change   #(on-change (.. % -target -value))}])
+
+;; ---------------------------------------------------------------------------
+;; Local-state text input (prevents cursor-jump on re-frame round-trip)
+;; ---------------------------------------------------------------------------
+
+(defn local-input
+  "A text input that uses local state to avoid cursor-jump issues.
+   Props: :value, :on-change, :placeholder, :disabled, and any extra keys
+   passed to the underlying <input>."
+  [{:keys [value]}]
+  (let [local (r/atom (or value ""))]
+    (fn [{:keys [value on-change placeholder disabled] :as props}]
+      (when (and (some? value) (not= value @local))
+        (reset! local value))
+      [:input.bp6-input.w-full
+       (merge (dissoc props :on-change)
+              {:value     @local
+               :on-change #(let [v (.. % -target -value)]
+                             (reset! local v)
+                             (when on-change (on-change v)))})])))
+
+(defn local-textarea
+  "A textarea that uses local state to avoid cursor-jump issues.
+   Props: :value, :on-change, :rows, :placeholder, :class, and any extra keys."
+  [{:keys [value]}]
+  (let [local (r/atom (or value ""))]
+    (fn [{:keys [value on-change] :as props}]
+      (when (and (some? value) (not= value @local))
+        (reset! local value))
+      [:textarea.bp6-input.w-full
+       (merge (dissoc props :on-change)
+              {:value     @local
+               :on-change #(let [v (.. % -target -value)]
+                             (reset! local v)
+                             (when on-change (on-change v)))})])))
 
 ;; ---------------------------------------------------------------------------
 ;; Archive Toggle

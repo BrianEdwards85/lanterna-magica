@@ -45,13 +45,11 @@
              [:option {:value id} name])]]]
         [:div.mb-4
          [:label.bp6-label "Configuration Body (JSON)"]
-         [bp/text-area {:fill      true
-                        :rows      12
-                        :value     (or (:body-text configuration) "")
-                        :class     "font-mono text-sm"
-                        :placeholder "{\n  \"key\": \"value\"\n}"
-                        :on-change #(rf/dispatch [::events/set-configuration-field
-                                                  :body-text (.. % -target -value)])}]]
+         [comp/local-textarea {:rows        12
+                               :value       (or (:body-text configuration) "")
+                               :class       "font-mono text-sm"
+                               :placeholder "{\n  \"key\": \"value\"\n}"
+                               :on-change   #(rf/dispatch [::events/set-configuration-field :body-text %])}]]
         (when error
           [comp/error-banner "Failed to create configuration. Check your JSON."])]
        [bp/dialog-footer

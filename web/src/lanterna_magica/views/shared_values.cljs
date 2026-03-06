@@ -23,10 +23,9 @@
        [bp/dialog-body
         [:div.mb-4
          [:label.bp6-label "Name"]
-         [bp/input-group {:value       (or (:name shared-value) "")
-                          :placeholder "DATABASE_URL"
-                          :on-change   #(rf/dispatch [::events/set-shared-value-field
-                                                      :name (.. % -target -value)])}]]
+         [comp/local-input {:value       (or (:name shared-value) "")
+                            :placeholder "DATABASE_URL"
+                            :on-change   #(rf/dispatch [::events/set-shared-value-field :name %])}]]
         (when error
           [comp/error-banner "Failed to create shared value."])]
        [bp/dialog-footer
@@ -77,12 +76,11 @@
              [:option {:value id} name])]]]
         [:div.mb-4
          [:label.bp6-label "Value (JSON)"]
-         [bp/text-area {:fill      true
-                        :rows      6
-                        :value     (or (:value-text revision) "")
-                        :placeholder "{\"key\": \"value\"}"
-                        :on-change #(rf/dispatch [::events/set-revision-field
-                                                  :value-text (.. % -target -value)])}]]
+         [comp/local-textarea {:rows        6
+                               :value       (or (:value-text revision) "")
+                               :placeholder "{\"key\": \"value\"}"
+                               :class       "font-mono text-sm"
+                               :on-change   #(rf/dispatch [::events/set-revision-field :value-text %])}]]
         (when error
           [comp/error-banner "Failed to create revision. Check your JSON."])]
        [bp/dialog-footer

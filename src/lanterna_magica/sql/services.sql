@@ -1,8 +1,7 @@
 -- name: get_services(include_archived, search, after_id, page_limit)
 select id, name, description, created_at, updated_at, archived_at
 from services
-where id != '00000000-0000-0000-0000-000000000000'
-  and (:include_archived::boolean OR archived_at IS NULL)
+where (:include_archived::boolean OR archived_at IS NULL)
   and (:search::text IS NULL OR name ILIKE '%' || :search || '%' ESCAPE '\' OR description ILIKE '%' || :search || '%' ESCAPE '\')
   and (:after_id::uuid IS NULL OR id < :after_id)
 order by id desc

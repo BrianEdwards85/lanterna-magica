@@ -30,18 +30,16 @@
 
           [:div.mb-4
            [:label.bp6-label "Name"]
-           [bp/input-group {:value       (or (:name environment) "")
-                            :placeholder "production"
-                            :disabled    (and editing archived?)
-                            :on-change   #(rf/dispatch [::events/set-environment-field
-                                                        :name (.. % -target -value)])}]]
+           [comp/local-input {:value       (or (:name environment) "")
+                              :placeholder "production"
+                              :disabled    (and editing archived?)
+                              :on-change   #(rf/dispatch [::events/set-environment-field :name %])}]]
           [:div.mb-4
            [:label.bp6-label "Description " [:span.text-tn-fg-dim "(optional)"]]
-           [bp/input-group {:value       (or (:description environment) "")
-                            :placeholder "Production environment"
-                            :disabled    (and editing archived?)
-                            :on-change   #(rf/dispatch [::events/set-environment-field
-                                                        :description (.. % -target -value)])}]]
+           [comp/local-input {:value       (or (:description environment) "")
+                              :placeholder "Production environment"
+                              :disabled    (and editing archived?)
+                              :on-change   #(rf/dispatch [::events/set-environment-field :description %])}]]
 
           (when save-error
             [comp/error-banner "Failed to save environment."])
