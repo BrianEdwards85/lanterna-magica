@@ -186,7 +186,7 @@
  (fn [_ _]
    {:dispatch [::re-graph/query
                {:query     gql/environments-query
-                :variables {:first 50}
+                :variables {:first 10}
                 :callback  [::events/on-environments-list]}]}))
 
 (rf/reg-event-fx
@@ -196,3 +196,30 @@
    (let [{:keys [data]} response
          nodes (mapv :node (get-in data [:environments :edges]))]
      {:db (assoc db :all-environments nodes)})))
+
+;; ---------------------------------------------------------------------------
+;; Search environments for dropdowns
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/search-environments-list
+ (fn [_ [_ query]]
+   (if (seq query)
+     {:dispatch [::re-graph/query
+                 {:query     gql/environments-query
+                  :variables {:search query :first 10}
+                  :callback  [::events/on-environments-search-results]}]}
+     {:dispatch [::events/clear-environments-search-results]})))
+
+(rf/reg-event-fx
+ ::events/on-environments-search-results
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [data]} response
+         nodes (mapv :node (get-in data [:environments :edges]))]
+     {:db (assoc db :environments-search-results nodes)})))
+
+(rf/reg-event-db
+ ::events/clear-environments-search-results
+ (fn [db _]
+   (assoc db :environments-search-results nil)))

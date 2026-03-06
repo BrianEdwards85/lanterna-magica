@@ -3,6 +3,7 @@
             [lanterna-magica.events :as events]
             [lanterna-magica.subs :as subs]
             [lanterna-magica.views.components :as comp]
+            [lanterna-magica.components.select :as sel]
             [re-frame.core :as rf]
             [reagent.core :as r]))
 
@@ -14,8 +15,8 @@
   (let [{:keys [open? configuration]} @(rf/subscribe [::subs/configuration-dialog])
         saving?      @(rf/subscribe [::subs/loading? :save-configuration])
         error        @(rf/subscribe [::subs/error :save-configuration])
-        services     @(rf/subscribe [::subs/all-services])
-        environments @(rf/subscribe [::subs/all-environments])]
+        services     @(rf/subscribe [::subs/services-dropdown-items])
+        environments @(rf/subscribe [::subs/environments-dropdown-items])]
     (when open?
       [bp/dialog {:title    "Create Configuration"
                   :icon     "document"
@@ -23,26 +24,28 @@
                   :on-close #(rf/dispatch [::events/close-configuration-dialog])
                   :class    "w-full max-w-lg"}
        [bp/dialog-body
-        [:div.mb-4
-         [:label.bp6-label "Service"]
-         [:div.bp6-html-select.w-full
-          [:select {:value     (or (:serviceId configuration) "")
-                    :on-change #(rf/dispatch [::events/set-configuration-field
-                                              :serviceId (.. % -target -value)])}
-           [:option {:value ""} "Select service..."]
-           (for [{:keys [id name]} services]
-             ^{:key id}
-             [:option {:value id} name])]]]
-        [:div.mb-4
-         [:label.bp6-label "Environment"]
-         [:div.bp6-html-select.w-full
-          [:select {:value     (or (:environmentId configuration) "")
-                    :on-change #(rf/dispatch [::events/set-configuration-field
-                                              :environmentId (.. % -target -value)])}
-           [:option {:value ""} "Select environment..."]
-           (for [{:keys [id name]} environments]
-             ^{:key id}
-             [:option {:value id} name])]]]
+        [:div {:class "mb-4 flex items-center gap-3"}
+         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Service"]
+         [:div.flex-1
+          [sel/searchable-select
+           {:items            services
+            :selected-id      (:serviceId configuration)
+            :on-select        #(rf/dispatch [::events/set-configuration-field :serviceId %])
+            :on-query-change  [::events/search-services-list]
+            :on-clear-search  [::events/clear-services-search-results]
+            :icon             "applications"
+            :placeholder      "Select service..."}]]]
+        [:div {:class "mb-4 flex items-center gap-3"}
+         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Environment"]
+         [:div.flex-1
+          [sel/searchable-select
+           {:items            environments
+            :selected-id      (:environmentId configuration)
+            :on-select        #(rf/dispatch [::events/set-configuration-field :environmentId %])
+            :on-query-change  [::events/search-environments-list]
+            :on-clear-search  [::events/clear-environments-search-results]
+            :icon             "globe-network"
+            :placeholder      "Select environment..."}]]]
         [:div.mb-4
          [:label.bp6-label "Configuration Body (JSON)"]
          [comp/local-textarea {:rows        12
@@ -113,26 +116,28 @@
 ;; ---------------------------------------------------------------------------
 
 (defn filter-bar []
-  (let [services     @(rf/subscribe [::subs/all-services])
-        environments @(rf/subscribe [::subs/all-environments])
+  (let [services     @(rf/subscribe [::subs/services-dropdown-items])
+        environments @(rf/subscribe [::subs/environments-dropdown-items])
         page         @(rf/subscribe [::subs/configurations-page])]
     [:div {:class "flex items-center gap-3 mb-4"}
-     [:div.bp6-html-select
-      [:select {:value     (or (:filter-service-id page) "")
-                :on-change #(rf/dispatch [::events/set-config-filter-service
-                                          (.. % -target -value)])}
-       [:option {:value ""} "All services"]
-       (for [{:keys [id name]} services]
-         ^{:key id}
-         [:option {:value id} name])]]
-     [:div.bp6-html-select
-      [:select {:value     (or (:filter-environment-id page) "")
-                :on-change #(rf/dispatch [::events/set-config-filter-environment
-                                          (.. % -target -value)])}
-       [:option {:value ""} "All environments"]
-       (for [{:keys [id name]} environments]
-         ^{:key id}
-         [:option {:value id} name])]]]))
+     [:div.flex-1
+      [sel/searchable-select
+       {:items            services
+        :selected-id      (:filter-service-id page)
+        :on-select        #(rf/dispatch [::events/set-config-filter-service %])
+        :on-query-change  [::events/search-services-list]
+        :on-clear-search  [::events/clear-services-search-results]
+        :icon             "applications"
+        :placeholder      "All services"}]]
+     [:div.flex-1
+      [sel/searchable-select
+       {:items            environments
+        :selected-id      (:filter-environment-id page)
+        :on-select        #(rf/dispatch [::events/set-config-filter-environment %])
+        :on-query-change  [::events/search-environments-list]
+        :on-clear-search  [::events/clear-environments-search-results]
+        :icon             "globe-network"
+        :placeholder      "All environments"}]]]))
 
 ;; ---------------------------------------------------------------------------
 ;; Screen

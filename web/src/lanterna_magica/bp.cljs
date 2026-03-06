@@ -1,6 +1,7 @@
 (ns lanterna-magica.bp
   "Reagent wrappers for Blueprint.js React components."
   (:require ["@blueprintjs/core" :as bp]
+            ["@blueprintjs/select" :as bp-select]
             [reagent.core :as r]))
 
 (def button          (r/adapt-react-class bp/Button))
@@ -19,3 +20,7 @@
 (def switch-control  (r/adapt-react-class bp/Switch))
 (def tag             (r/adapt-react-class bp/Tag))
 (def text-area       (r/adapt-react-class bp/TextArea))
+
+;; @blueprintjs/select
+(def select-component bp-select/Select)
+(def menu-item       (r/adapt-react-class bp/MenuItem))

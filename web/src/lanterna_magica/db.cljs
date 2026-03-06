@@ -16,9 +16,13 @@
    :configurations-page {:edges [] :page-info {:hasNextPage false :endCursor nil}
                           :filter-service-id nil :filter-environment-id nil}
 
-   ;; Flat lists for dropdowns (all active, no pagination)
+   ;; Flat lists for dropdowns (initial set, no pagination)
    :all-services     []
    :all-environments []
+
+   ;; Search results for searchable dropdowns
+   :services-search-results     nil
+   :environments-search-results nil
 
    ;; Dialog state per entity
    :service-dialog      {:open? false}

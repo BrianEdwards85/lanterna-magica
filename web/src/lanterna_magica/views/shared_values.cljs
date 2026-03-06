@@ -3,6 +3,7 @@
             [lanterna-magica.events :as events]
             [lanterna-magica.subs :as subs]
             [lanterna-magica.views.components :as comp]
+            [lanterna-magica.components.select :as sel]
             [re-frame.core :as rf]
             [reagent.core :as r]))
 
@@ -45,8 +46,8 @@
   (let [{:keys [open? revision]} @(rf/subscribe [::subs/revision-dialog])
         saving?      @(rf/subscribe [::subs/loading? :save-revision])
         error        @(rf/subscribe [::subs/error :save-revision])
-        services     @(rf/subscribe [::subs/all-services])
-        environments @(rf/subscribe [::subs/all-environments])]
+        services     @(rf/subscribe [::subs/services-dropdown-items])
+        environments @(rf/subscribe [::subs/environments-dropdown-items])]
     (when open?
       [bp/dialog {:title    "Create Revision"
                   :icon     "history"
@@ -54,26 +55,28 @@
                   :on-close #(rf/dispatch [::events/close-revision-dialog])
                   :class    "w-full max-w-md"}
        [bp/dialog-body
-        [:div.mb-4
-         [:label.bp6-label "Service"]
-         [:div.bp6-html-select
-          [:select {:value     (or (:serviceId revision) "")
-                    :on-change #(rf/dispatch [::events/set-revision-field
-                                              :serviceId (.. % -target -value)])}
-           [:option {:value ""} "Select service..."]
-           (for [{:keys [id name]} services]
-             ^{:key id}
-             [:option {:value id} name])]]]
-        [:div.mb-4
-         [:label.bp6-label "Environment"]
-         [:div.bp6-html-select
-          [:select {:value     (or (:environmentId revision) "")
-                    :on-change #(rf/dispatch [::events/set-revision-field
-                                              :environmentId (.. % -target -value)])}
-           [:option {:value ""} "Select environment..."]
-           (for [{:keys [id name]} environments]
-             ^{:key id}
-             [:option {:value id} name])]]]
+        [:div {:class "mb-4 flex items-center gap-3"}
+         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Service"]
+         [:div.flex-1
+          [sel/searchable-select
+           {:items            services
+            :selected-id      (:serviceId revision)
+            :on-select        #(rf/dispatch [::events/set-revision-field :serviceId %])
+            :on-query-change  [::events/search-services-list]
+            :on-clear-search  [::events/clear-services-search-results]
+            :icon             "applications"
+            :placeholder      "Select service..."}]]]
+        [:div {:class "mb-4 flex items-center gap-3"}
+         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Environment"]
+         [:div.flex-1
+          [sel/searchable-select
+           {:items            environments
+            :selected-id      (:environmentId revision)
+            :on-select        #(rf/dispatch [::events/set-revision-field :environmentId %])
+            :on-query-change  [::events/search-environments-list]
+            :on-clear-search  [::events/clear-environments-search-results]
+            :icon             "globe-network"
+            :placeholder      "Select environment..."}]]]
         [:div.mb-4
          [:label.bp6-label "Value (JSON)"]
          [comp/local-textarea {:rows        6

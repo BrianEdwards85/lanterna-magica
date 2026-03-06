@@ -186,7 +186,7 @@
  (fn [_ _]
    {:dispatch [::re-graph/query
                {:query     gql/services-query
-                :variables {:first 50}
+                :variables {:first 10}
                 :callback  [::events/on-services-list]}]}))
 
 (rf/reg-event-fx
@@ -196,3 +196,30 @@
    (let [{:keys [data]} response
          nodes (mapv :node (get-in data [:services :edges]))]
      {:db (assoc db :all-services nodes)})))
+
+;; ---------------------------------------------------------------------------
+;; Search services for dropdowns
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/search-services-list
+ (fn [_ [_ query]]
+   (if (seq query)
+     {:dispatch [::re-graph/query
+                 {:query     gql/services-query
+                  :variables {:search query :first 10}
+                  :callback  [::events/on-services-search-results]}]}
+     {:dispatch [::events/clear-services-search-results]})))
+
+(rf/reg-event-fx
+ ::events/on-services-search-results
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [data]} response
+         nodes (mapv :node (get-in data [:services :edges]))]
+     {:db (assoc db :services-search-results nodes)})))
+
+(rf/reg-event-db
+ ::events/clear-services-search-results
+ (fn [db _]
+   (assoc db :services-search-results nil)))

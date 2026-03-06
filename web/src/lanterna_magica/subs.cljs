@@ -21,6 +21,17 @@
 (rf/reg-sub ::all-services     (fn [db _] (:all-services db)))
 (rf/reg-sub ::all-environments (fn [db _] (:all-environments db)))
 
+(rf/reg-sub ::services-search-results     (fn [db _] (:services-search-results db)))
+(rf/reg-sub ::environments-search-results (fn [db _] (:environments-search-results db)))
+
+(rf/reg-sub ::services-dropdown-items
+ (fn [db _]
+   (or (:services-search-results db) (:all-services db))))
+
+(rf/reg-sub ::environments-dropdown-items
+ (fn [db _]
+   (or (:environments-search-results db) (:all-environments db))))
+
 ;; -- Dialog state ---------------------------------------------------------
 
 (rf/reg-sub ::service-dialog      (fn [db _] (:service-dialog db)))
