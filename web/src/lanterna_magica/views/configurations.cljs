@@ -144,56 +144,51 @@
 ;; ---------------------------------------------------------------------------
 
 (defn configurations-screen []
-  (let [initial-load (r/atom true)]
-    (when @initial-load
-      (rf/dispatch [::events/fetch-configurations])
-      (reset! initial-load false))
-    (fn []
-      (let [{:keys [edges page-info selected-id]} @(rf/subscribe [::subs/configurations-page])
-            loading?   @(rf/subscribe [::subs/loading? :configurations])
-            page-error @(rf/subscribe [::subs/error :configurations])]
-        [:div {:class "max-w-2xl mx-auto px-4 py-4"}
-         (when page-error
-           [comp/error-banner "Failed to load configurations."])
+  (let [{:keys [edges page-info selected-id]} @(rf/subscribe [::subs/configurations-page])
+        loading?   @(rf/subscribe [::subs/loading? :configurations])
+        page-error @(rf/subscribe [::subs/error :configurations])]
+    [:div {:class "max-w-2xl mx-auto px-4 py-4"}
+     (when page-error
+       [comp/error-banner "Failed to load configurations."])
 
-         [comp/page-header {:title      "Configurations"
-                            :loading?   loading?
-                            :on-refresh #(rf/dispatch [::events/fetch-configurations])
-                            :on-create  #(rf/dispatch [::events/open-configuration-dialog])}]
+     [comp/page-header {:title      "Configurations"
+                        :loading?   loading?
+                        :on-refresh #(rf/dispatch [::events/fetch-configurations])
+                        :on-create  #(rf/dispatch [::events/open-configuration-dialog])}]
 
-         [filter-bar]
+     [filter-bar]
 
-         (cond
-           (and loading? (empty? edges))
-           [comp/loading-spinner]
+     (cond
+       (and loading? (empty? edges))
+       [comp/loading-spinner]
 
-           (empty? edges)
-           [comp/empty-state {:icon        "document"
-                              :title       "No configurations found"
-                              :description "Create a configuration or adjust filters."}]
+       (empty? edges)
+       [comp/empty-state {:icon        "document"
+                          :title       "No configurations found"
+                          :description "Create a configuration or adjust filters."}]
 
-           :else
-           [:div
-            (for [edge edges]
-              (let [node (:node edge)]
-                ^{:key (:id node)}
-                [:div {:class (str "mb-2 rounded p-3 cursor-pointer transition-all "
-                                   "bg-tn-bg-card hover:brightness-110"
-                                   (when (= (:id node) selected-id) " ring-1 ring-tn-blue/50"))
-                       :on-click #(rf/dispatch [::events/select-configuration (:id node)])}
-                 [:div.flex.items-center.justify-between
-                  [:div.flex.items-center.gap-2
-                   [:span.font-semibold
-                    (str (get-in node [:service :name]) " / " (get-in node [:environment :name]))]
-                   (when (:isCurrent node)
-                     [bp/tag {:intent "success" :minimal true} "current"])]
-                  [:span.text-xs.text-tn-fg-dim (:createdAt node)]]]))
-            [comp/load-more-button
-             {:has-next? (:hasNextPage page-info)
-              :loading?  loading?
-              :on-click  #(rf/dispatch [::events/load-more-configurations])}]])
+       :else
+       [:div
+        (for [edge edges]
+          (let [node (:node edge)]
+            ^{:key (:id node)}
+            [:div {:class (str "mb-2 rounded p-3 cursor-pointer transition-all "
+                               "bg-tn-bg-card hover:brightness-110"
+                               (when (= (:id node) selected-id) " ring-1 ring-tn-blue/50"))
+                   :on-click #(rf/dispatch [::events/select-configuration (:id node)])}
+             [:div.flex.items-center.justify-between
+              [:div.flex.items-center.gap-2
+               [:span.font-semibold
+                (str (get-in node [:service :name]) " / " (get-in node [:environment :name]))]
+               (when (:isCurrent node)
+                 [bp/tag {:intent "success" :minimal true} "current"])]
+              [:span.text-xs.text-tn-fg-dim (:createdAt node)]]]))
+        [comp/load-more-button
+         {:has-next? (:hasNextPage page-info)
+          :loading?  loading?
+          :on-click  #(rf/dispatch [::events/load-more-configurations])}]])
 
-         (when selected-id
-           [config-detail-panel])
+     (when selected-id
+       [config-detail-panel])
 
-         [configuration-dialog]]))))
+     [configuration-dialog]]))

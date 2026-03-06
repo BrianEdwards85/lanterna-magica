@@ -69,52 +69,47 @@
 ;; ---------------------------------------------------------------------------
 
 (defn services-screen []
-  (let [initial-load (r/atom true)]
-    (when @initial-load
-      (rf/dispatch [::events/fetch-services])
-      (reset! initial-load false))
-    (fn []
-      (let [{:keys [search show-archived edges page-info]} @(rf/subscribe [::subs/services-page])
-            loading?   @(rf/subscribe [::subs/loading? :services])
-            page-error @(rf/subscribe [::subs/error :services])]
-        [:div {:class "max-w-2xl mx-auto px-4 py-4"}
-         (when page-error
-           [comp/error-banner "Failed to load services."])
+  (let [{:keys [search show-archived edges page-info]} @(rf/subscribe [::subs/services-page])
+        loading?   @(rf/subscribe [::subs/loading? :services])
+        page-error @(rf/subscribe [::subs/error :services])]
+    [:div {:class "max-w-2xl mx-auto px-4 py-4"}
+     (when page-error
+       [comp/error-banner "Failed to load services."])
 
-         [comp/page-header {:title      "Services"
-                            :loading?   loading?
-                            :on-refresh #(rf/dispatch [::events/fetch-services])
-                            :on-create  #(rf/dispatch [::events/open-service-dialog nil])}]
+     [comp/page-header {:title      "Services"
+                        :loading?   loading?
+                        :on-refresh #(rf/dispatch [::events/fetch-services])
+                        :on-create  #(rf/dispatch [::events/open-service-dialog nil])}]
 
-         [comp/search-bar {:search              search
-                           :on-search-change    #(rf/dispatch [::events/set-services-search %])
-                           :show-archived       show-archived
-                           :on-toggle-archived  #(rf/dispatch [::events/toggle-services-archived])
-                           :placeholder         "Search services..."}]
+     [comp/search-bar {:search              search
+                       :on-search-change    #(rf/dispatch [::events/set-services-search %])
+                       :show-archived       show-archived
+                       :on-toggle-archived  #(rf/dispatch [::events/toggle-services-archived])
+                       :placeholder         "Search services..."}]
 
-         (cond
-           (and loading? (empty? edges))
-           [comp/loading-spinner]
+     (cond
+       (and loading? (empty? edges))
+       [comp/loading-spinner]
 
-           (empty? edges)
-           [comp/empty-state {:icon        "applications"
-                              :title       "No services found"
-                              :description (if (seq search)
-                                             "Try a different search term."
-                                             "Create your first service to get started.")}]
+       (empty? edges)
+       [comp/empty-state {:icon        "applications"
+                          :title       "No services found"
+                          :description (if (seq search)
+                                         "Try a different search term."
+                                         "Create your first service to get started.")}]
 
-           :else
-           [:div
-            (for [edge edges]
-              ^{:key (get-in edge [:node :id])}
-              [comp/entity-card
-               {:name        (get-in edge [:node :name])
-                :description (get-in edge [:node :description])
-                :archived?   (some? (get-in edge [:node :archivedAt]))
-                :on-click    #(rf/dispatch [::events/open-service-dialog (:node edge)])}])
-            [comp/load-more-button
-             {:has-next? (:hasNextPage page-info)
-              :loading?  loading?
-              :on-click  #(rf/dispatch [::events/load-more-services])}]])
+       :else
+       [:div
+        (for [edge edges]
+          ^{:key (get-in edge [:node :id])}
+          [comp/entity-card
+           {:name        (get-in edge [:node :name])
+            :description (get-in edge [:node :description])
+            :archived?   (some? (get-in edge [:node :archivedAt]))
+            :on-click    #(rf/dispatch [::events/open-service-dialog (:node edge)])}])
+        [comp/load-more-button
+         {:has-next? (:hasNextPage page-info)
+          :loading?  loading?
+          :on-click  #(rf/dispatch [::events/load-more-services])}]])
 
-         [service-dialog]]))))
+     [service-dialog]]))

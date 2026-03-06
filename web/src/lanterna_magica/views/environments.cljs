@@ -69,52 +69,47 @@
 ;; ---------------------------------------------------------------------------
 
 (defn environments-screen []
-  (let [initial-load (r/atom true)]
-    (when @initial-load
-      (rf/dispatch [::events/fetch-environments])
-      (reset! initial-load false))
-    (fn []
-      (let [{:keys [search show-archived edges page-info]} @(rf/subscribe [::subs/environments-page])
-            loading?   @(rf/subscribe [::subs/loading? :environments])
-            page-error @(rf/subscribe [::subs/error :environments])]
-        [:div {:class "max-w-2xl mx-auto px-4 py-4"}
-         (when page-error
-           [comp/error-banner "Failed to load environments."])
+  (let [{:keys [search show-archived edges page-info]} @(rf/subscribe [::subs/environments-page])
+        loading?   @(rf/subscribe [::subs/loading? :environments])
+        page-error @(rf/subscribe [::subs/error :environments])]
+    [:div {:class "max-w-2xl mx-auto px-4 py-4"}
+     (when page-error
+       [comp/error-banner "Failed to load environments."])
 
-         [comp/page-header {:title      "Environments"
-                            :loading?   loading?
-                            :on-refresh #(rf/dispatch [::events/fetch-environments])
-                            :on-create  #(rf/dispatch [::events/open-environment-dialog nil])}]
+     [comp/page-header {:title      "Environments"
+                        :loading?   loading?
+                        :on-refresh #(rf/dispatch [::events/fetch-environments])
+                        :on-create  #(rf/dispatch [::events/open-environment-dialog nil])}]
 
-         [comp/search-bar {:search              search
-                           :on-search-change    #(rf/dispatch [::events/set-environments-search %])
-                           :show-archived       show-archived
-                           :on-toggle-archived  #(rf/dispatch [::events/toggle-environments-archived])
-                           :placeholder         "Search environments..."}]
+     [comp/search-bar {:search              search
+                       :on-search-change    #(rf/dispatch [::events/set-environments-search %])
+                       :show-archived       show-archived
+                       :on-toggle-archived  #(rf/dispatch [::events/toggle-environments-archived])
+                       :placeholder         "Search environments..."}]
 
-         (cond
-           (and loading? (empty? edges))
-           [comp/loading-spinner]
+     (cond
+       (and loading? (empty? edges))
+       [comp/loading-spinner]
 
-           (empty? edges)
-           [comp/empty-state {:icon        "globe-network"
-                              :title       "No environments found"
-                              :description (if (seq search)
-                                             "Try a different search term."
-                                             "Create your first environment to get started.")}]
+       (empty? edges)
+       [comp/empty-state {:icon        "globe-network"
+                          :title       "No environments found"
+                          :description (if (seq search)
+                                         "Try a different search term."
+                                         "Create your first environment to get started.")}]
 
-           :else
-           [:div
-            (for [edge edges]
-              ^{:key (get-in edge [:node :id])}
-              [comp/entity-card
-               {:name        (get-in edge [:node :name])
-                :description (get-in edge [:node :description])
-                :archived?   (some? (get-in edge [:node :archivedAt]))
-                :on-click    #(rf/dispatch [::events/open-environment-dialog (:node edge)])}])
-            [comp/load-more-button
-             {:has-next? (:hasNextPage page-info)
-              :loading?  loading?
-              :on-click  #(rf/dispatch [::events/load-more-environments])}]])
+       :else
+       [:div
+        (for [edge edges]
+          ^{:key (get-in edge [:node :id])}
+          [comp/entity-card
+           {:name        (get-in edge [:node :name])
+            :description (get-in edge [:node :description])
+            :archived?   (some? (get-in edge [:node :archivedAt]))
+            :on-click    #(rf/dispatch [::events/open-environment-dialog (:node edge)])}])
+        [comp/load-more-button
+         {:has-next? (:hasNextPage page-info)
+          :loading?  loading?
+          :on-click  #(rf/dispatch [::events/load-more-environments])}]])
 
-         [environment-dialog]]))))
+     [environment-dialog]]))

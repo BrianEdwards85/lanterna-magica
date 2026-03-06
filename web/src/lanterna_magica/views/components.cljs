@@ -1,6 +1,7 @@
 (ns lanterna-magica.views.components
   "Shared, reusable UI components for lanterna-magica."
-  (:require [lanterna-magica.bp :as bp]
+  (:require ["lodash.debounce" :as debounce]
+            [lanterna-magica.bp :as bp]
             [reagent.core :as r]))
 
 ;; ---------------------------------------------------------------------------
@@ -8,11 +9,28 @@
 ;; ---------------------------------------------------------------------------
 
 (defn search-input
-  [{:keys [value on-change placeholder]}]
-  [bp/input-group {:left-icon   "search"
-                   :placeholder (or placeholder "Search...")
-                   :value       (or value "")
-                   :on-change   #(on-change (.. % -target -value))}])
+  "Search input with local state and 500ms debounce on on-change."
+  [{:keys [value]}]
+  (let [local           (r/atom (or value ""))
+        debounced-fn    (atom nil)]
+    (r/create-class
+     {:component-will-unmount
+      (fn [_]
+        (when-let [d @debounced-fn]
+          (.cancel d)))
+
+      :reagent-render
+      (fn [{:keys [value on-change placeholder]}]
+        (when (and (some? value) (not= value @local))
+          (reset! local value))
+        (when (nil? @debounced-fn)
+          (reset! debounced-fn (debounce (fn [v] (on-change v)) 500)))
+        [bp/input-group {:left-icon   "search"
+                         :placeholder (or placeholder "Search...")
+                         :value       (or @local "")
+                         :on-change   #(let [v (.. % -target -value)]
+                                         (reset! local v)
+                                         (@debounced-fn v))}])})))
 
 ;; ---------------------------------------------------------------------------
 ;; Local-state text input (prevents cursor-jump on re-frame round-trip)

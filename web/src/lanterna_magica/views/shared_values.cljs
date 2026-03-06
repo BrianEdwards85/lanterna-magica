@@ -144,64 +144,59 @@
 ;; ---------------------------------------------------------------------------
 
 (defn shared-values-screen []
-  (let [initial-load (r/atom true)]
-    (when @initial-load
-      (rf/dispatch [::events/fetch-shared-values])
-      (reset! initial-load false))
-    (fn []
-      (let [{:keys [show-archived edges page-info selected-id]} @(rf/subscribe [::subs/shared-values-page])
-            loading?   @(rf/subscribe [::subs/loading? :shared-values])
-            page-error @(rf/subscribe [::subs/error :shared-values])]
-        [:div {:class "max-w-2xl mx-auto px-4 py-4"}
-         (when page-error
-           [comp/error-banner "Failed to load shared values."])
+  (let [{:keys [show-archived edges page-info selected-id]} @(rf/subscribe [::subs/shared-values-page])
+        loading?   @(rf/subscribe [::subs/loading? :shared-values])
+        page-error @(rf/subscribe [::subs/error :shared-values])]
+    [:div {:class "max-w-2xl mx-auto px-4 py-4"}
+     (when page-error
+       [comp/error-banner "Failed to load shared values."])
 
-         [comp/page-header {:title      "Shared Values"
-                            :loading?   loading?
-                            :on-refresh #(rf/dispatch [::events/fetch-shared-values])
-                            :on-create  #(rf/dispatch [::events/open-shared-value-dialog])}]
+     [comp/page-header {:title      "Shared Values"
+                        :loading?   loading?
+                        :on-refresh #(rf/dispatch [::events/fetch-shared-values])
+                        :on-create  #(rf/dispatch [::events/open-shared-value-dialog])}]
 
-         [:div {:class "flex items-center gap-3 mb-4"}
-          [comp/archive-toggle {:checked   show-archived
-                                :on-change #(rf/dispatch [::events/toggle-shared-values-archived])}]]
+     [:div {:class "flex items-center gap-3 mb-4"}
+      [comp/archive-toggle {:checked   show-archived
+                            :on-change #(rf/dispatch [::events/toggle-shared-values-archived])}]]
 
-         (cond
-           (and loading? (empty? edges))
-           [comp/loading-spinner]
+     (cond
+       (and loading? (empty? edges))
+       [comp/loading-spinner]
 
-           (empty? edges)
-           [comp/empty-state {:icon        "variable"
-                              :title       "No shared values found"
-                              :description "Create your first shared value to get started."}]
+       (empty? edges)
+       [comp/empty-state {:icon        "variable"
+                          :title       "No shared values found"
+                          :description "Create your first shared value to get started."}]
 
-           :else
-           [:div
-            (for [edge edges]
-              (let [node (:node edge)
-                    archived? (some? (:archivedAt node))]
-                ^{:key (:id node)}
-                [:div.mb-2
-                 [comp/entity-card
-                  {:name      (:name node)
-                   :archived? archived?
-                   :badges    (when (= (:id node) selected-id)
-                                [[bp/tag {:intent "primary" :minimal true} "selected"]])
-                   :on-click  #(rf/dispatch [::events/select-shared-value (:id node)])}]
-                 [:div {:class "flex gap-2 mt-1 ml-3"}
-                  (if archived?
-                    [bp/button {:icon "undo" :text "Unarchive" :minimal true :small true
-                                :intent "success"
-                                :on-click #(rf/dispatch [::events/unarchive-shared-value (:id node)])}]
-                    [bp/button {:icon "trash" :text "Archive" :minimal true :small true
-                                :intent "danger"
-                                :on-click #(rf/dispatch [::events/archive-shared-value (:id node)])}])]]))
-            [comp/load-more-button
-             {:has-next? (:hasNextPage page-info)
-              :loading?  loading?
-              :on-click  #(rf/dispatch [::events/load-more-shared-values])}]])
+       :else
+       [:div
+        (for [edge edges]
+          (let [node (:node edge)
+                archived? (some? (:archivedAt node))]
+            ^{:key (:id node)}
+            [:div.mb-2
+             [comp/entity-card
+              {:name      (:name node)
+               :archived? archived?
+               :badges    (when (= (:id node) selected-id)
+                            [[bp/tag {:intent "primary" :minimal true} "selected"]])
+               :on-click  #(rf/dispatch [::events/select-shared-value (:id node)])}]
+             [:div {:class "flex gap-2 mt-1 ml-3"}
+              (if archived?
+                [bp/button {:icon "undo" :text "Unarchive" :minimal true :small true
+                            :intent "success"
+                            :on-click #(rf/dispatch [::events/unarchive-shared-value (:id node)])}]
+                [bp/button {:icon "trash" :text "Archive" :minimal true :small true
+                            :intent "danger"
+                            :on-click #(rf/dispatch [::events/archive-shared-value (:id node)])}])]]))
+        [comp/load-more-button
+         {:has-next? (:hasNextPage page-info)
+          :loading?  loading?
+          :on-click  #(rf/dispatch [::events/load-more-shared-values])}]])
 
-         (when selected-id
-           [revisions-panel selected-id])
+     (when selected-id
+       [revisions-panel selected-id])
 
-         [shared-value-dialog]
-         [revision-dialog]]))))
+     [shared-value-dialog]
+     [revision-dialog]]))
