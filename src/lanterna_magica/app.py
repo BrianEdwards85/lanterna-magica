@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 import asyncpg
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from lanterna_magica.db import apply_migrations, create_pool
@@ -25,6 +26,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="lanterna-magica", lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 async def health():
@@ -38,6 +47,6 @@ async def health():
         return JSONResponse({"status": "degraded"}, status_code=503)
 
 
-@app.api_route("/graphql", methods=["GET", "POST"])
+@app.api_route("/graphql", methods=["GET", "POST", "OPTIONS"])
 async def graphql_endpoint(request: Request) -> Response:
     return await app.state.graphql.handle_request(request)

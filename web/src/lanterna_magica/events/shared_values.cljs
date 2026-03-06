@@ -1,0 +1,283 @@
+(ns lanterna-magica.events.shared-values
+  (:require [lanterna-magica.events :as-alias events]
+            [lanterna-magica.gql :as gql]
+            [re-frame.core :as rf]
+            [re-graph.core :as re-graph]))
+
+(def ^:private page-size 30)
+
+;; ---------------------------------------------------------------------------
+;; Fetch Shared Values (paginated list)
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/fetch-shared-values
+ (fn [{:keys [db]} _]
+   (let [archived (get-in db [:shared-values-page :show-archived])]
+     {:db       (update db :loading conj :shared-values)
+      :dispatch [::re-graph/query
+                 {:query     gql/shared-values-query
+                  :variables {:includeArchived (boolean archived)
+                              :first           page-size}
+                  :callback  [::events/on-shared-values-fresh]}]})))
+
+(rf/reg-event-fx
+ ::events/load-more-shared-values
+ (fn [{:keys [db]} _]
+   (let [archived (get-in db [:shared-values-page :show-archived])
+         cursor   (get-in db [:shared-values-page :page-info :endCursor])]
+     {:db       (update db :loading conj :shared-values)
+      :dispatch [::re-graph/query
+                 {:query     gql/shared-values-query
+                  :variables {:includeArchived (boolean archived)
+                              :first           page-size
+                              :after           cursor}
+                  :callback  [::events/on-shared-values-append]}]})))
+
+(rf/reg-event-fx
+ ::events/on-shared-values-fresh
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [data errors]} response
+         connection (:sharedValues data)]
+     {:db (-> db
+              (assoc-in [:shared-values-page :edges] (:edges connection))
+              (assoc-in [:shared-values-page :page-info] (:pageInfo connection))
+              (update :loading disj :shared-values)
+              (assoc-in [:errors :shared-values] errors))})))
+
+(rf/reg-event-fx
+ ::events/on-shared-values-append
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [data errors]} response
+         connection (:sharedValues data)]
+     {:db (-> db
+              (update-in [:shared-values-page :edges] into (:edges connection))
+              (assoc-in [:shared-values-page :page-info] (:pageInfo connection))
+              (update :loading disj :shared-values)
+              (assoc-in [:errors :shared-values] errors))})))
+
+;; ---------------------------------------------------------------------------
+;; Archive Toggle
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/toggle-shared-values-archived
+ (fn [{:keys [db]} _]
+   {:db       (-> db
+                  (update-in [:shared-values-page :show-archived] not)
+                  (assoc-in [:shared-values-page :edges] [])
+                  (assoc-in [:shared-values-page :page-info] {:hasNextPage false :endCursor nil}))
+    :dispatch [::events/fetch-shared-values]}))
+
+;; ---------------------------------------------------------------------------
+;; Select Shared Value + Load Revisions
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/select-shared-value
+ (fn [{:keys [db]} [_ id]]
+   (if id
+     {:db       (-> db
+                    (assoc-in [:shared-values-page :selected-id] id)
+                    (assoc-in [:shared-values-page :revisions] {:edges []})
+                    (assoc-in [:shared-values-page :revisions-page-info] nil))
+      :dispatch [::events/fetch-revisions id]}
+     {:db (-> db
+              (assoc-in [:shared-values-page :selected-id] nil)
+              (assoc-in [:shared-values-page :revisions] {:edges []})
+              (assoc-in [:shared-values-page :revisions-page-info] nil))})))
+
+(rf/reg-event-fx
+ ::events/fetch-revisions
+ (fn [{:keys [db]} [_ shared-value-id]]
+   {:db       (update db :loading conj :revisions)
+    :dispatch [::re-graph/query
+               {:query     gql/shared-value-query
+                :variables {:id    shared-value-id
+                            :first page-size}
+                :callback  [::events/on-revisions-fresh]}]}))
+
+(rf/reg-event-fx
+ ::events/on-revisions-fresh
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [data errors]} response
+         connection (get-in data [:sharedValue :revisions])]
+     {:db (-> db
+              (assoc-in [:shared-values-page :revisions] {:edges (:edges connection)})
+              (assoc-in [:shared-values-page :revisions-page-info] (:pageInfo connection))
+              (update :loading disj :revisions)
+              (assoc-in [:errors :revisions] errors))})))
+
+;; ---------------------------------------------------------------------------
+;; Load More Revisions
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/load-more-revisions
+ (fn [{:keys [db]} _]
+   (let [sv-id  (get-in db [:shared-values-page :selected-id])
+         cursor (get-in db [:shared-values-page :revisions-page-info :endCursor])]
+     {:db       (update db :loading conj :revisions)
+      :dispatch [::re-graph/query
+                 {:query     gql/shared-value-query
+                  :variables {:id    sv-id
+                              :first page-size
+                              :after cursor}
+                  :callback  [::events/on-revisions-append]}]})))
+
+(rf/reg-event-fx
+ ::events/on-revisions-append
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [data errors]} response
+         connection (get-in data [:sharedValue :revisions])]
+     {:db (-> db
+              (update-in [:shared-values-page :revisions :edges] into (:edges connection))
+              (assoc-in [:shared-values-page :revisions-page-info] (:pageInfo connection))
+              (update :loading disj :revisions)
+              (assoc-in [:errors :revisions] errors))})))
+
+;; ---------------------------------------------------------------------------
+;; Create Shared Value Dialog
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-db
+ ::events/open-shared-value-dialog
+ (fn [db _]
+   (assoc db :shared-value-dialog
+          {:open?        true
+           :shared-value {:name ""}})))
+
+(rf/reg-event-db
+ ::events/close-shared-value-dialog
+ (fn [db _]
+   (assoc db :shared-value-dialog {:open? false})))
+
+(rf/reg-event-db
+ ::events/set-shared-value-field
+ (fn [db [_ field value]]
+   (assoc-in db [:shared-value-dialog :shared-value field] value)))
+
+(rf/reg-event-fx
+ ::events/save-shared-value
+ (fn [{:keys [db]} _]
+   (let [{:keys [shared-value]} (:shared-value-dialog db)
+         input (select-keys shared-value [:name])]
+     {:db       (update db :loading conj :save-shared-value)
+      :dispatch [::re-graph/mutate
+                 {:query     gql/create-shared-value-mutation
+                  :variables {:input input}
+                  :callback  [::events/on-shared-value-saved]}]})))
+
+(rf/reg-event-fx
+ ::events/on-shared-value-saved
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [errors]} response]
+     (if errors
+       {:db (-> db
+                (update :loading disj :save-shared-value)
+                (assoc-in [:errors :save-shared-value] errors))}
+       {:db       (-> db
+                      (update :loading disj :save-shared-value)
+                      (assoc :shared-value-dialog {:open? false})
+                      (assoc-in [:errors :save-shared-value] nil))
+        :dispatch [::events/fetch-shared-values]}))))
+
+;; ---------------------------------------------------------------------------
+;; Archive / Unarchive
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/archive-shared-value
+ (fn [{:keys [db]} [_ id]]
+   {:db       (update db :loading conj :archive-shared-value)
+    :dispatch [::re-graph/mutate
+               {:query     gql/archive-shared-value-mutation
+                :variables {:id id}
+                :callback  [::events/on-shared-value-archive-toggled]}]}))
+
+(rf/reg-event-fx
+ ::events/unarchive-shared-value
+ (fn [{:keys [db]} [_ id]]
+   {:db       (update db :loading conj :archive-shared-value)
+    :dispatch [::re-graph/mutate
+               {:query     gql/unarchive-shared-value-mutation
+                :variables {:id id}
+                :callback  [::events/on-shared-value-archive-toggled]}]}))
+
+(rf/reg-event-fx
+ ::events/on-shared-value-archive-toggled
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [errors]} response]
+     (if errors
+       {:db (-> db
+                (update :loading disj :archive-shared-value)
+                (assoc-in [:errors :archive-shared-value] errors))}
+       {:db       (-> db
+                      (update :loading disj :archive-shared-value))
+        :dispatch [::events/fetch-shared-values]}))))
+
+;; ---------------------------------------------------------------------------
+;; Create Revision Dialog
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-db
+ ::events/open-revision-dialog
+ (fn [db [_ shared-value-id]]
+   (assoc db :revision-dialog
+          {:open?    true
+           :revision {:sharedValueId  shared-value-id
+                      :serviceId      ""
+                      :environmentId  ""
+                      :value-text     ""}})))
+
+(rf/reg-event-db
+ ::events/close-revision-dialog
+ (fn [db _]
+   (assoc db :revision-dialog {:open? false})))
+
+(rf/reg-event-db
+ ::events/set-revision-field
+ (fn [db [_ field value]]
+   (assoc-in db [:revision-dialog :revision field] value)))
+
+(rf/reg-event-fx
+ ::events/save-revision
+ (fn [{:keys [db]} _]
+   (let [{:keys [revision]} (:revision-dialog db)
+         value-text (:value-text revision)]
+     (try
+       (let [parsed (.parse js/JSON value-text)
+             input  {:sharedValueId  (:sharedValueId revision)
+                     :serviceId      (:serviceId revision)
+                     :environmentId  (:environmentId revision)
+                     :value          parsed}]
+         {:db       (update db :loading conj :save-revision)
+          :dispatch [::re-graph/mutate
+                     {:query     gql/create-shared-value-revision-mutation
+                      :variables {:input input}
+                      :callback  [::events/on-revision-saved]}]})
+       (catch :default _
+         {:db (assoc-in db [:errors :save-revision]
+                        [{:message "Invalid JSON"}])})))))
+
+(rf/reg-event-fx
+ ::events/on-revision-saved
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [errors]} response
+         sv-id (get-in db [:revision-dialog :revision :sharedValueId])]
+     (if errors
+       {:db (-> db
+                (update :loading disj :save-revision)
+                (assoc-in [:errors :save-revision] errors))}
+       {:db       (-> db
+                      (update :loading disj :save-revision)
+                      (assoc :revision-dialog {:open? false})
+                      (assoc-in [:errors :save-revision] nil))
+        :dispatch [::events/fetch-revisions sv-id]}))))

@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@source "../lanterna_magica";
+
+@theme {
+  --color-tn-bg: #24283b;
+  --color-tn-bg-dark: #1f2335;
+  --color-tn-bg-float: #292e42;
+  --color-tn-bg-card: #2f3549;
+  --color-tn-border: #3b4261;
+  --color-tn-fg: #c0caf5;
+  --color-tn-fg-muted: #a9b1d6;
+  --color-tn-fg-dim: #565f89;
+  --color-tn-selection: #364a82;
+  --color-tn-red: #f7768e;
+  --color-tn-green: #9ece6a;
+  --color-tn-yellow: #e0af68;
+  --color-tn-blue: #7aa2f7;
+  --color-tn-purple: #bb9af7;
+  --color-tn-cyan: #7dcfff;
+  --color-tn-orange: #ff9e64;
+}
+
+body {
+  background-color: var(--color-tn-bg);
+  color: var(--color-tn-fg);
+}
+
+.bp6-dark .bp6-navbar {
+  background-color: var(--color-tn-bg-dark);
+  box-shadow: 0 1px 0 var(--color-tn-border);
+}
+
+.bp6-dark .bp6-card {
+  background-color: var(--color-tn-bg-float);
+  border: 1px solid var(--color-tn-border);
+}
+
+.bp6-dark .bp6-card.bp6-interactive:hover {
+  border-color: var(--color-tn-blue);
+  background-color: var(--color-tn-selection);
+}
+
+.bp6-dark .bp6-dialog {
+  background-color: var(--color-tn-bg-float);
+}
+
+.bp6-dark .bp6-html-table.bp6-html-table-striped tbody tr:nth-child(odd) td {
+  background-color: var(--color-tn-bg-dark);
+}
+
+.json-display {
+  background-color: var(--color-tn-bg-dark);
+  border: 1px solid var(--color-tn-border);
+  border-radius: 6px;
+  padding: 1rem;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 767px) {
+  .mobile-icon-only .bp6-button-text {
+    display: none;
+  }
+}

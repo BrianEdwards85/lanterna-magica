@@ -1,0 +1,24 @@
+(ns lanterna-magica.events.init
+  (:require [lanterna-magica.events :as-alias events]
+            [lanterna-magica.db :as db]
+            [lanterna-magica.routes :as routes]
+            [re-frame.core :as rf]
+            [re-graph.core :as re-graph]))
+
+(rf/reg-event-fx
+ ::events/initialize-db
+ (fn [_ _]
+   {:db db/default-db}))
+
+(rf/reg-fx
+ :navigate
+ (fn [route-name]
+   (routes/navigate! route-name)))
+
+(rf/reg-event-fx
+ ::events/boot
+ (fn [_ _]
+   {:dispatch-n [[::re-graph/init {:ws   nil
+                                    :http {:url "http://localhost:8000/graphql"}}]
+                 [::events/fetch-services-list]
+                 [::events/fetch-environments-list]]}))
