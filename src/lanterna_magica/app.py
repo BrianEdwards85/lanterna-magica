@@ -7,18 +7,40 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from lanterna_magica.config import settings
 from lanterna_magica.db import apply_migrations, create_pool
 from lanterna_magica.resolvers import create_gql
+from lanterna_magica.telemetry import (
+    instrument_app,
+    instrument_db,
+    setup_telemetry,
+    shutdown_telemetry,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if settings.cookie_secure:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+        return response
 
 WEB_PUBLIC = Path(__file__).parent.parent.parent / "web" / "resources" / "public"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_telemetry()
+    instrument_db()
     apply_migrations()
     pool = await create_pool()
     app.state.pool = pool
@@ -26,15 +48,18 @@ async def lifespan(app: FastAPI):
     logger.info("lanterna-magica started")
     yield
     await pool.close()
+    shutdown_telemetry()
     logger.info("lanterna-magica stopped")
 
 
 app = FastAPI(title="lanterna-magica", lifespan=lifespan)
+instrument_app(app)
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.server.cors_origins,
-    allow_credentials=True,
+    allow_origins=settings.cors.allow_origins,
+    allow_credentials=settings.cors.allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

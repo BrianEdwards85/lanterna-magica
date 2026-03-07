@@ -17,6 +17,12 @@ dependencies = [
     "aiodataloader>=0.4",
     "aiosql>=12",
     "dynaconf>=3.2",
+    "httpx>=0.28",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-instrumentation-starlette",
+    "opentelemetry-instrumentation-asyncpg",
+    "opentelemetry-exporter-otlp-proto-http",
 ]
 
 [project.optional-dependencies]
