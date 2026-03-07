@@ -5,13 +5,14 @@ from lanterna_magica.errors import NotFoundError, ValidationError
 from .utils import build_connection, decode_cursor, page_limit, queries, sanitize_search, validate_name
 
 
-class Environments:
+class Dimensions:
     def __init__(self, pool: Pool):
         self.pool = pool
 
-    async def get_environments(
+    async def get_dimensions(
         self,
         *,
+        type_id: str,
         search: str | None = None,
         include_archived: bool = False,
         first: int | None = None,
@@ -23,8 +24,9 @@ class Environments:
 
         rows = [
             dict(r)
-            async for r in queries.get_environments(
+            async for r in queries.get_dimensions(
                 self.pool,
+                type_id=type_id,
                 include_archived=include_archived,
                 search=search,
                 after_id=after_id,
@@ -33,40 +35,50 @@ class Environments:
         ]
         return build_connection(rows, "id", limit, search=search)
 
-    async def get_environments_by_ids(self, ids: list[str]) -> list[dict]:
+    async def get_dimensions_by_ids(self, ids: list[str]) -> list[dict]:
         rows = [
             dict(r)
-            async for r in queries.get_environments_by_ids(self.pool, ids=ids)
+            async for r in queries.get_dimensions_by_ids(self.pool, ids=ids)
         ]
         return rows
 
-    async def create_environment(self, *, name: str, description: str | None = None) -> dict:
-        validate_name(name)
-        row = await queries.create_environment(self.pool, name=name, description=description)
+    async def get_base_dimension(self, type_id: str) -> dict:
+        row = await queries.get_base_dimension(self.pool, type_id=type_id)
+        if not row:
+            raise NotFoundError("Base dimension not found for this type")
         return dict(row)
 
-    async def update_environment(
+    async def create_dimension(
+        self, *, type_id: str, name: str, description: str | None = None
+    ) -> dict:
+        validate_name(name)
+        row = await queries.create_dimension(
+            self.pool, type_id=type_id, name=name, description=description
+        )
+        return dict(row)
+
+    async def update_dimension(
         self, *, id: str, name: str | None = None, description: str | None = None
     ) -> dict:
         if name is None and description is None:
             raise ValidationError("At least one field must be provided")
         if name is not None:
             validate_name(name)
-        row = await queries.update_environment(
+        row = await queries.update_dimension(
             self.pool, id=id, name=name, description=description
         )
         if not row:
-            raise NotFoundError("Environment not found")
+            raise NotFoundError("Dimension not found")
         return dict(row)
 
-    async def archive_environment(self, id: str) -> dict:
-        row = await queries.archive_environment(self.pool, id=id)
+    async def archive_dimension(self, id: str) -> dict:
+        row = await queries.archive_dimension(self.pool, id=id)
         if not row:
-            raise NotFoundError("Environment not found or already archived")
+            raise NotFoundError("Dimension not found or already archived")
         return dict(row)
 
-    async def unarchive_environment(self, id: str) -> dict:
-        row = await queries.unarchive_environment(self.pool, id=id)
+    async def unarchive_dimension(self, id: str) -> dict:
+        row = await queries.unarchive_dimension(self.pool, id=id)
         if not row:
-            raise NotFoundError("Environment not found or not archived")
+            raise NotFoundError("Dimension not found or not archived")
         return dict(row)

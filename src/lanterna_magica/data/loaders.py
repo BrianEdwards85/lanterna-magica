@@ -19,12 +19,12 @@ class _ByIdLoader(DataLoader):
         return [by_id.get(str(i)) for i in ids]
 
 
-class ServiceLoader(_ByIdLoader):
-    query_fn = queries.get_services_by_ids
+class DimensionTypeLoader(_ByIdLoader):
+    query_fn = queries.get_dimension_types_by_ids
 
 
-class EnvironmentLoader(_ByIdLoader):
-    query_fn = queries.get_environments_by_ids
+class DimensionLoader(_ByIdLoader):
+    query_fn = queries.get_dimensions_by_ids
 
 
 class SharedValueLoader(_ByIdLoader):
@@ -33,6 +33,34 @@ class SharedValueLoader(_ByIdLoader):
 
 class ConfigurationLoader(_ByIdLoader):
     query_fn = queries.get_configurations_by_ids
+
+
+class _ScopesByParentLoader(DataLoader):
+    """One-to-many loader: parent_id -> list of dimension rows."""
+
+    query_fn = None
+    parent_key = None
+
+    def __init__(self, pool: Pool):
+        super().__init__()
+        self.pool = pool
+
+    async def batch_load_fn(self, parent_ids):
+        by_parent = defaultdict(list)
+        async for r in self.query_fn(self.pool, ids=list(parent_ids)):
+            d = dict(r)
+            by_parent[str(d[self.parent_key])].append(d)
+        return [by_parent.get(str(pid), []) for pid in parent_ids]
+
+
+class ScopesByConfigLoader(_ScopesByParentLoader):
+    query_fn = queries.get_scopes_by_config_ids
+    parent_key = "configuration_id"
+
+
+class ScopesByRevisionLoader(_ScopesByParentLoader):
+    query_fn = queries.get_scopes_by_revision_ids
+    parent_key = "revision_id"
 
 
 class SubstitutionsByConfigLoader(DataLoader):
@@ -55,8 +83,10 @@ class SubstitutionsByConfigLoader(DataLoader):
 def create_loaders(pool: Pool) -> dict:
     return {
         "configuration_loader": ConfigurationLoader(pool),
-        "service_loader": ServiceLoader(pool),
-        "environment_loader": EnvironmentLoader(pool),
+        "dimension_type_loader": DimensionTypeLoader(pool),
+        "dimension_loader": DimensionLoader(pool),
         "shared_value_loader": SharedValueLoader(pool),
         "substitution_loader": SubstitutionsByConfigLoader(pool),
+        "config_scopes_loader": ScopesByConfigLoader(pool),
+        "revision_scopes_loader": ScopesByRevisionLoader(pool),
     }

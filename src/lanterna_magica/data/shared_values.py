@@ -2,7 +2,7 @@ from asyncpg import Pool
 
 from lanterna_magica.errors import NotFoundError, ValidationError
 
-from .utils import build_connection, decode_cursor, page_limit, queries, validate_name
+from .utils import build_connection, compute_scope_hash, decode_cursor, page_limit, queries, validate_name
 
 
 class SharedValues:
@@ -84,9 +84,8 @@ class SharedValues:
         self,
         *,
         shared_value_id: str,
-        service_id: str | None = None,
-        environment_id: str | None = None,
-        include_global: bool = True,
+        dimension_ids: list[str] | None = None,
+        include_base: bool = True,
         current_only: bool = False,
         first: int | None = None,
         after: str | None = None,
@@ -99,9 +98,8 @@ class SharedValues:
             async for r in queries.get_revisions(
                 self.pool,
                 shared_value_id=shared_value_id,
-                service_id=service_id,
-                environment_id=environment_id,
-                include_global=include_global,
+                dimension_ids=dimension_ids,
+                include_base=include_base,
                 current_only=current_only,
                 after_id=after_id,
                 page_limit=limit + 1,
@@ -113,23 +111,31 @@ class SharedValues:
         self,
         *,
         shared_value_id: str,
-        service_id: str,
-        environment_id: str,
+        dimension_ids: list[str],
         value: dict | list | str | int | float | bool | None,
     ) -> dict:
+        scope_hash = compute_scope_hash(dimension_ids)
+
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 await queries.unset_current_revision(
                     conn,
                     shared_value_id=shared_value_id,
-                    service_id=service_id,
-                    environment_id=environment_id,
+                    scope_hash=scope_hash,
                 )
                 row = await queries.create_revision(
                     conn,
                     shared_value_id=shared_value_id,
-                    service_id=service_id,
-                    environment_id=environment_id,
+                    scope_hash=scope_hash,
                     value=value,
                 )
-        return dict(row)
+                revision = dict(row)
+
+                for dim_id in dimension_ids:
+                    await queries.insert_revision_scope(
+                        conn,
+                        revision_id=str(revision["id"]),
+                        dimension_id=dim_id,
+                    )
+
+        return revision

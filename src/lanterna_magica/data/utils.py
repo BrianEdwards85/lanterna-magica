@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from base64 import b64decode, b64encode
@@ -11,10 +12,14 @@ SQL_DIR = Path(__file__).parent.parent / "sql"
 
 queries = aiosql.from_path(str(SQL_DIR), "asyncpg")
 
-SENTINEL_UUID = "00000000-0000-0000-0000-000000000000"
-
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 100
+
+
+def compute_scope_hash(dimension_ids: list[str]) -> str:
+    joined = ",".join(sorted(dimension_ids))
+    hex_digest = hashlib.md5(joined.encode()).hexdigest()
+    return f"{hex_digest[:8]}-{hex_digest[8:12]}-{hex_digest[12:16]}-{hex_digest[16:20]}-{hex_digest[20:]}"
 
 
 def page_limit(first: int | None) -> int:
