@@ -1,5 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
+from lanterna_magica.data.dimensions import Dimensions
 from utils import create_dimension, create_dimension_type, nodes, parse_dt
 
 # -- Mutations --
@@ -383,3 +384,26 @@ async def test_pagination(client):
     page3 = body["data"]["dimensions"]
     assert_that(page3["edges"]).described_as("page 3 edge count").is_length(2)
     assert_that(page3["pageInfo"]["hasNextPage"]).described_as("page 3 has no next page").is_false()
+
+
+# -- Data layer tests --
+
+
+async def test_get_base_dimension(client, pool):
+    """Dimensions.get_base_dimension returns the base dimension for a type."""
+    type_id = await _get_service_type_id(client)
+    dims = Dimensions(pool)
+    base = await dims.get_base_dimension(type_id)
+    assert_that(base["name"]).described_as("base dimension name").is_equal_to("global")
+    assert_that(base["base"]).described_as("base flag").is_true()
+    assert_that(str(base["type_id"])).described_as("base type_id").is_equal_to(type_id)
+
+
+async def test_get_base_dimension_not_found(pool):
+    """get_base_dimension raises NotFoundError for a nonexistent type."""
+    from lanterna_magica.errors import NotFoundError
+    import pytest
+
+    dims = Dimensions(pool)
+    with pytest.raises(NotFoundError):
+        await dims.get_base_dimension("00000000-0000-0000-0000-ffffffffffff")

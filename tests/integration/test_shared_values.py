@@ -452,3 +452,52 @@ async def test_update_shared_value_with_percent_in_name_fails(client):
 async def test_shared_value_name_with_underscore_allowed(client):
     sv = await create_shared_value(client, "my_value")
     assert_that(sv["name"]).described_as("underscore in name").is_equal_to("my_value")
+
+
+# -- Nested relationship / loader tests --
+
+
+REVISION_WITH_TYPED_DIMENSIONS = """
+query SharedValueWithRevisions($id: ID!) {
+    sharedValue(id: $id) {
+        id name
+        revisions {
+            edges {
+                node {
+                    id value isCurrent
+                    sharedValue { id name }
+                    dimensions { id name type { id name } }
+                }
+            }
+        }
+    }
+}
+"""
+
+
+async def test_revision_dimensions_include_type(client):
+    """Revision.dimensions should resolve nested type via DimensionTypeLoader."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "val")
+
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions).is_length(1)
+    for dim in revisions[0]["dimensions"]:
+        assert_that(dim["type"]).described_as("dimension has type").contains_key("id", "name")
+        assert_that(dim["type"]["name"]).described_as("type name").is_in("service", "environment")
+
+
+async def test_revision_shared_value_resolved(client):
+    """Revision.sharedValue should resolve via SharedValueLoader."""
+    sv = await create_shared_value(client, "my_secret")
+    svc = await create_service(client)
+    env = await create_environment(client)
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "val")
+
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions[0]["sharedValue"]["id"]).described_as("revision -> sv id").is_equal_to(sv["id"])
+    assert_that(revisions[0]["sharedValue"]["name"]).described_as("revision -> sv name").is_equal_to("my_secret")

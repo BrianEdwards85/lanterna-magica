@@ -454,3 +454,73 @@ async def test_create_configuration_with_array_body(client):
 async def test_configuration_by_invalid_uuid(client):
     body = await gql(client, CONFIGURATION, {"id": "not-a-uuid"}, expect_errors=True)
     assert_that(body).described_as("invalid uuid rejected").contains_key("errors")
+
+
+# -- Nested relationship / loader tests --
+
+
+CONFIGURATION_WITH_TYPED_DIMENSIONS = """
+query Configuration($id: ID!) {
+    configuration(id: $id) {
+        id
+        dimensions { id name type { id name } }
+        substitutions {
+            id jsonpath
+            configuration { id }
+            sharedValue { id name }
+        }
+    }
+}
+"""
+
+
+async def test_configuration_dimensions_include_type(client):
+    """Configuration.dimensions should resolve nested type via DimensionTypeLoader."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    cfg = await _create_configuration(client, [svc["id"], env["id"]], {"k": "v"})
+
+    body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg["id"]})
+    config = body["data"]["configuration"]
+    for dim in config["dimensions"]:
+        assert_that(dim["type"]).described_as("dimension has type").contains_key("id", "name")
+        assert_that(dim["type"]["name"]).described_as("type name").is_in("service", "environment")
+
+
+async def test_configuration_substitutions_resolve_nested(client):
+    """ConfigSubstitution should resolve configuration and sharedValue loaders."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv = await create_shared_value(client, "db_host")
+
+    cfg = await _create_configuration(
+        client,
+        [svc["id"], env["id"]],
+        {"host": "placeholder"},
+        [{"jsonpath": "$.host", "sharedValueId": sv["id"]}],
+    )
+
+    body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg["id"]})
+    subs = body["data"]["configuration"]["substitutions"]
+    assert_that(subs).described_as("substitutions count").is_length(1)
+    assert_that(subs[0]["configuration"]["id"]).described_as("sub -> config id").is_equal_to(cfg["id"])
+    assert_that(subs[0]["sharedValue"]["id"]).described_as("sub -> shared value id").is_equal_to(sv["id"])
+    assert_that(subs[0]["sharedValue"]["name"]).described_as("sub -> shared value name").is_equal_to("db_host")
+
+
+async def test_update_config_substitution_not_found(client):
+    """Updating a substitution for a nonexistent config/jsonpath should error."""
+    sv = await create_shared_value(client, "db_host")
+    body = await gql(
+        client,
+        UPDATE_CONFIG_SUBSTITUTION,
+        {
+            "input": {
+                "configurationId": "00000000-0000-0000-0000-ffffffffffff",
+                "jsonpath": "$.nope",
+                "sharedValueId": sv["id"],
+            }
+        },
+        expect_errors=True,
+    )
+    assert_that(body).described_as("not-found substitution update").contains_key("errors")
