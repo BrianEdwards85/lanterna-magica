@@ -68,11 +68,10 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health():
-    pool = app.state.pool
+async def health(request: Request):
     checks = {}
     try:
-        async with pool.acquire() as conn:
+        async with request.app.state.pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
         checks["db"] = "ok"
     except (asyncpg.PostgresError, OSError):
