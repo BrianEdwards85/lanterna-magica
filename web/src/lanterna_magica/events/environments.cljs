@@ -1,5 +1,6 @@
 (ns lanterna-magica.events.environments
   (:require [lanterna-magica.events :as-alias events]
+            [lanterna-magica.events.helpers :as h]
             [lanterna-magica.gql :as gql]
             [re-frame.core :as rf]
             [re-graph.core :as re-graph]))
@@ -15,7 +16,7 @@
  (fn [{:keys [db]} _]
    (let [search   (get-in db [:environments-page :search])
          archived (get-in db [:environments-page :show-archived])]
-     {:db       (update db :loading conj :environments)
+     {:db       (h/start-loading db :environments)
       :dispatch [::re-graph/query
                  {:query     gql/environments-query
                   :variables {:search          (when (seq search) search)
@@ -29,7 +30,7 @@
    (let [search   (get-in db [:environments-page :search])
          archived (get-in db [:environments-page :show-archived])
          cursor   (get-in db [:environments-page :page-info :endCursor])]
-     {:db       (update db :loading conj :environments)
+     {:db       (h/start-loading db :environments)
       :dispatch [::re-graph/query
                  {:query     gql/environments-query
                   :variables {:search          (when (seq search) search)
@@ -47,8 +48,7 @@
      {:db (-> db
               (assoc-in [:environments-page :edges] (:edges connection))
               (assoc-in [:environments-page :page-info] (:pageInfo connection))
-              (update :loading disj :environments)
-              (assoc-in [:errors :environments] errors))})))
+              (h/stop-loading :environments errors))})))
 
 (rf/reg-event-fx
  ::events/on-environments-append
@@ -59,8 +59,7 @@
      {:db (-> db
               (update-in [:environments-page :edges] into (:edges connection))
               (assoc-in [:environments-page :page-info] (:pageInfo connection))
-              (update :loading disj :environments)
-              (assoc-in [:errors :environments] errors))})))
+              (h/stop-loading :environments errors))})))
 
 ;; ---------------------------------------------------------------------------
 ;; Search / Archive Toggle
@@ -118,7 +117,7 @@
          input    (if editing
                     (select-keys environment [:id :name :description])
                     (select-keys environment [:name :description]))]
-     {:db       (update db :loading conj :save-environment)
+     {:db       (h/start-loading db :save-environment)
       :dispatch [::re-graph/mutate
                  {:query     mutation
                   :variables {:input input}
@@ -130,13 +129,10 @@
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [errors]} response]
      (if errors
-       {:db (-> db
-                (update :loading disj :save-environment)
-                (assoc-in [:errors :save-environment] errors))}
+       {:db (h/stop-loading db :save-environment errors)}
        {:db       (-> db
-                      (update :loading disj :save-environment)
-                      (assoc :environment-dialog {:open? false})
-                      (assoc-in [:errors :save-environment] nil))
+                      (h/stop-loading :save-environment)
+                      (assoc :environment-dialog {:open? false}))
         :dispatch-n [[::events/fetch-environments]
                      [::events/fetch-environments-list]]}))))
 
@@ -147,7 +143,7 @@
 (rf/reg-event-fx
  ::events/archive-environment
  (fn [{:keys [db]} [_ id]]
-   {:db       (update db :loading conj :archive-environment)
+   {:db       (h/start-loading db :archive-environment)
     :dispatch [::re-graph/mutate
                {:query     gql/archive-environment-mutation
                 :variables {:id id}
@@ -156,7 +152,7 @@
 (rf/reg-event-fx
  ::events/unarchive-environment
  (fn [{:keys [db]} [_ id]]
-   {:db       (update db :loading conj :archive-environment)
+   {:db       (h/start-loading db :archive-environment)
     :dispatch [::re-graph/mutate
                {:query     gql/unarchive-environment-mutation
                 :variables {:id id}
@@ -168,11 +164,9 @@
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [errors]} response]
      (if errors
-       {:db (-> db
-                (update :loading disj :archive-environment)
-                (assoc-in [:errors :archive-environment] errors))}
+       {:db (h/stop-loading db :archive-environment errors)}
        {:db       (-> db
-                      (update :loading disj :archive-environment)
+                      (h/stop-loading :archive-environment)
                       (assoc :environment-dialog {:open? false}))
         :dispatch-n [[::events/fetch-environments]
                      [::events/fetch-environments-list]]}))))

@@ -1,5 +1,6 @@
 (ns lanterna-magica.events.configurations
   (:require [lanterna-magica.events :as-alias events]
+            [lanterna-magica.events.helpers :as h]
             [lanterna-magica.gql :as gql]
             [re-frame.core :as rf]
             [re-graph.core :as re-graph]))
@@ -15,7 +16,7 @@
  (fn [{:keys [db]} _]
    (let [svc-id (get-in db [:configurations-page :filter-service-id])
          env-id (get-in db [:configurations-page :filter-environment-id])]
-     {:db       (update db :loading conj :configurations)
+     {:db       (h/start-loading db :configurations)
       :dispatch [::re-graph/query
                  {:query     gql/configurations-query
                   :variables {:serviceId     svc-id
@@ -29,7 +30,7 @@
    (let [svc-id (get-in db [:configurations-page :filter-service-id])
          env-id (get-in db [:configurations-page :filter-environment-id])
          cursor (get-in db [:configurations-page :page-info :endCursor])]
-     {:db       (update db :loading conj :configurations)
+     {:db       (h/start-loading db :configurations)
       :dispatch [::re-graph/query
                  {:query     gql/configurations-query
                   :variables {:serviceId     svc-id
@@ -47,8 +48,7 @@
      {:db (-> db
               (assoc-in [:configurations-page :edges] (:edges connection))
               (assoc-in [:configurations-page :page-info] (:pageInfo connection))
-              (update :loading disj :configurations)
-              (assoc-in [:errors :configurations] errors))})))
+              (h/stop-loading :configurations errors))})))
 
 (rf/reg-event-fx
  ::events/on-configurations-append
@@ -59,8 +59,7 @@
      {:db (-> db
               (update-in [:configurations-page :edges] into (:edges connection))
               (assoc-in [:configurations-page :page-info] (:pageInfo connection))
-              (update :loading disj :configurations)
-              (assoc-in [:errors :configurations] errors))})))
+              (h/stop-loading :configurations errors))})))
 
 ;; ---------------------------------------------------------------------------
 ;; Filter by service / environment
@@ -117,7 +116,7 @@
              input  {:serviceId     (:serviceId configuration)
                      :environmentId (:environmentId configuration)
                      :body          parsed}]
-         {:db       (update db :loading conj :save-configuration)
+         {:db       (h/start-loading db :save-configuration)
           :dispatch [::re-graph/mutate
                      {:query     gql/create-configuration-mutation
                       :variables {:input input}
@@ -132,13 +131,10 @@
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [errors]} response]
      (if errors
-       {:db (-> db
-                (update :loading disj :save-configuration)
-                (assoc-in [:errors :save-configuration] errors))}
+       {:db (h/stop-loading db :save-configuration errors)}
        {:db       (-> db
-                      (update :loading disj :save-configuration)
-                      (assoc :configuration-dialog {:open? false})
-                      (assoc-in [:errors :save-configuration] nil))
+                      (h/stop-loading :save-configuration)
+                      (assoc :configuration-dialog {:open? false}))
         :dispatch [::events/fetch-configurations]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -151,7 +147,7 @@
    (if id
      {:db       (-> db
                     (assoc-in [:configurations-page :selected-id] id)
-                    (update :loading conj :configuration-detail))
+                    (h/start-loading :configuration-detail))
       :dispatch [::re-graph/query
                  {:query     gql/configuration-query
                   :variables {:id id}
@@ -167,5 +163,4 @@
    (let [{:keys [data errors]} response]
      {:db (-> db
               (assoc-in [:configurations-page :selected] (:configuration data))
-              (update :loading disj :configuration-detail)
-              (assoc-in [:errors :configuration-detail] errors))})))
+              (h/stop-loading :configuration-detail errors))})))

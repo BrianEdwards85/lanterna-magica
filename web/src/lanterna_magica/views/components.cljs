@@ -53,16 +53,18 @@
                              (when on-change (on-change v)))})])))
 
 (defn local-textarea
-  "A textarea that uses local state to avoid cursor-jump issues.
+  "A textarea using Blueprint TextArea with local state to avoid cursor-jump issues.
    Props: :value, :on-change, :rows, :placeholder, :class, and any extra keys."
   [{:keys [value]}]
   (let [local (r/atom (or value ""))]
-    (fn [{:keys [value on-change] :as props}]
+    (fn [{:keys [value on-change class] :as props}]
       (when (and (some? value) (not= value @local))
         (reset! local value))
-      [:textarea.bp6-input.w-full
-       (merge (dissoc props :on-change)
-              {:value     @local
+      [bp/text-area
+       (merge (dissoc props :on-change :class)
+              {:fill      true
+               :class-name class
+               :value     @local
                :on-change #(let [v (.. % -target -value)]
                              (reset! local v)
                              (when on-change (on-change v)))})])))

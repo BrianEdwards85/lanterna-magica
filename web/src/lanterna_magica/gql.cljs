@@ -87,13 +87,6 @@
      }
    }")
 
-(def search-shared-values-query
-  "query SearchSharedValues($search: String!, $includeArchived: Boolean, $limit: Int) {
-     searchSharedValues(search: $search, includeArchived: $includeArchived, limit: $limit) {
-       id name createdAt updatedAt archivedAt
-     }
-   }")
-
 (def shared-value-query
   "query SharedValue($id: ID!, $serviceId: ID, $environmentId: ID, $includeGlobal: Boolean, $currentOnly: Boolean, $first: Int, $after: String) {
      sharedValue(id: $id) {

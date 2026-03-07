@@ -1,5 +1,6 @@
 (ns lanterna-magica.events.services
   (:require [lanterna-magica.events :as-alias events]
+            [lanterna-magica.events.helpers :as h]
             [lanterna-magica.gql :as gql]
             [re-frame.core :as rf]
             [re-graph.core :as re-graph]))
@@ -15,7 +16,7 @@
  (fn [{:keys [db]} _]
    (let [search   (get-in db [:services-page :search])
          archived (get-in db [:services-page :show-archived])]
-     {:db       (update db :loading conj :services)
+     {:db       (h/start-loading db :services)
       :dispatch [::re-graph/query
                  {:query     gql/services-query
                   :variables {:search          (when (seq search) search)
@@ -29,7 +30,7 @@
    (let [search   (get-in db [:services-page :search])
          archived (get-in db [:services-page :show-archived])
          cursor   (get-in db [:services-page :page-info :endCursor])]
-     {:db       (update db :loading conj :services)
+     {:db       (h/start-loading db :services)
       :dispatch [::re-graph/query
                  {:query     gql/services-query
                   :variables {:search          (when (seq search) search)
@@ -47,8 +48,7 @@
      {:db (-> db
               (assoc-in [:services-page :edges] (:edges connection))
               (assoc-in [:services-page :page-info] (:pageInfo connection))
-              (update :loading disj :services)
-              (assoc-in [:errors :services] errors))})))
+              (h/stop-loading :services errors))})))
 
 (rf/reg-event-fx
  ::events/on-services-append
@@ -59,8 +59,7 @@
      {:db (-> db
               (update-in [:services-page :edges] into (:edges connection))
               (assoc-in [:services-page :page-info] (:pageInfo connection))
-              (update :loading disj :services)
-              (assoc-in [:errors :services] errors))})))
+              (h/stop-loading :services errors))})))
 
 ;; ---------------------------------------------------------------------------
 ;; Search / Archive Toggle
@@ -118,7 +117,7 @@
          input    (if editing
                     (select-keys service [:id :name :description])
                     (select-keys service [:name :description]))]
-     {:db       (update db :loading conj :save-service)
+     {:db       (h/start-loading db :save-service)
       :dispatch [::re-graph/mutate
                  {:query     mutation
                   :variables {:input input}
@@ -130,13 +129,10 @@
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [errors]} response]
      (if errors
-       {:db (-> db
-                (update :loading disj :save-service)
-                (assoc-in [:errors :save-service] errors))}
+       {:db (h/stop-loading db :save-service errors)}
        {:db       (-> db
-                      (update :loading disj :save-service)
-                      (assoc :service-dialog {:open? false})
-                      (assoc-in [:errors :save-service] nil))
+                      (h/stop-loading :save-service)
+                      (assoc :service-dialog {:open? false}))
         :dispatch-n [[::events/fetch-services]
                      [::events/fetch-services-list]]}))))
 
@@ -147,7 +143,7 @@
 (rf/reg-event-fx
  ::events/archive-service
  (fn [{:keys [db]} [_ id]]
-   {:db       (update db :loading conj :archive-service)
+   {:db       (h/start-loading db :archive-service)
     :dispatch [::re-graph/mutate
                {:query     gql/archive-service-mutation
                 :variables {:id id}
@@ -156,7 +152,7 @@
 (rf/reg-event-fx
  ::events/unarchive-service
  (fn [{:keys [db]} [_ id]]
-   {:db       (update db :loading conj :archive-service)
+   {:db       (h/start-loading db :archive-service)
     :dispatch [::re-graph/mutate
                {:query     gql/unarchive-service-mutation
                 :variables {:id id}
@@ -168,11 +164,9 @@
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [errors]} response]
      (if errors
-       {:db (-> db
-                (update :loading disj :archive-service)
-                (assoc-in [:errors :archive-service] errors))}
+       {:db (h/stop-loading db :archive-service errors)}
        {:db       (-> db
-                      (update :loading disj :archive-service)
+                      (h/stop-loading :archive-service)
                       (assoc :service-dialog {:open? false}))
         :dispatch-n [[::events/fetch-services]
                      [::events/fetch-services-list]]}))))
