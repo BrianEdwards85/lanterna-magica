@@ -54,10 +54,11 @@
 
 (rf/reg-event-db
  ::events/open-dimension-type-dialog
- (fn [db _]
+ (fn [db [_ dt]]
    (assoc db :dimension-type-dialog
           {:open?          true
-           :dimension-type {:name "" :priority 0}})))
+           :editing        (some? dt)
+           :dimension-type (or dt {:name "" :priority 0})})))
 
 (rf/reg-event-db
  ::events/close-dimension-type-dialog
@@ -72,11 +73,14 @@
 (rf/reg-event-fx
  ::events/save-dimension-type
  (fn [{:keys [db]} _]
-   (let [{:keys [dimension-type]} (:dimension-type-dialog db)
-         input (select-keys dimension-type [:name :priority])]
+   (let [{:keys [editing dimension-type]} (:dimension-type-dialog db)
+         mutation (if editing gql/update-dimension-type-mutation gql/create-dimension-type-mutation)
+         input    (if editing
+                    (select-keys dimension-type [:id :name])
+                    (select-keys dimension-type [:name]))]
      {:db       (h/start-loading db :save-dimension-type)
       :dispatch [::re-graph/mutate
-                 {:query     gql/create-dimension-type-mutation
+                 {:query     mutation
                   :variables {:input input}
                   :callback  [::events/on-dimension-type-saved]}]})))
 
@@ -120,6 +124,33 @@
      (if errors
        {:db (h/stop-loading db :archive-dimension-type errors)}
        {:db       (h/stop-loading db :archive-dimension-type)
+        :dispatch [::events/fetch-dimension-types]}))))
+
+;; --- Swap Dimension Type Priorities ---
+
+(rf/reg-event-fx
+ ::events/move-dimension-type
+ (fn [{:keys [db]} [_ type-id direction]]
+   (let [types (:dimension-types db)
+         idx   (.indexOf (mapv :id types) type-id)]
+     (when (>= idx 0)
+       (let [swap-idx (case direction :up (dec idx) :down (inc idx))]
+         (when (and (>= swap-idx 0) (< swap-idx (count types)))
+           (let [other-id (:id (nth types swap-idx))]
+             {:db       (h/start-loading db :swap-dimension-type)
+              :dispatch [::re-graph/mutate
+                         {:query     gql/swap-dimension-type-priorities-mutation
+                          :variables {:idA type-id :idB other-id}
+                          :callback  [::events/on-dimension-type-swapped]}]})))))))
+
+(rf/reg-event-fx
+ ::events/on-dimension-type-swapped
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [errors]} response]
+     (if errors
+       {:db (h/stop-loading db :swap-dimension-type errors)}
+       {:db       (h/stop-loading db :swap-dimension-type)
         :dispatch [::events/fetch-dimension-types]}))))
 
 ;; ---------------------------------------------------------------------------

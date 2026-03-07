@@ -15,7 +15,11 @@ type DimensionType {
 
 input CreateDimensionTypeInput {
   name: String!
-  priority: Int!
+}
+
+input UpdateDimensionTypeInput {
+  id: ID!
+  name: String!
 }
 
 extend type Query {
@@ -24,6 +28,8 @@ extend type Query {
 
 extend type Mutation {
   createDimensionType(input: CreateDimensionTypeInput!): DimensionType!
+  updateDimensionType(input: UpdateDimensionTypeInput!): DimensionType!
+  swapDimensionTypePriorities(idA: ID!, idB: ID!): [DimensionType!]!
   archiveDimensionType(id: ID!): DimensionType!
   unarchiveDimensionType(id: ID!): DimensionType!
 }

@@ -106,7 +106,7 @@ async def test_create_dimension_duplicate_name_same_type(client):
 async def test_create_dimension_same_name_different_type(client):
     """Same name is allowed across different dimension types."""
     type_id = await _get_service_type_id(client)
-    env_type = await create_dimension_type(client, "region", 10)
+    env_type = await create_dimension_type(client, "region")
 
     await create_dimension(client, type_id, "shared-name")
     dim2 = await create_dimension(client, env_type["id"], "shared-name")
@@ -230,7 +230,7 @@ async def test_each_type_has_base_dimension(client):
 async def test_dimensions_filtered_by_type(client):
     """Dimensions from one type should not appear when querying another."""
     type_id = await _get_service_type_id(client)
-    other_type = await create_dimension_type(client, "region", 10)
+    other_type = await create_dimension_type(client, "region")
 
     await create_dimension(client, type_id, "traefik")
     await create_dimension(client, other_type["id"], "us-east-1")

@@ -16,7 +16,17 @@ class DimensionTypesResolver:
 
     async def resolve_create_dimension_type(self, _obj, info, *, input):
         return await self.dimension_types.create_dimension_type(
-            name=input["name"], priority=input["priority"]
+            name=input["name"]
+        )
+
+    async def resolve_update_dimension_type(self, _obj, info, *, input):
+        return await self.dimension_types.update_dimension_type(
+            id=input["id"], name=input["name"]
+        )
+
+    async def resolve_swap_dimension_type_priorities(self, _obj, info, *, id_a, id_b):
+        return await self.dimension_types.swap_dimension_type_priorities(
+            id_a=id_a, id_b=id_b
         )
 
     async def resolve_archive_dimension_type(self, _obj, info, *, id):
@@ -47,6 +57,8 @@ def get_dimension_type_resolvers(dimension_types: DimensionTypes, dimensions: Di
 
     query.set_field("dimensionTypes", resolver.resolve_dimension_types)
     mutation.set_field("createDimensionType", resolver.resolve_create_dimension_type)
+    mutation.set_field("updateDimensionType", resolver.resolve_update_dimension_type)
+    mutation.set_field("swapDimensionTypePriorities", resolver.resolve_swap_dimension_type_priorities)
     mutation.set_field("archiveDimensionType", resolver.resolve_archive_dimension_type)
     mutation.set_field("unarchiveDimensionType", resolver.resolve_unarchive_dimension_type)
     dimension_type_type.set_field("dimensions", resolver.resolve_dimensions_for_type)

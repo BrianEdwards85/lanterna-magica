@@ -78,9 +78,9 @@ async def create_environment(client, name="production", description=None):
     return body["data"]["createEnvironment"]
 
 
-async def create_dimension_type(client, name, priority):
+async def create_dimension_type(client, name):
     body = await gql(
-        client, _CREATE_DIMENSION_TYPE, {"input": {"name": name, "priority": priority}}
+        client, _CREATE_DIMENSION_TYPE, {"input": {"name": name}}
     )
     return body["data"]["createDimensionType"]
 

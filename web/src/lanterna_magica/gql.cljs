@@ -17,6 +17,16 @@
      createDimensionType(input: $input) { id name priority createdAt archivedAt }
    }")
 
+(def update-dimension-type-mutation
+  "mutation UpdateDimensionType($input: UpdateDimensionTypeInput!) {
+     updateDimensionType(input: $input) { id name createdAt archivedAt }
+   }")
+
+(def swap-dimension-type-priorities-mutation
+  "mutation SwapDimensionTypePriorities($idA: ID!, $idB: ID!) {
+     swapDimensionTypePriorities(idA: $idA, idB: $idB) { id name priority createdAt archivedAt }
+   }")
+
 (def archive-dimension-type-mutation
   "mutation ArchiveDimensionType($id: ID!) {
      archiveDimensionType(id: $id) { id name priority createdAt archivedAt }
