@@ -19,7 +19,6 @@ import httpx
 import pytest
 from httpx import ASGITransport
 
-from lanterna_magica.data.utils import SENTINEL_UUID
 from lanterna_magica.db import create_pool
 
 
@@ -76,23 +75,27 @@ async def client(pool, server_url):
 
 @pytest.fixture(autouse=True)
 async def _clean_db(pool):
-    """Truncate all tables after each test, then re-insert sentinel rows."""
+    """Truncate all tables after each test, then re-insert seed dimension types and base dimensions."""
     yield
     async with pool.acquire() as conn:
         await conn.execute(
-            "TRUNCATE services, environments, configurations,"
+            "TRUNCATE dimension_types, dimensions, configurations,"
+            " configuration_scopes, revision_scopes,"
             " shared_values, shared_value_revisions, config_substitutions"
             " CASCADE"
         )
         await conn.execute(
-            "INSERT INTO services (id, name, description)"
-            " VALUES ($1, '_global', 'Sentinel for unscoped configurations')",
-            SENTINEL_UUID,
+            "INSERT INTO dimension_types (name, priority)"
+            " VALUES ('service', 1), ('environment', 2)"
+            " ON CONFLICT DO NOTHING"
         )
         await conn.execute(
-            "INSERT INTO environments (id, name, description)"
-            " VALUES ($1, '_global', 'Sentinel for unscoped configurations')",
-            SENTINEL_UUID,
+            "INSERT INTO dimensions (type_id, name, description, base)"
+            " SELECT dt.id, 'global', 'Base dimension for unscoped entries', true"
+            " FROM dimension_types dt"
+            " WHERE NOT EXISTS ("
+            "   SELECT 1 FROM dimensions d WHERE d.type_id = dt.id AND d.base = true"
+            " )"
         )
 
 

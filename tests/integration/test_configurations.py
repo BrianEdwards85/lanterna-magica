@@ -1,7 +1,6 @@
 from assertpy import assert_that
 from conftest import gql
 from lanterna_magica.data.configurations import Configurations
-from lanterna_magica.data.utils import SENTINEL_UUID
 from utils import create_environment, create_service, create_shared_value, nodes
 
 # -- Mutations --
@@ -10,8 +9,7 @@ CREATE_CONFIGURATION = """
 mutation CreateConfiguration($input: CreateConfigurationInput!) {
     createConfiguration(input: $input) {
         id
-        service { id name }
-        environment { id name }
+        dimensions { id name }
         body
         isCurrent
         createdAt
@@ -49,13 +47,12 @@ query Configuration($id: ID!) {
 # -- Queries --
 
 CONFIGURATIONS = """
-query Configurations($serviceId: ID, $environmentId: ID, $includeGlobal: Boolean, $first: Int, $after: String) {
-    configurations(serviceId: $serviceId, environmentId: $environmentId, includeGlobal: $includeGlobal, first: $first, after: $after) {
+query Configurations($dimensionIds: [ID!], $includeBase: Boolean, $first: Int, $after: String) {
+    configurations(dimensionIds: $dimensionIds, includeBase: $includeBase, first: $first, after: $after) {
         edges {
             node {
                 id
-                service { id }
-                environment { id }
+                dimensions { id name }
                 body
                 isCurrent
                 createdAt
@@ -74,8 +71,7 @@ CONFIGURATION = """
 query Configuration($id: ID!) {
     configuration(id: $id) {
         id
-        service { id }
-        environment { id }
+        dimensions { id name }
         body
         isCurrent
         createdAt
@@ -87,11 +83,10 @@ query Configuration($id: ID!) {
 # -- Helpers --
 
 
-async def _create_configuration(client, service_id, environment_id, body, substitutions=None):
+async def _create_configuration(client, dimension_ids, body, substitutions=None):
     variables = {
         "input": {
-            "serviceId": service_id,
-            "environmentId": environment_id,
+            "dimensionIds": dimension_ids,
             "body": body,
         }
     }
@@ -109,14 +104,12 @@ async def test_create_configuration(client):
     env = await create_environment(client)
     config_body = {"host": "localhost", "port": 8080}
 
-    cfg = await _create_configuration(client, svc["id"], env["id"], config_body)
+    cfg = await _create_configuration(client, [svc["id"], env["id"]], config_body)
     assert_that(cfg["id"]).described_as("configuration id").is_not_none()
     assert_that(cfg["body"]).described_as("configuration body").is_equal_to(config_body)
     assert_that(cfg["isCurrent"]).described_as("new configuration is current").is_true()
-    assert_that(cfg["service"]["id"]).described_as("service reference").is_equal_to(svc["id"])
-    assert_that(cfg["environment"]["id"]).described_as("environment reference").is_equal_to(
-        env["id"]
-    )
+    dim_ids = [d["id"] for d in cfg["dimensions"]]
+    assert_that(dim_ids).described_as("dimension references").contains(svc["id"], env["id"])
     assert_that(cfg["createdAt"]).described_as("createdAt timestamp").is_not_none()
     assert_that(cfg["substitutions"]).described_as("no substitutions").is_empty()
 
@@ -129,7 +122,7 @@ async def test_create_configuration_with_substitutions(client):
     config_body = {"database": {"password": "placeholder"}}
     substitutions = [{"jsonpath": "$.database.password", "sharedValueId": sv["id"]}]
 
-    cfg = await _create_configuration(client, svc["id"], env["id"], config_body, substitutions)
+    cfg = await _create_configuration(client, [svc["id"], env["id"]], config_body, substitutions)
     assert_that(cfg["substitutions"]).described_as("substitutions count").is_length(1)
     sub = cfg["substitutions"][0]
     assert_that(sub["jsonpath"]).described_as("substitution jsonpath").is_equal_to(
@@ -144,8 +137,8 @@ async def test_new_configuration_replaces_current(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    cfg1 = await _create_configuration(client, svc["id"], env["id"], {"version": 1})
-    cfg2 = await _create_configuration(client, svc["id"], env["id"], {"version": 2})
+    cfg1 = await _create_configuration(client, [svc["id"], env["id"]], {"version": 1})
+    cfg2 = await _create_configuration(client, [svc["id"], env["id"]], {"version": 2})
 
     assert_that(cfg2["isCurrent"]).described_as("new config is current").is_true()
 
@@ -160,7 +153,7 @@ async def test_configuration_by_id(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    cfg = await _create_configuration(client, svc["id"], env["id"], {"key": "value"})
+    cfg = await _create_configuration(client, [svc["id"], env["id"]], {"key": "value"})
     body = await gql(client, CONFIGURATION, {"id": cfg["id"]})
     found = body["data"]["configuration"]
     assert_that(found["id"]).described_as("fetched configuration id").is_equal_to(cfg["id"])
@@ -178,8 +171,8 @@ async def test_configurations_list(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    cfg1 = await _create_configuration(client, svc["id"], env["id"], {"version": 1})
-    cfg2 = await _create_configuration(client, svc["id"], env["id"], {"version": 2})
+    cfg1 = await _create_configuration(client, [svc["id"], env["id"]], {"version": 1})
+    cfg2 = await _create_configuration(client, [svc["id"], env["id"]], {"version": 2})
 
     body = await gql(client, CONFIGURATIONS)
     items = nodes(body["data"]["configurations"]["edges"])
@@ -188,32 +181,18 @@ async def test_configurations_list(client):
     )
 
 
-async def test_configurations_filter_by_service(client):
+async def test_configurations_filter_by_dimension(client):
     svc1 = await create_service(client, "traefik")
     svc2 = await create_service(client, "nginx")
     env = await create_environment(client)
 
-    await _create_configuration(client, svc1["id"], env["id"], {"app": "traefik"})
-    await _create_configuration(client, svc2["id"], env["id"], {"app": "nginx"})
+    await _create_configuration(client, [svc1["id"], env["id"]], {"app": "traefik"})
+    await _create_configuration(client, [svc2["id"], env["id"]], {"app": "nginx"})
 
-    body = await gql(client, CONFIGURATIONS, {"serviceId": svc1["id"]})
+    body = await gql(client, CONFIGURATIONS, {"dimensionIds": [svc1["id"]]})
     items = nodes(body["data"]["configurations"]["edges"])
-    assert_that(items).described_as("configs filtered by service").is_length(1)
+    assert_that(items).described_as("configs filtered by dimension").is_length(1)
     assert_that(items[0]["body"]).described_as("filtered config body").is_equal_to({"app": "traefik"})
-
-
-async def test_configurations_filter_by_environment(client):
-    svc = await create_service(client)
-    env1 = await create_environment(client, "production")
-    env2 = await create_environment(client, "staging")
-
-    await _create_configuration(client, svc["id"], env1["id"], {"env": "prod"})
-    await _create_configuration(client, svc["id"], env2["id"], {"env": "staging"})
-
-    body = await gql(client, CONFIGURATIONS, {"environmentId": env1["id"]})
-    items = nodes(body["data"]["configurations"]["edges"])
-    assert_that(items).described_as("configs filtered by environment").is_length(1)
-    assert_that(items[0]["body"]).described_as("filtered config body").is_equal_to({"env": "prod"})
 
 
 async def test_configurations_pagination(client):
@@ -221,7 +200,7 @@ async def test_configurations_pagination(client):
     env = await create_environment(client)
 
     for i in range(5):
-        await _create_configuration(client, svc["id"], env["id"], {"version": i})
+        await _create_configuration(client, [svc["id"], env["id"]], {"version": i})
 
     body = await gql(client, CONFIGURATIONS, {"first": 2})
     page1 = body["data"]["configurations"]
@@ -256,8 +235,7 @@ async def test_update_config_substitution(client):
 
     cfg = await _create_configuration(
         client,
-        svc["id"],
-        env["id"],
+        [svc["id"], env["id"]],
         {"database": {"password": "placeholder"}},
         [{"jsonpath": "$.database.password", "sharedValueId": sv1["id"]}],
     )
@@ -292,8 +270,7 @@ async def test_update_config_substitution_targets_single_jsonpath(client):
 
     cfg = await _create_configuration(
         client,
-        svc["id"],
-        env["id"],
+        [svc["id"], env["id"]],
         {"database": {"host": "placeholder", "port": 0}},
         [
             {"jsonpath": "$.database.host", "sharedValueId": sv_host["id"]},
@@ -340,8 +317,7 @@ async def test_configuration_substitutions_field(client):
 
     cfg = await _create_configuration(
         client,
-        svc["id"],
-        env["id"],
+        [svc["id"], env["id"]],
         {"database": {"host": "placeholder", "port": 0}},
         [
             {"jsonpath": "$.database.host", "sharedValueId": sv1["id"]},
@@ -360,38 +336,54 @@ async def test_configuration_substitutions_field(client):
     )
 
 
-# -- includeGlobal Tests --
+# -- includeBase Tests --
 
 
-async def test_configurations_include_global_default(client):
-    """By default, filtering by service includes global (sentinel) configs."""
+async def test_configurations_include_base_default(client, pool):
+    """By default, filtering by dimension includes base dimension configs."""
     svc = await create_service(client)
     env = await create_environment(client)
 
-    await _create_configuration(client, svc["id"], env["id"], {"scope": "specific"})
-    await _create_configuration(client, SENTINEL_UUID, env["id"], {"scope": "global"})
+    # Get the base service dimension
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT d.id FROM dimensions d JOIN dimension_types dt ON d.type_id = dt.id"
+            " WHERE dt.name = 'service' AND d.base = true"
+        )
+        base_svc_id = str(row["id"])
 
-    body = await gql(client, CONFIGURATIONS, {"serviceId": svc["id"]})
+    await _create_configuration(client, [svc["id"], env["id"]], {"scope": "specific"})
+    await _create_configuration(client, [base_svc_id, env["id"]], {"scope": "base"})
+
+    body = await gql(client, CONFIGURATIONS, {"dimensionIds": [svc["id"]]})
     items = nodes(body["data"]["configurations"]["edges"])
     bodies = [i["body"] for i in items]
-    assert_that(bodies).described_as("default includes global").contains(
-        {"scope": "specific"}, {"scope": "global"}
+    assert_that(bodies).described_as("default includes base").contains(
+        {"scope": "specific"}, {"scope": "base"}
     )
 
 
-async def test_configurations_exclude_global(client):
-    """includeGlobal=false filters out sentinel-scoped configs."""
+async def test_configurations_exclude_base(client, pool):
+    """includeBase=false filters out base-dimension configs."""
     svc = await create_service(client)
     env = await create_environment(client)
 
-    await _create_configuration(client, svc["id"], env["id"], {"scope": "specific"})
-    await _create_configuration(client, SENTINEL_UUID, env["id"], {"scope": "global"})
+    # Get the base service dimension
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT d.id FROM dimensions d JOIN dimension_types dt ON d.type_id = dt.id"
+            " WHERE dt.name = 'service' AND d.base = true"
+        )
+        base_svc_id = str(row["id"])
+
+    await _create_configuration(client, [svc["id"], env["id"]], {"scope": "specific"})
+    await _create_configuration(client, [base_svc_id, env["id"]], {"scope": "base"})
 
     body = await gql(
-        client, CONFIGURATIONS, {"serviceId": svc["id"], "includeGlobal": False}
+        client, CONFIGURATIONS, {"dimensionIds": [svc["id"]], "includeBase": False}
     )
     items = nodes(body["data"]["configurations"]["edges"])
-    assert_that(items).described_as("exclude global").is_length(1)
+    assert_that(items).described_as("exclude base").is_length(1)
     assert_that(items[0]["body"]).is_equal_to({"scope": "specific"})
 
 
@@ -407,8 +399,7 @@ async def test_create_configuration_data_layer_returns_substitutions(client, poo
     sv = await create_shared_value(client, "dl-test-sv")
 
     result = await configs.create_configuration(
-        service_id=svc["id"],
-        environment_id=env["id"],
+        dimension_ids=[svc["id"], env["id"]],
         body={"key": "value"},
         substitutions=[{"jsonpath": "$.key", "shared_value_id": sv["id"]}],
     )
@@ -431,8 +422,7 @@ async def test_create_configuration_data_layer_returns_empty_substitutions(clien
     env = await create_environment(client, "dl-test-env2")
 
     result = await configs.create_configuration(
-        service_id=svc["id"],
-        environment_id=env["id"],
+        dimension_ids=[svc["id"], env["id"]],
         body={"key": "value"},
     )
 
@@ -448,7 +438,7 @@ async def test_create_configuration_with_empty_object_body(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    cfg = await _create_configuration(client, svc["id"], env["id"], {})
+    cfg = await _create_configuration(client, [svc["id"], env["id"]], {})
     assert_that(cfg["body"]).described_as("empty object body").is_equal_to({})
 
 
@@ -457,36 +447,8 @@ async def test_create_configuration_with_array_body(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    cfg = await _create_configuration(client, svc["id"], env["id"], [1, 2, 3])
+    cfg = await _create_configuration(client, [svc["id"], env["id"]], [1, 2, 3])
     assert_that(cfg["body"]).described_as("array body").is_equal_to([1, 2, 3])
-
-
-async def test_create_configuration_invalid_service_uuid(client):
-    env = await create_environment(client)
-    body = await gql(
-        client,
-        CREATE_CONFIGURATION,
-        {"input": {"serviceId": "not-a-uuid", "environmentId": env["id"], "body": {}}},
-        expect_errors=True,
-    )
-    assert_that(body).described_as("invalid service uuid rejected").contains_key("errors")
-
-
-async def test_create_configuration_nonexistent_service(client):
-    env = await create_environment(client)
-    body = await gql(
-        client,
-        CREATE_CONFIGURATION,
-        {
-            "input": {
-                "serviceId": "00000000-0000-0000-0000-ffffffffffff",
-                "environmentId": env["id"],
-                "body": {"key": "value"},
-            }
-        },
-        expect_errors=True,
-    )
-    assert_that(body).described_as("nonexistent service rejected").contains_key("errors")
 
 
 async def test_configuration_by_invalid_uuid(client):

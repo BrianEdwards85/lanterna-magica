@@ -116,11 +116,12 @@ async def test_environments_list(client):
     ).extracting("name").contains("production", "staging")
 
 
-async def test_environments_excludes_sentinel(client):
+async def test_environments_excludes_base(client):
+    """Base dimensions should not appear in environment list queries."""
     body = await gql(client, ENVIRONMENTS)
     assert_that(nodes(body["data"]["environments"]["edges"])).described_as(
-        "sentinel row should be hidden"
-    ).extracting("name").does_not_contain("_global")
+        "base dimension should be hidden"
+    ).extracting("name").does_not_contain("global")
 
 
 async def test_update_environment(client):

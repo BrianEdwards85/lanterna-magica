@@ -112,11 +112,12 @@ async def test_services_list(client):
     ).extracting("name").contains("traefik", "nginx")
 
 
-async def test_services_excludes_sentinel(client):
+async def test_services_excludes_base(client):
+    """Base dimensions should not appear in service list queries."""
     body = await gql(client, SERVICES)
     assert_that(nodes(body["data"]["services"]["edges"])).described_as(
-        "sentinel row should be hidden"
-    ).extracting("name").does_not_contain("_global")
+        "base dimension should be hidden"
+    ).extracting("name").does_not_contain("global")
 
 
 async def test_update_service(client):

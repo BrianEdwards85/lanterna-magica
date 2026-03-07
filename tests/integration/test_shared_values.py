@@ -69,8 +69,7 @@ query SharedValue($id: ID!) {
 SHARED_VALUE_WITH_REVISIONS = """
 query SharedValueWithRevisions(
     $id: ID!,
-    $serviceId: ID,
-    $environmentId: ID,
+    $dimensionIds: [ID!],
     $currentOnly: Boolean,
     $first: Int,
     $after: String
@@ -78,14 +77,13 @@ query SharedValueWithRevisions(
     sharedValue(id: $id) {
         id name
         revisions(
-            serviceId: $serviceId,
-            environmentId: $environmentId,
+            dimensionIds: $dimensionIds,
             currentOnly: $currentOnly,
             first: $first,
             after: $after
         ) {
             edges {
-                node { id sharedValue { id } service { id } environment { id } value isCurrent createdAt }
+                node { id sharedValue { id } dimensions { id name } value isCurrent createdAt }
                 cursor
             }
             pageInfo { hasNextPage endCursor }
@@ -278,14 +276,12 @@ async def test_create_revision(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    rev = await create_revision(client, sv["id"], svc["id"], env["id"], "secret123")
+    rev = await create_revision(client, sv["id"], [svc["id"], env["id"]], "secret123")
     assert_that(rev["sharedValue"]["id"]).described_as("revision shared value id").is_equal_to(
         sv["id"]
     )
-    assert_that(rev["service"]["id"]).described_as("revision service id").is_equal_to(svc["id"])
-    assert_that(rev["environment"]["id"]).described_as("revision environment id").is_equal_to(
-        env["id"]
-    )
+    dim_ids = [d["id"] for d in rev["dimensions"]]
+    assert_that(dim_ids).described_as("revision dimension ids").contains(svc["id"], env["id"])
     assert_that(rev["value"]).described_as("revision value").is_equal_to("secret123")
     assert_that(rev["isCurrent"]).described_as("new revision should be current").is_true()
 
@@ -295,8 +291,8 @@ async def test_new_revision_replaces_current(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    rev1 = await create_revision(client, sv["id"], svc["id"], env["id"], "v1")
-    rev2 = await create_revision(client, sv["id"], svc["id"], env["id"], "v2")
+    rev1 = await create_revision(client, sv["id"], [svc["id"], env["id"]], "v1")
+    rev2 = await create_revision(client, sv["id"], [svc["id"], env["id"]], "v2")
 
     assert_that(rev2["isCurrent"]).described_as("newest revision should be current").is_true()
 
@@ -312,18 +308,18 @@ async def test_new_revision_replaces_current(client):
     ).is_true()
 
 
-async def test_revisions_scoped_by_service_and_environment(client):
+async def test_revisions_scoped_by_dimension(client):
     sv = await create_shared_value(client)
     svc1 = await create_service(client, "traefik")
     svc2 = await create_service(client, "nginx")
     env = await create_environment(client)
 
-    await create_revision(client, sv["id"], svc1["id"], env["id"], "val-svc1")
-    await create_revision(client, sv["id"], svc2["id"], env["id"], "val-svc2")
+    await create_revision(client, sv["id"], [svc1["id"], env["id"]], "val-svc1")
+    await create_revision(client, sv["id"], [svc2["id"], env["id"]], "val-svc2")
 
     # Filter by svc1
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "serviceId": svc1["id"]}
+        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "dimensionIds": [svc1["id"]]}
     )
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc1").is_length(1)
@@ -333,7 +329,7 @@ async def test_revisions_scoped_by_service_and_environment(client):
 
     # Filter by svc2
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "serviceId": svc2["id"]}
+        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "dimensionIds": [svc2["id"]]}
     )
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc2").is_length(1)
@@ -347,8 +343,8 @@ async def test_revisions_current_only_filter(client):
     svc = await create_service(client)
     env = await create_environment(client)
 
-    await create_revision(client, sv["id"], svc["id"], env["id"], "v1")
-    await create_revision(client, sv["id"], svc["id"], env["id"], "v2")
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "v1")
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "v2")
 
     # All revisions
     body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
@@ -375,7 +371,7 @@ async def test_revisions_pagination(client):
     env = await create_environment(client)
 
     for i in range(5):
-        await create_revision(client, sv["id"], svc["id"], env["id"], f"v{i}")
+        await create_revision(client, sv["id"], [svc["id"], env["id"]], f"v{i}")
 
     body = await gql(
         client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "first": 2}
@@ -415,11 +411,11 @@ async def test_revisions_filter_by_environment(client):
     env1 = await create_environment(client, "production")
     env2 = await create_environment(client, "staging")
 
-    await create_revision(client, sv["id"], svc["id"], env1["id"], "prod-val")
-    await create_revision(client, sv["id"], svc["id"], env2["id"], "staging-val")
+    await create_revision(client, sv["id"], [svc["id"], env1["id"]], "prod-val")
+    await create_revision(client, sv["id"], [svc["id"], env2["id"]], "staging-val")
 
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "environmentId": env1["id"]}
+        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "dimensionIds": [env1["id"]]}
     )
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by production env").is_length(1)

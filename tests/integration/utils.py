@@ -20,6 +20,22 @@ mutation CreateEnvironment($input: CreateEnvironmentInput!) {
 }
 """
 
+_CREATE_DIMENSION_TYPE = """
+mutation CreateDimensionType($input: CreateDimensionTypeInput!) {
+    createDimensionType(input: $input) {
+        id name priority createdAt archivedAt
+    }
+}
+"""
+
+_CREATE_DIMENSION = """
+mutation CreateDimension($input: CreateDimensionInput!) {
+    createDimension(input: $input) {
+        id type { id name } name description base createdAt updatedAt archivedAt
+    }
+}
+"""
+
 _CREATE_SHARED_VALUE = """
 mutation CreateSharedValue($input: CreateSharedValueInput!) {
     createSharedValue(input: $input) {
@@ -31,7 +47,7 @@ mutation CreateSharedValue($input: CreateSharedValueInput!) {
 _CREATE_REVISION = """
 mutation CreateSharedValueRevision($input: CreateSharedValueRevisionInput!) {
     createSharedValueRevision(input: $input) {
-        id sharedValue { id } service { id } environment { id } value isCurrent createdAt
+        id sharedValue { id } dimensions { id name } value isCurrent createdAt
     }
 }
 """
@@ -62,20 +78,33 @@ async def create_environment(client, name="production", description=None):
     return body["data"]["createEnvironment"]
 
 
+async def create_dimension_type(client, name, priority):
+    body = await gql(
+        client, _CREATE_DIMENSION_TYPE, {"input": {"name": name, "priority": priority}}
+    )
+    return body["data"]["createDimensionType"]
+
+
+async def create_dimension(client, type_id, name, description=None):
+    body = await gql(
+        client, _CREATE_DIMENSION, {"input": {"typeId": type_id, "name": name, "description": description}}
+    )
+    return body["data"]["createDimension"]
+
+
 async def create_shared_value(client, name="db_password"):
     body = await gql(client, _CREATE_SHARED_VALUE, {"input": {"name": name}})
     return body["data"]["createSharedValue"]
 
 
-async def create_revision(client, shared_value_id, service_id, environment_id, value):
+async def create_revision(client, shared_value_id, dimension_ids, value):
     body = await gql(
         client,
         _CREATE_REVISION,
         {
             "input": {
                 "sharedValueId": shared_value_id,
-                "serviceId": service_id,
-                "environmentId": environment_id,
+                "dimensionIds": dimension_ids,
                 "value": value,
             }
         },
