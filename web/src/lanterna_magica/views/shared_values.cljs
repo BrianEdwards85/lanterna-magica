@@ -49,12 +49,14 @@
         services     @(rf/subscribe [::subs/services-dropdown-items])
         environments @(rf/subscribe [::subs/environments-dropdown-items])]
     (when open?
-      [bp/dialog {:title    "Create Revision"
-                  :icon     "history"
-                  :is-open  true
-                  :on-close #(rf/dispatch [::events/close-revision-dialog])
-                  :class    "w-full max-w-md"}
-       [bp/dialog-body
+      (let [valid? (and (seq (:serviceId revision))
+                        (seq (:environmentId revision)))]
+        [bp/dialog {:title    "Create Revision"
+                    :icon     "history"
+                    :is-open  true
+                    :on-close #(rf/dispatch [::events/close-revision-dialog])
+                    :class    "w-full max-w-md"}
+         [bp/dialog-body
         [:div {:class "mb-4 flex items-center gap-3"}
          [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Service"]
          [:div.flex-1
@@ -86,14 +88,15 @@
                                :on-change   #(rf/dispatch [::events/set-revision-field :value-text %])}]]
         (when error
           [comp/error-banner "Failed to create revision. Check your JSON."])]
-       [bp/dialog-footer
-        {:actions
-         (r/as-element
-          [:<>
-           [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-revision-dialog])}]
-           [bp/button {:text "Create" :intent "primary" :icon "tick"
-                       :loading saving?
-                       :on-click #(rf/dispatch [::events/save-revision])}]])}]])))
+         [bp/dialog-footer
+          {:actions
+           (r/as-element
+            [:<>
+             [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-revision-dialog])}]
+             [bp/button {:text "Create" :intent "primary" :icon "tick"
+                         :loading  saving?
+                         :disabled (not valid?)
+                         :on-click #(rf/dispatch [::events/save-revision])}]])}]]))))
 
 ;; ---------------------------------------------------------------------------
 ;; Revisions Panel

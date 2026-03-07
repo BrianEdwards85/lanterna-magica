@@ -18,12 +18,14 @@
         services     @(rf/subscribe [::subs/services-dropdown-items])
         environments @(rf/subscribe [::subs/environments-dropdown-items])]
     (when open?
-      [bp/dialog {:title    "Create Configuration"
-                  :icon     "document"
-                  :is-open  true
-                  :on-close #(rf/dispatch [::events/close-configuration-dialog])
-                  :class    "w-full max-w-lg"}
-       [bp/dialog-body
+      (let [valid? (and (seq (:serviceId configuration))
+                        (seq (:environmentId configuration)))]
+        [bp/dialog {:title    "Create Configuration"
+                    :icon     "document"
+                    :is-open  true
+                    :on-close #(rf/dispatch [::events/close-configuration-dialog])
+                    :class    "w-full max-w-lg"}
+         [bp/dialog-body
         [:div {:class "mb-4 flex items-center gap-3"}
          [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Service"]
          [:div.flex-1
@@ -53,16 +55,17 @@
                                :class       "font-mono text-sm"
                                :placeholder "{\n  \"key\": \"value\"\n}"
                                :on-change   #(rf/dispatch [::events/set-configuration-field :body-text %])}]]
-        (when error
-          [comp/error-banner "Failed to create configuration. Check your JSON."])]
-       [bp/dialog-footer
-        {:actions
-         (r/as-element
-          [:<>
-           [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-configuration-dialog])}]
-           [bp/button {:text "Create" :intent "primary" :icon "tick"
-                       :loading saving?
-                       :on-click #(rf/dispatch [::events/save-configuration])}]])}]])))
+          (when error
+            [comp/error-banner "Failed to create configuration. Check your JSON."])]
+         [bp/dialog-footer
+          {:actions
+           (r/as-element
+            [:<>
+             [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-configuration-dialog])}]
+             [bp/button {:text "Create" :intent "primary" :icon "tick"
+                         :loading  saving?
+                         :disabled (not valid?)
+                         :on-click #(rf/dispatch [::events/save-configuration])}]])}]]))))
 
 ;; ---------------------------------------------------------------------------
 ;; Configuration Detail Panel

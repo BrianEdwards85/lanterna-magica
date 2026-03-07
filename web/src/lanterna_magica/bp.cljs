@@ -19,7 +19,6 @@
 (def spinner         (r/adapt-react-class bp/Spinner))
 (def switch-control  (r/adapt-react-class bp/Switch))
 (def tag             (r/adapt-react-class bp/Tag))
-(def text-area       (r/adapt-react-class bp/TextArea))
 
 ;; @blueprintjs/select
 (def select-component bp-select/Select)

@@ -14,7 +14,8 @@
                           :revisions {:edges []}
                           :revisions-page-info nil}
    :configurations-page {:edges [] :page-info {:hasNextPage false :endCursor nil}
-                          :filter-service-id nil :filter-environment-id nil}
+                          :filter-service-id nil :filter-environment-id nil
+                          :selected-id nil :selected nil}
 
    ;; Flat lists for dropdowns (initial set, no pagination)
    :all-services     []
