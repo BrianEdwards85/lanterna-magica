@@ -13,6 +13,7 @@ from lanterna_magica.config import settings
 from lanterna_magica.db import apply_migrations, create_pool
 from lanterna_magica.resolvers import create_gql
 from lanterna_magica.telemetry import (
+    configure_logging,
     instrument_app,
     instrument_db,
     setup_telemetry,
@@ -39,6 +40,7 @@ WEB_PUBLIC = Path(__file__).parent.parent.parent / "web" / "resources" / "public
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_logging(json_output=settings.get("log_json", False))
     setup_telemetry()
     instrument_db()
     apply_migrations()

@@ -1,4 +1,4 @@
-"""OpenTelemetry and log shipping setup.
+"""OpenTelemetry, structured logging, and log shipping setup.
 
 Reads config from dynaconf settings (settings.otel.endpoint,
 settings.otel.auth_token). When endpoint is empty, telemetry is
@@ -6,8 +6,10 @@ silently disabled (local dev).
 """
 
 import contextlib
+import json
 import logging
 import threading
+from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -93,6 +95,36 @@ class OpenObserveLogHandler(logging.Handler):
         self.flush()
         self._client.close()
         super().close()
+
+
+class JsonLogFormatter(logging.Formatter):
+    """Structured JSON formatter for stdout/stderr in containers."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(
+            {
+                "timestamp": datetime.fromtimestamp(
+                    record.created, tz=timezone.utc
+                ).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+                "module": record.module,
+                "func": record.funcName,
+                "line": record.lineno,
+            },
+            default=str,
+        )
+
+
+def configure_logging(*, json_output: bool = False) -> None:
+    """Configure root logger. Use json_output=True in containers."""
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if json_output:
+        handler = logging.StreamHandler()
+        handler.setFormatter(JsonLogFormatter())
+        root.handlers = [handler]
 
 
 def setup_telemetry() -> None:

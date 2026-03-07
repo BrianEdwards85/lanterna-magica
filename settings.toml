@@ -34,6 +34,7 @@ password = "lanterna_magica_test"
 [production]
 dynaconf_merge = true
 cookie_secure = true
+log_json = true
 
 [production.cors]
 allow_origins = []

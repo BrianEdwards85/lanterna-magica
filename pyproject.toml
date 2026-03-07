@@ -46,6 +46,9 @@ format = "ruff format src/"
 test = "pytest tests/ -v"
 test-unit = "pytest tests/unit -v"
 test-integration = "pytest tests/integration -v"
+migrate = "python -c \"from lanterna_magica.db import apply_migrations; apply_migrations()\""
+"docker:build" = {shell = "docker build -t lanterna-magica:latest ."}
+"docker:up" = {shell = "docker compose up -d"}
 
 [tool.ruff]
 target-version = "py312"
