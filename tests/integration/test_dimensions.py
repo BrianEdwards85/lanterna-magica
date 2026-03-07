@@ -39,8 +39,8 @@ mutation UnarchiveDimension($id: ID!) {
 # -- Queries --
 
 DIMENSIONS = """
-query Dimensions($typeId: ID!, $includeArchived: Boolean, $first: Int, $after: String, $search: String) {
-    dimensions(typeId: $typeId, includeArchived: $includeArchived, first: $first, after: $after, search: $search) {
+query Dimensions($typeId: ID!, $includeBase: Boolean, $includeArchived: Boolean, $first: Int, $after: String, $search: String) {
+    dimensions(typeId: $typeId, includeBase: $includeBase, includeArchived: $includeArchived, first: $first, after: $after, search: $search) {
         edges {
             node { id type { id } name description base createdAt updatedAt archivedAt }
             cursor
@@ -138,14 +138,93 @@ async def test_dimensions_list(client):
     assert_that(items).described_as("dimensions list").extracting("name").contains("traefik", "nginx")
 
 
-async def test_dimensions_excludes_base(client):
-    """Base dimensions should not appear in list queries."""
+async def test_dimensions_includes_base_by_default(client):
+    """Base dimensions should appear by default."""
     type_id = await _get_service_type_id(client)
     await create_dimension(client, type_id, "traefik")
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id})
     items = nodes(body["data"]["dimensions"]["edges"])
+    assert_that(items).described_as("base dimension included").extracting("name").contains("global")
+
+
+async def test_dimensions_excludes_base_when_false(client):
+    """Base dimensions should not appear when includeBase is false."""
+    type_id = await _get_service_type_id(client)
+    await create_dimension(client, type_id, "traefik")
+
+    body = await gql(client, DIMENSIONS, {"typeId": type_id, "includeBase": False})
+    items = nodes(body["data"]["dimensions"]["edges"])
     assert_that(items).described_as("base dimension excluded").extracting("name").does_not_contain("global")
+
+
+async def test_base_dimension_fields(client):
+    """The base dimension has correct field values."""
+    type_id = await _get_service_type_id(client)
+
+    body = await gql(client, DIMENSIONS, {"typeId": type_id})
+    items = nodes(body["data"]["dimensions"]["edges"])
+    base = next(d for d in items if d["base"])
+    assert_that(base["name"]).described_as("base name").is_equal_to("global")
+    assert_that(base["base"]).described_as("base flag").is_true()
+    assert_that(base["type"]["id"]).described_as("base type").is_equal_to(type_id)
+    assert_that(base["archivedAt"]).described_as("base not archived").is_none()
+
+
+async def test_base_dimension_by_id(client):
+    """The base dimension can be fetched by ID."""
+    type_id = await _get_service_type_id(client)
+
+    body = await gql(client, DIMENSIONS, {"typeId": type_id})
+    items = nodes(body["data"]["dimensions"]["edges"])
+    base = next(d for d in items if d["base"])
+
+    body = await gql(client, DIMENSION, {"id": base["id"]})
+    found = body["data"]["dimension"]
+    assert_that(found["id"]).described_as("fetched base id").is_equal_to(base["id"])
+    assert_that(found["name"]).described_as("fetched base name").is_equal_to("global")
+    assert_that(found["base"]).described_as("fetched base flag").is_true()
+
+
+async def test_base_dimension_not_updatable(client):
+    """Base dimensions cannot be updated."""
+    type_id = await _get_service_type_id(client)
+
+    body = await gql(client, DIMENSIONS, {"typeId": type_id})
+    items = nodes(body["data"]["dimensions"]["edges"])
+    base = next(d for d in items if d["base"])
+
+    body = await gql(
+        client,
+        UPDATE_DIMENSION,
+        {"input": {"id": base["id"], "name": "renamed"}},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("base dimension update rejected").contains_key("errors")
+
+
+async def test_base_dimension_not_archivable(client):
+    """Base dimensions cannot be archived."""
+    type_id = await _get_service_type_id(client)
+
+    body = await gql(client, DIMENSIONS, {"typeId": type_id})
+    items = nodes(body["data"]["dimensions"]["edges"])
+    base = next(d for d in items if d["base"])
+
+    body = await gql(client, ARCHIVE_DIMENSION, {"id": base["id"]}, expect_errors=True)
+    assert_that(body).described_as("base dimension archive rejected").contains_key("errors")
+
+
+async def test_each_type_has_base_dimension(client):
+    """Every seeded dimension type should have a base dimension."""
+    types_body = await gql(client, "{ dimensionTypes { id name } }")
+    for dt in types_body["data"]["dimensionTypes"]:
+        body = await gql(client, DIMENSIONS, {"typeId": dt["id"]})
+        items = nodes(body["data"]["dimensions"]["edges"])
+        base_dims = [d for d in items if d["base"]]
+        assert_that(base_dims).described_as(
+            f"base dimension for type {dt['name']}"
+        ).is_length(1)
 
 
 async def test_dimensions_filtered_by_type(client):
@@ -302,5 +381,5 @@ async def test_pagination(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id, "first": 2, "after": page2["pageInfo"]["endCursor"]})
     page3 = body["data"]["dimensions"]
-    assert_that(page3["edges"]).described_as("page 3 edge count").is_length(1)
+    assert_that(page3["edges"]).described_as("page 3 edge count").is_length(2)
     assert_that(page3["pageInfo"]["hasNextPage"]).described_as("page 3 has no next page").is_false()

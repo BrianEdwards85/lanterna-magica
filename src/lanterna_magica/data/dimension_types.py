@@ -32,7 +32,12 @@ class DimensionTypes:
         row = await queries.create_dimension_type(
             self.pool, name=name, priority=priority
         )
-        return dict(row)
+        dt = dict(row)
+        await queries.create_base_dimension(
+            self.pool, type_id=str(dt["id"]), name="global",
+            description=f"Default base for {name} dimension",
+        )
+        return dt
 
     async def archive_dimension_type(self, id: str) -> dict:
         row = await queries.archive_dimension_type(self.pool, id=id)

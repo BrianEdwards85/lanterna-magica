@@ -34,6 +34,7 @@ input UpdateDimensionInput {
 extend type Query {
   dimensions(
     typeId: ID!
+    includeBase: Boolean
     includeArchived: Boolean
     first: Int
     after: String

@@ -27,6 +27,7 @@ class DimensionFacadeResolver:
         return await self.dimensions.get_dimensions(
             type_id=type_id,
             search=search,
+            include_base=False,
             include_archived=include_archived,
             first=first,
             after=after,

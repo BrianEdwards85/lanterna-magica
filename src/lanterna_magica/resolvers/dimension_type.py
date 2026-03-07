@@ -26,11 +26,12 @@ class DimensionTypesResolver:
         return await self.dimension_types.unarchive_dimension_type(id)
 
     async def resolve_dimensions_for_type(
-        self, obj, info, *, include_archived=False, first=None, after=None, search=None
+        self, obj, info, *, include_base=True, include_archived=False, first=None, after=None, search=None
     ):
         return await self.dimensions.get_dimensions(
             type_id=str(obj["id"]),
             search=search,
+            include_base=include_base,
             include_archived=include_archived,
             first=first,
             after=after,

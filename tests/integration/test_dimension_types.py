@@ -142,6 +142,23 @@ async def test_dimension_type_has_dimensions_field(client):
     """DimensionType.dimensions should return its child dimensions."""
     body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS)
     types = body["data"]["dimensionTypes"]
-    # Seed types exist but base dimensions are excluded from list queries
     for t in types:
         assert_that(t).described_as("type has dimensions field").contains_key("dimensions")
+
+
+async def test_create_dimension_type_creates_base_dimension(client):
+    """Creating a dimension type should also create a base 'global' dimension."""
+    dt = await create_dimension_type(client, "region", 10)
+
+    dims_query = """
+    query Dimensions($typeId: ID!) {
+        dimensions(typeId: $typeId) {
+            edges { node { id name base } }
+        }
+    }
+    """
+    body = await gql(client, dims_query, {"typeId": dt["id"]})
+    items = [e["node"] for e in body["data"]["dimensions"]["edges"]]
+    base_dims = [d for d in items if d["base"]]
+    assert_that(base_dims).described_as("new type has base dimension").is_length(1)
+    assert_that(base_dims[0]["name"]).described_as("base dimension name").is_equal_to("global")

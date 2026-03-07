@@ -9,7 +9,6 @@
   "query DimensionTypes($includeArchived: Boolean) {
      dimensionTypes(includeArchived: $includeArchived) {
        id name priority createdAt archivedAt
-       dimensions(first: 0) { pageInfo { hasNextPage } }
      }
    }")
 
@@ -33,8 +32,8 @@
 ;; ---------------------------------------------------------------------------
 
 (def dimensions-query
-  "query Dimensions($typeId: ID!, $search: String, $includeArchived: Boolean, $first: Int, $after: String) {
-     dimensions(typeId: $typeId, search: $search, includeArchived: $includeArchived, first: $first, after: $after) {
+  "query Dimensions($typeId: ID!, $search: String, $includeBase: Boolean, $includeArchived: Boolean, $first: Int, $after: String) {
+     dimensions(typeId: $typeId, search: $search, includeBase: $includeBase, includeArchived: $includeArchived, first: $first, after: $after) {
        edges { cursor node { id name description base createdAt updatedAt archivedAt type { id name } } }
        pageInfo { hasNextPage endCursor }
      }

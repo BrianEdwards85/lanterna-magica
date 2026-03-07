@@ -14,6 +14,7 @@ class Dimensions:
         *,
         type_id: str,
         search: str | None = None,
+        include_base: bool = True,
         include_archived: bool = False,
         first: int | None = None,
         after: str | None = None,
@@ -27,6 +28,7 @@ class Dimensions:
             async for r in queries.get_dimensions(
                 self.pool,
                 type_id=type_id,
+                include_base=include_base,
                 include_archived=include_archived,
                 search=search,
                 after_id=after_id,

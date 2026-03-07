@@ -114,10 +114,9 @@
 ;; ---------------------------------------------------------------------------
 ;; Dimensions (parameterized by type-id)
 ;;
-;; NOTE: Callbacks that carry a type-id use the raw event vector instead of
-;; rf/unwrap, because re-graph conj's {:response ...} onto the callback vec.
-;; With callback [::event type-id], re-graph dispatches
-;; [::event type-id {:response ...}], so we destructure [_ type-id result].
+;; re-graph callbacks must be [::event {:key val}] — re-graph does
+;; (update callback 1 assoc :response response), so index 1 must be a map.
+;; We pass type-id inside that map and use rf/unwrap to destructure.
 ;; ---------------------------------------------------------------------------
 
 (defn- dims-page-path [type-id]
@@ -144,9 +143,10 @@
                  {:query     gql/dimensions-query
                   :variables {:typeId          type-id
                               :search          (when (seq search) search)
+
                               :includeArchived (boolean archived)
                               :first           page-size}
-                  :callback  [::events/on-dimensions-fresh type-id]}]})))
+                  :callback  [::events/on-dimensions-fresh {:type-id type-id}]}]})))
 
 (rf/reg-event-fx
  ::events/load-more-dimensions
@@ -160,14 +160,16 @@
                  {:query     gql/dimensions-query
                   :variables {:typeId          type-id
                               :search          (when (seq search) search)
+
                               :includeArchived (boolean archived)
                               :first           page-size
                               :after           cursor}
-                  :callback  [::events/on-dimensions-append type-id]}]})))
+                  :callback  [::events/on-dimensions-append {:type-id type-id}]}]})))
 
 (rf/reg-event-fx
  ::events/on-dimensions-fresh
- (fn [{:keys [db]} [_ type-id {:keys [response]}]]
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [type-id response]}]
    (let [{:keys [data errors]} response
          connection (:dimensions data)
          path (dims-page-path type-id)]
@@ -178,7 +180,8 @@
 
 (rf/reg-event-fx
  ::events/on-dimensions-append
- (fn [{:keys [db]} [_ type-id {:keys [response]}]]
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [type-id response]}]
    (let [{:keys [data errors]} response
          connection (:dimensions data)
          path (dims-page-path type-id)]
@@ -245,11 +248,12 @@
       :dispatch [::re-graph/mutate
                  {:query     mutation
                   :variables {:input input}
-                  :callback  [::events/on-dimension-saved type-id]}]})))
+                  :callback  [::events/on-dimension-saved {:type-id type-id}]}]})))
 
 (rf/reg-event-fx
  ::events/on-dimension-saved
- (fn [{:keys [db]} [_ type-id {:keys [response]}]]
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [type-id response]}]
    (let [{:keys [errors]} response]
      (if errors
        {:db (h/stop-loading db :save-dimension errors)}
@@ -268,7 +272,7 @@
     :dispatch [::re-graph/mutate
                {:query     gql/archive-dimension-mutation
                 :variables {:id id}
-                :callback  [::events/on-dimension-archive-toggled type-id]}]}))
+                :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
 
 (rf/reg-event-fx
  ::events/unarchive-dimension
@@ -277,11 +281,12 @@
     :dispatch [::re-graph/mutate
                {:query     gql/unarchive-dimension-mutation
                 :variables {:id id}
-                :callback  [::events/on-dimension-archive-toggled type-id]}]}))
+                :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
 
 (rf/reg-event-fx
  ::events/on-dimension-archive-toggled
- (fn [{:keys [db]} [_ type-id {:keys [response]}]]
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [type-id response]}]
    (let [{:keys [errors]} response]
      (if errors
        {:db (h/stop-loading db :archive-dimension errors)}
@@ -301,11 +306,12 @@
    {:dispatch [::re-graph/query
                {:query     gql/dimensions-query
                 :variables {:typeId type-id :first 10}
-                :callback  [::events/on-dimensions-list type-id]}]}))
+                :callback  [::events/on-dimensions-list {:type-id type-id}]}]}))
 
 (rf/reg-event-fx
  ::events/on-dimensions-list
- (fn [{:keys [db]} [_ type-id {:keys [response]}]]
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [type-id response]}]
    (let [{:keys [data]} response
          nodes (mapv :node (get-in data [:dimensions :edges]))]
      {:db (assoc-in db [:all-dimensions type-id] nodes)})))
@@ -321,12 +327,13 @@
      {:dispatch [::re-graph/query
                  {:query     gql/dimensions-query
                   :variables {:typeId type-id :search query :first 10}
-                  :callback  [::events/on-dimensions-search-results type-id]}]}
+                  :callback  [::events/on-dimensions-search-results {:type-id type-id}]}]}
      {:dispatch [::events/clear-dimensions-search-results type-id]})))
 
 (rf/reg-event-fx
  ::events/on-dimensions-search-results
- (fn [{:keys [db]} [_ type-id {:keys [response]}]]
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [type-id response]}]
    (let [{:keys [data]} response
          nodes (mapv :node (get-in data [:dimensions :edges]))]
      {:db (assoc-in db [:dimensions-search-results type-id] nodes)})))

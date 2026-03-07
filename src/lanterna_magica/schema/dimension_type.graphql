@@ -3,6 +3,7 @@ type DimensionType {
   name: String!
   priority: Int!
   dimensions(
+    includeBase: Boolean
     includeArchived: Boolean
     first: Int
     after: String
