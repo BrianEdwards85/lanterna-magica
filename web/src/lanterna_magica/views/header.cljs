@@ -14,12 +14,6 @@
        [bp/icon {:icon "cog" :intent "primary" :class "mr-2"}]
        [bp/navbar-heading "Lanterna Magica"]]
       [bp/navbar-divider]
-      [bp/button {:icon     "layers"
-                  :text     "Dimension Types"
-                  :minimal  true
-                  :active   (= route-name :route/dimension-types)
-                  :class    "mobile-icon-only"
-                  :on-click #(routes/navigate! :route/dimension-types)}]
       [bp/button {:icon     "tag"
                   :text     "Dimensions"
                   :minimal  true

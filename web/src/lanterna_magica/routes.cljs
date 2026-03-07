@@ -7,7 +7,6 @@
 (def routes
   [["/"                {:name :route/home}]
    ["/dimensions"      {:name :route/dimensions}]
-   ["/dimension-types" {:name :route/dimension-types}]
    ["/shared-values"   {:name :route/shared-values}]
    ["/configurations"  {:name :route/configurations}]])
 
@@ -23,7 +22,6 @@
 
 (def ^:private route->fetch-event
   {:route/dimensions      [::events/fetch-dimension-types]
-   :route/dimension-types [::events/fetch-dimension-types]
    :route/shared-values   [::events/fetch-shared-values]
    :route/configurations  [::events/fetch-configurations]})
 

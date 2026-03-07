@@ -16,6 +16,9 @@
 
 ;; -- Dimensions (per type) ------------------------------------------------
 
+(rf/reg-sub ::selected-dimension-type-id
+ (fn [db _] (:selected-dimension-type-id db)))
+
 (rf/reg-sub ::dimensions-page
  (fn [db [_ type-id]]
    (get-in db [:dimensions-pages type-id]

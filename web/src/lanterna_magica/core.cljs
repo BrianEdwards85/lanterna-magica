@@ -5,7 +5,6 @@
             [lanterna-magica.views.header :as header]
             [lanterna-magica.views.home :as home]
             [lanterna-magica.views.dimensions :as dimensions]
-            [lanterna-magica.views.dimension-types :as dimension-types]
             [lanterna-magica.views.shared-values :as shared-values]
             [lanterna-magica.views.configurations :as configurations]
             [re-frame.core :as rf]
@@ -18,7 +17,6 @@
     (case route-name
       :route/home             [home/home-screen]
       :route/dimensions       [dimensions/dimensions-screen]
-      :route/dimension-types  [dimension-types/dimension-types-screen]
       :route/shared-values    [shared-values/shared-values-screen]
       :route/configurations   [configurations/configurations-screen]
       [home/home-screen])))

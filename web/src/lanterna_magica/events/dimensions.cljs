@@ -26,12 +26,23 @@
  [rf/unwrap]
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [data errors]} response
-         types (or (:dimensionTypes data) [])]
+         types (or (:dimensionTypes data) [])
+         current-sel (:selected-dimension-type-id db)
+         still-valid? (some #(= current-sel (:id %)) types)
+         selected (if still-valid? current-sel (:id (first types)))]
      (cond-> {:db (-> db
                       (assoc :dimension-types types)
+                      (assoc :selected-dimension-type-id selected)
                       (h/stop-loading :dimension-types errors))}
        (seq types)
-       (assoc :dispatch-n (mapv (fn [dt] [::events/fetch-dimensions-list (:id dt)]) types))))))
+       (assoc :dispatch-n (into (mapv (fn [dt] [::events/fetch-dimensions-list (:id dt)]) types)
+                                (when selected [[::events/fetch-dimensions selected]])))))))
+
+(rf/reg-event-fx
+ ::events/select-dimension-type
+ (fn [{:keys [db]} [_ type-id]]
+   {:db       (assoc db :selected-dimension-type-id type-id)
+    :dispatch [::events/fetch-dimensions type-id]}))
 
 (rf/reg-event-fx
  ::events/toggle-dimension-types-archived

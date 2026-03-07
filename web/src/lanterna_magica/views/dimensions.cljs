@@ -65,74 +65,153 @@
                            :on-click #(rf/dispatch [::events/save-dimension])}])])}]]))))
 
 ;; ---------------------------------------------------------------------------
-;; Dimensions list for a single type
+;; Create Dimension Type Dialog
 ;; ---------------------------------------------------------------------------
 
-(defn dimensions-panel [type-id type-name]
-  (let [page       @(rf/subscribe [::subs/dimensions-page type-id])
-        {:keys [search show-archived edges page-info]} page
-        loading?   @(rf/subscribe [::subs/loading? :dimensions])
-        page-error @(rf/subscribe [::subs/error :dimensions])]
-    [:div {:class "mt-4"}
-     (when page-error
-       [comp/error-banner (str "Failed to load " type-name " dimensions.")])
-
-     [comp/page-header {:title      type-name
-                        :loading?   loading?
-                        :on-refresh #(rf/dispatch [::events/fetch-dimensions type-id])
-                        :on-create  #(rf/dispatch [::events/open-dimension-dialog type-id nil])}]
-
-     [comp/search-bar {:search              (or search "")
-                       :on-search-change    #(rf/dispatch [::events/set-dimensions-search type-id %])
-                       :show-archived       show-archived
-                       :on-toggle-archived  #(rf/dispatch [::events/toggle-dimensions-archived type-id])
-                       :placeholder         (str "Search " type-name "...")}]
-
-     (cond
-       (and loading? (empty? edges))
-       [comp/loading-spinner]
-
-       (empty? edges)
-       [comp/empty-state {:icon        "tag"
-                          :title       (str "No " type-name " found")
-                          :description (if (seq search)
-                                         "Try a different search term."
-                                         "Create your first dimension to get started.")}]
-
-       :else
-       [:div
-        (for [edge edges]
-          ^{:key (get-in edge [:node :id])}
-          [comp/entity-card
-           {:name        (get-in edge [:node :name])
-            :description (get-in edge [:node :description])
-            :archived?   (some? (get-in edge [:node :archivedAt]))
-            :on-click    #(rf/dispatch [::events/open-dimension-dialog type-id (:node edge)])}])
-        [comp/load-more-button
-         {:has-next? (:hasNextPage page-info)
-          :loading?  loading?
-          :on-click  #(rf/dispatch [::events/load-more-dimensions type-id])}]])]))
+(defn- dimension-type-dialog []
+  (let [{:keys [open? dimension-type]} @(rf/subscribe [::subs/dimension-type-dialog])
+        saving?    @(rf/subscribe [::subs/loading? :save-dimension-type])
+        save-error @(rf/subscribe [::subs/error :save-dimension-type])]
+    (when open?
+      [bp/dialog {:title    "Create Dimension Type"
+                  :icon     "layers"
+                  :is-open  true
+                  :on-close #(rf/dispatch [::events/close-dimension-type-dialog])
+                  :class    "w-full max-w-md"}
+       [bp/dialog-body
+        [:div.mb-4
+         [:label.bp6-label "Name"]
+         [comp/local-input {:value       (or (:name dimension-type) "")
+                            :placeholder "e.g. region"
+                            :on-change   #(rf/dispatch [::events/set-dimension-type-field :name %])}]]
+        [:div.mb-4
+         [:label.bp6-label "Priority"]
+         [comp/local-input {:value       (str (or (:priority dimension-type) 0))
+                            :placeholder "0"
+                            :on-change   #(rf/dispatch [::events/set-dimension-type-field :priority (js/parseInt % 10)])}]]
+        (when save-error
+          [comp/error-banner "Failed to create dimension type."])]
+       [bp/dialog-footer
+        {:actions
+         (r/as-element
+          [:<>
+           [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-dimension-type-dialog])}]
+           [bp/button {:text "Create" :intent "primary" :icon "tick"
+                       :loading saving?
+                       :on-click #(rf/dispatch [::events/save-dimension-type])}]])}]])))
 
 ;; ---------------------------------------------------------------------------
-;; Screen — shows all dimension types with their dimensions
+;; Left sidebar — dimension type list
 ;; ---------------------------------------------------------------------------
 
-(defn dimensions-screen []
-  (let [dim-types @(rf/subscribe [::subs/dimension-types])
-        loading?  @(rf/subscribe [::subs/loading? :dimension-types])]
-    [:div {:class "max-w-2xl mx-auto px-4 py-4"}
+(defn- type-list-item [dt selected?]
+  [:div {:class    (str "px-3 py-2 rounded cursor-pointer transition-all flex items-center justify-between "
+                        (if selected?
+                          "bg-tn-selection ring-1 ring-tn-blue/50"
+                          "hover:brightness-110 bg-tn-bg-card"))
+         :on-click #(rf/dispatch [::events/select-dimension-type (:id dt)])}
+   [:div.flex.items-center.gap-2
+    [bp/icon {:icon "layers" :size 14 :class (when-not selected? "opacity-50")}]
+    [:span {:class (when selected? "font-semibold")} (:name dt)]]
+   (when (some? (:archivedAt dt))
+     [bp/tag {:minimal true :class "ml-2"} "archived"])])
+
+(defn- type-sidebar []
+  (let [dim-types  @(rf/subscribe [::subs/dimension-types])
+        selected   @(rf/subscribe [::subs/selected-dimension-type-id])
+        loading?   @(rf/subscribe [::subs/loading? :dimension-types])]
+    [:div {:class "w-56 shrink-0 border-r border-tn-border pr-3"}
+     [:div.flex.items-center.justify-between.mb-3
+      [:span.font-semibold.text-sm.text-tn-fg-muted "Dimension Types"]
+      [:div.flex.items-center.gap-1
+       [bp/button {:icon     "plus"
+                   :minimal  true
+                   :small    true
+                   :on-click #(rf/dispatch [::events/open-dimension-type-dialog])}]
+       [bp/button {:icon     "refresh"
+                   :minimal  true
+                   :small    true
+                   :loading  loading?
+                   :on-click #(rf/dispatch [::events/fetch-dimension-types])}]]]
      (cond
        (and loading? (empty? dim-types))
        [comp/loading-spinner]
 
        (empty? dim-types)
-       [comp/empty-state {:icon        "layers"
-                          :title       "No dimension types"
-                          :description "Create dimension types to organize your dimensions."}]
+       [:div.text-sm.text-tn-fg-dim.p-2 "No dimension types yet."]
 
        :else
-       (for [dt dim-types]
-         ^{:key (:id dt)}
-         [dimensions-panel (:id dt) (:name dt)]))
+       [:div {:class "flex flex-col gap-1"}
+        (for [dt dim-types]
+          ^{:key (:id dt)}
+          [type-list-item dt (= (:id dt) selected)])])]))
 
-     [dimension-dialog]]))
+;; ---------------------------------------------------------------------------
+;; Right panel — dimensions for selected type
+;; ---------------------------------------------------------------------------
+
+(defn- dimensions-main []
+  (let [selected-id @(rf/subscribe [::subs/selected-dimension-type-id])
+        dim-types   @(rf/subscribe [::subs/dimension-types])
+        sel-type    (some #(when (= (:id %) selected-id) %) dim-types)]
+    (if-not sel-type
+      [comp/empty-state {:icon        "tag"
+                         :title       "Select a dimension type"
+                         :description "Choose a dimension type from the left to view its dimensions."}]
+      (let [type-id    (:id sel-type)
+            type-name  (:name sel-type)
+            page       @(rf/subscribe [::subs/dimensions-page type-id])
+            {:keys [search show-archived edges page-info]} page
+            loading?   @(rf/subscribe [::subs/loading? :dimensions])
+            page-error @(rf/subscribe [::subs/error :dimensions])]
+        [:div.flex-1.pl-4
+         (when page-error
+           [comp/error-banner (str "Failed to load " type-name " dimensions.")])
+
+         [comp/page-header {:title      type-name
+                            :loading?   loading?
+                            :on-refresh #(rf/dispatch [::events/fetch-dimensions type-id])
+                            :on-create  #(rf/dispatch [::events/open-dimension-dialog type-id nil])}]
+
+         [comp/search-bar {:search              (or search "")
+                           :on-search-change    #(rf/dispatch [::events/set-dimensions-search type-id %])
+                           :show-archived       show-archived
+                           :on-toggle-archived  #(rf/dispatch [::events/toggle-dimensions-archived type-id])
+                           :placeholder         (str "Search " type-name "...")}]
+
+         (cond
+           (and loading? (empty? edges))
+           [comp/loading-spinner]
+
+           (empty? edges)
+           [comp/empty-state {:icon        "tag"
+                              :title       (str "No " type-name " found")
+                              :description (if (seq search)
+                                             "Try a different search term."
+                                             "Create your first dimension to get started.")}]
+
+           :else
+           [:div
+            (for [edge edges]
+              ^{:key (get-in edge [:node :id])}
+              [comp/entity-card
+               {:name        (get-in edge [:node :name])
+                :description (get-in edge [:node :description])
+                :archived?   (some? (get-in edge [:node :archivedAt]))
+                :on-click    #(rf/dispatch [::events/open-dimension-dialog type-id (:node edge)])}])
+            [comp/load-more-button
+             {:has-next? (:hasNextPage page-info)
+              :loading?  loading?
+              :on-click  #(rf/dispatch [::events/load-more-dimensions type-id])}]])]))))
+
+;; ---------------------------------------------------------------------------
+;; Screen
+;; ---------------------------------------------------------------------------
+
+(defn dimensions-screen []
+  [:div {:class "max-w-4xl mx-auto px-4 py-4"}
+   [:div.flex
+    [type-sidebar]
+    [dimensions-main]]
+   [dimension-dialog]
+   [dimension-type-dialog]])
