@@ -1,5 +1,6 @@
 (ns lanterna-magica.events.shared-values
   (:require [lanterna-magica.events :as-alias events]
+            [lanterna-magica.events.helpers :as h]
             [lanterna-magica.gql :as gql]
             [re-frame.core :as rf]
             [re-graph.core :as re-graph]))
@@ -14,7 +15,7 @@
  ::events/fetch-shared-values
  (fn [{:keys [db]} _]
    (let [archived (get-in db [:shared-values-page :show-archived])]
-     {:db       (update db :loading conj :shared-values)
+     {:db       (h/start-loading db :shared-values)
       :dispatch [::re-graph/query
                  {:query     gql/shared-values-query
                   :variables {:includeArchived (boolean archived)
@@ -26,7 +27,7 @@
  (fn [{:keys [db]} _]
    (let [archived (get-in db [:shared-values-page :show-archived])
          cursor   (get-in db [:shared-values-page :page-info :endCursor])]
-     {:db       (update db :loading conj :shared-values)
+     {:db       (h/start-loading db :shared-values)
       :dispatch [::re-graph/query
                  {:query     gql/shared-values-query
                   :variables {:includeArchived (boolean archived)
@@ -43,8 +44,7 @@
      {:db (-> db
               (assoc-in [:shared-values-page :edges] (:edges connection))
               (assoc-in [:shared-values-page :page-info] (:pageInfo connection))
-              (update :loading disj :shared-values)
-              (assoc-in [:errors :shared-values] errors))})))
+              (h/stop-loading :shared-values errors))})))
 
 (rf/reg-event-fx
  ::events/on-shared-values-append
@@ -55,8 +55,7 @@
      {:db (-> db
               (update-in [:shared-values-page :edges] into (:edges connection))
               (assoc-in [:shared-values-page :page-info] (:pageInfo connection))
-              (update :loading disj :shared-values)
-              (assoc-in [:errors :shared-values] errors))})))
+              (h/stop-loading :shared-values errors))})))
 
 ;; ---------------------------------------------------------------------------
 ;; Archive Toggle
@@ -92,7 +91,7 @@
 (rf/reg-event-fx
  ::events/fetch-revisions
  (fn [{:keys [db]} [_ shared-value-id]]
-   {:db       (update db :loading conj :revisions)
+   {:db       (h/start-loading db :revisions)
     :dispatch [::re-graph/query
                {:query     gql/shared-value-query
                 :variables {:id    shared-value-id
@@ -108,8 +107,7 @@
      {:db (-> db
               (assoc-in [:shared-values-page :revisions] {:edges (:edges connection)})
               (assoc-in [:shared-values-page :revisions-page-info] (:pageInfo connection))
-              (update :loading disj :revisions)
-              (assoc-in [:errors :revisions] errors))})))
+              (h/stop-loading :revisions errors))})))
 
 ;; ---------------------------------------------------------------------------
 ;; Load More Revisions
@@ -120,7 +118,7 @@
  (fn [{:keys [db]} _]
    (let [sv-id  (get-in db [:shared-values-page :selected-id])
          cursor (get-in db [:shared-values-page :revisions-page-info :endCursor])]
-     {:db       (update db :loading conj :revisions)
+     {:db       (h/start-loading db :revisions)
       :dispatch [::re-graph/query
                  {:query     gql/shared-value-query
                   :variables {:id    sv-id
@@ -137,8 +135,7 @@
      {:db (-> db
               (update-in [:shared-values-page :revisions :edges] into (:edges connection))
               (assoc-in [:shared-values-page :revisions-page-info] (:pageInfo connection))
-              (update :loading disj :revisions)
-              (assoc-in [:errors :revisions] errors))})))
+              (h/stop-loading :revisions errors))})))
 
 ;; ---------------------------------------------------------------------------
 ;; Create Shared Value Dialog
@@ -166,7 +163,7 @@
  (fn [{:keys [db]} _]
    (let [{:keys [shared-value]} (:shared-value-dialog db)
          input (select-keys shared-value [:name])]
-     {:db       (update db :loading conj :save-shared-value)
+     {:db       (h/start-loading db :save-shared-value)
       :dispatch [::re-graph/mutate
                  {:query     gql/create-shared-value-mutation
                   :variables {:input input}
@@ -178,13 +175,10 @@
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [errors]} response]
      (if errors
-       {:db (-> db
-                (update :loading disj :save-shared-value)
-                (assoc-in [:errors :save-shared-value] errors))}
+       {:db (h/stop-loading db :save-shared-value errors)}
        {:db       (-> db
-                      (update :loading disj :save-shared-value)
-                      (assoc :shared-value-dialog {:open? false})
-                      (assoc-in [:errors :save-shared-value] nil))
+                      (h/stop-loading :save-shared-value)
+                      (assoc :shared-value-dialog {:open? false}))
         :dispatch [::events/fetch-shared-values]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -194,7 +188,7 @@
 (rf/reg-event-fx
  ::events/archive-shared-value
  (fn [{:keys [db]} [_ id]]
-   {:db       (update db :loading conj :archive-shared-value)
+   {:db       (h/start-loading db :archive-shared-value)
     :dispatch [::re-graph/mutate
                {:query     gql/archive-shared-value-mutation
                 :variables {:id id}
@@ -203,7 +197,7 @@
 (rf/reg-event-fx
  ::events/unarchive-shared-value
  (fn [{:keys [db]} [_ id]]
-   {:db       (update db :loading conj :archive-shared-value)
+   {:db       (h/start-loading db :archive-shared-value)
     :dispatch [::re-graph/mutate
                {:query     gql/unarchive-shared-value-mutation
                 :variables {:id id}
@@ -215,11 +209,8 @@
  (fn [{:keys [db]} {:keys [response]}]
    (let [{:keys [errors]} response]
      (if errors
-       {:db (-> db
-                (update :loading disj :archive-shared-value)
-                (assoc-in [:errors :archive-shared-value] errors))}
-       {:db       (-> db
-                      (update :loading disj :archive-shared-value))
+       {:db (h/stop-loading db :archive-shared-value errors)}
+       {:db       (h/stop-loading db :archive-shared-value)
         :dispatch [::events/fetch-shared-values]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -257,7 +248,7 @@
                      :serviceId      (:serviceId revision)
                      :environmentId  (:environmentId revision)
                      :value          parsed}]
-         {:db       (update db :loading conj :save-revision)
+         {:db       (h/start-loading db :save-revision)
           :dispatch [::re-graph/mutate
                      {:query     gql/create-shared-value-revision-mutation
                       :variables {:input input}
@@ -273,11 +264,8 @@
    (let [{:keys [errors]} response
          sv-id (get-in db [:revision-dialog :revision :sharedValueId])]
      (if errors
-       {:db (-> db
-                (update :loading disj :save-revision)
-                (assoc-in [:errors :save-revision] errors))}
+       {:db (h/stop-loading db :save-revision errors)}
        {:db       (-> db
-                      (update :loading disj :save-revision)
-                      (assoc :revision-dialog {:open? false})
-                      (assoc-in [:errors :save-revision] nil))
+                      (h/stop-loading :save-revision)
+                      (assoc :revision-dialog {:open? false}))
         :dispatch [::events/fetch-revisions sv-id]}))))
