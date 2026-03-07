@@ -1,7 +1,6 @@
 type Configuration {
   id: ID!
-  service: Service!
-  environment: Environment!
+  dimensions: [Dimension!]!
   body: JSON!
   isCurrent: Boolean!
   createdAt: DateTime!
@@ -32,8 +31,7 @@ input ConfigSubstitutionInput {
 }
 
 input CreateConfigurationInput {
-  serviceId: ID!
-  environmentId: ID!
+  dimensionIds: [ID!]!
   body: JSON!
   substitutions: [ConfigSubstitutionInput!]
 }
@@ -46,9 +44,8 @@ input SetConfigSubstitutionInput {
 
 extend type Query {
   configurations(
-    serviceId: ID
-    environmentId: ID
-    includeGlobal: Boolean
+    dimensionIds: [ID!]
+    includeBase: Boolean
     first: Int
     after: String
   ): ConfigurationConnection!

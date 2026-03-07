@@ -1,0 +1,28 @@
+type DimensionType {
+  id: ID!
+  name: String!
+  priority: Int!
+  dimensions(
+    includeArchived: Boolean
+    first: Int
+    after: String
+    search: String
+  ): DimensionConnection!
+  createdAt: DateTime!
+  archivedAt: DateTime
+}
+
+input CreateDimensionTypeInput {
+  name: String!
+  priority: Int!
+}
+
+extend type Query {
+  dimensionTypes(includeArchived: Boolean): [DimensionType!]!
+}
+
+extend type Mutation {
+  createDimensionType(input: CreateDimensionTypeInput!): DimensionType!
+  archiveDimensionType(id: ID!): DimensionType!
+  unarchiveDimensionType(id: ID!): DimensionType!
+}
