@@ -2,7 +2,7 @@ from asyncpg import Pool
 
 from lanterna_magica.errors import NotFoundError
 
-from .utils import build_connection, decode_cursor, page_limit, queries
+from .utils import build_connection, compute_scope_hash, decode_cursor, page_limit, queries
 
 
 class Configurations:
@@ -12,9 +12,8 @@ class Configurations:
     async def get_configurations(
         self,
         *,
-        service_id: str | None = None,
-        environment_id: str | None = None,
-        include_global: bool = True,
+        dimension_ids: list[str] | None = None,
+        include_base: bool = True,
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
@@ -25,37 +24,46 @@ class Configurations:
             dict(r)
             async for r in queries.get_configurations(
                 self.pool,
-                service_id=service_id,
-                environment_id=environment_id,
-                include_global=include_global,
+                dimension_ids=dimension_ids,
+                include_base=include_base,
                 after_id=after_id,
                 page_limit=limit + 1,
             )
         ]
         return build_connection(rows, "id", limit)
 
+    async def get_configurations_by_ids(self, ids: list[str]) -> list[dict]:
+        rows = [
+            dict(r)
+            async for r in queries.get_configurations_by_ids(self.pool, ids=ids)
+        ]
+        return rows
+
     async def create_configuration(
         self,
         *,
-        service_id: str,
-        environment_id: str,
+        dimension_ids: list[str],
         body: dict | list,
         substitutions: list[dict] | None = None,
     ) -> dict:
+        scope_hash = compute_scope_hash(dimension_ids)
+
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 await queries.unset_current_configuration(
-                    conn,
-                    service_id=service_id,
-                    environment_id=environment_id,
+                    conn, scope_hash=scope_hash
                 )
                 row = await queries.create_configuration(
-                    conn,
-                    service_id=service_id,
-                    environment_id=environment_id,
-                    body=body,
+                    conn, scope_hash=scope_hash, body=body
                 )
                 config = dict(row)
+
+                for dim_id in dimension_ids:
+                    await queries.insert_configuration_scope(
+                        conn,
+                        configuration_id=str(config["id"]),
+                        dimension_id=dim_id,
+                    )
 
                 created_subs = []
                 if substitutions:

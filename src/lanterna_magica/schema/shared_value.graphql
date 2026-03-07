@@ -5,9 +5,8 @@ type SharedValue {
   updatedAt: DateTime!
   archivedAt: DateTime
   revisions(
-    serviceId: ID
-    environmentId: ID
-    includeGlobal: Boolean
+    dimensionIds: [ID!]
+    includeBase: Boolean
     currentOnly: Boolean
     first: Int
     after: String
@@ -27,8 +26,7 @@ type SharedValueConnection {
 type SharedValueRevision {
   id: ID!
   sharedValue: SharedValue!
-  service: Service!
-  environment: Environment!
+  dimensions: [Dimension!]!
   value: JSON!
   isCurrent: Boolean!
   createdAt: DateTime!
@@ -55,8 +53,7 @@ input UpdateSharedValueInput {
 
 input CreateSharedValueRevisionInput {
   sharedValueId: ID!
-  serviceId: ID!
-  environmentId: ID!
+  dimensionIds: [ID!]!
   value: JSON!
 }
 

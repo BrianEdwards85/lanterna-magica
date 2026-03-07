@@ -6,3 +6,8 @@ dist/
 .venv/
 .ruff_cache/
 .pytest_cache/
+**/node_modules
+**/.shadow-cljs
+web/resources/public/js/
+web/resources/public/css/
+AGENTS.md

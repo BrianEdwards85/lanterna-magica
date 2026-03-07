@@ -1,0 +1,51 @@
+type Dimension {
+  id: ID!
+  type: DimensionType!
+  name: String!
+  description: String
+  base: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  archivedAt: DateTime
+}
+
+type DimensionEdge {
+  node: Dimension!
+  cursor: String!
+}
+
+type DimensionConnection {
+  edges: [DimensionEdge!]!
+  pageInfo: PageInfo!
+}
+
+input CreateDimensionInput {
+  typeId: ID!
+  name: String!
+  description: String
+}
+
+input UpdateDimensionInput {
+  id: ID!
+  name: String
+  description: String
+}
+
+extend type Query {
+  dimensions(
+    typeId: ID!
+    includeBase: Boolean
+    includeArchived: Boolean
+    first: Int
+    after: String
+    search: String
+  ): DimensionConnection!
+  dimension(id: ID!): Dimension
+}
+
+extend type Mutation {
+  createDimension(input: CreateDimensionInput!): Dimension!
+  updateDimension(input: UpdateDimensionInput!): Dimension!
+  archiveDimension(id: ID!): Dimension!
+  unarchiveDimension(id: ID!): Dimension!
+}
