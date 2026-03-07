@@ -11,5 +11,6 @@
                                                       :file   "src/js/change-case-shim.js"}}}
                 :devtools   {:http-root    "resources/public"
                              :http-port    3000
+                             :proxy-url    "http://localhost:8000"
                              :push-state/index "index.html"
                              :after-load   lanterna-magica.core/init}}}}

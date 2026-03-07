@@ -33,6 +33,8 @@ packages = ["src/lanterna_magica"]
 
 [tool.poe.tasks]
 dev = "uvicorn lanterna_magica.app:app --reload --host 0.0.0.0 --port 8000"
+"dev:web" = {shell = "cd web && npm run dev"}
+"build:web" = {shell = "cd web && npm run css:build && npm run cljs:release"}
 lint = "ruff check src/"
 format = "ruff format src/"
 test = "pytest tests/ -v"
