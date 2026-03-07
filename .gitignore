@@ -10,3 +10,4 @@ dist/
 **/.shadow-cljs
 web/resources/public/js/
 web/resources/public/css/
+AGENTS.md
