@@ -2,7 +2,7 @@ from asyncpg import Pool
 
 from lanterna_magica.errors import NotFoundError, ValidationError
 
-from .utils import queries, validate_name
+from .utils import queries, require_row, validate_name
 
 
 class DimensionTypes:
@@ -43,12 +43,10 @@ class DimensionTypes:
         self, *, id: str, name: str
     ) -> dict:
         validate_name(name)
-        row = await queries.update_dimension_type(
-            self.pool, id=id, name=name
+        return await require_row(
+            queries.update_dimension_type, "Dimension type not found or archived",
+            self.pool, id=id, name=name,
         )
-        if not row:
-            raise NotFoundError("Dimension type not found or archived")
-        return dict(row)
 
     async def swap_dimension_type_priorities(
         self, *, id_a: str, id_b: str
@@ -57,6 +55,7 @@ class DimensionTypes:
             raise ValidationError("Cannot swap a dimension type with itself")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
+                await conn.execute("LOCK TABLE dimension_types IN EXCLUSIVE MODE")
                 row_a = await queries.get_dimension_type_priority(conn, id=id_a)
                 row_b = await queries.get_dimension_type_priority(conn, id=id_b)
                 if not row_a or not row_b:
@@ -75,13 +74,13 @@ class DimensionTypes:
         return rows
 
     async def archive_dimension_type(self, id: str) -> dict:
-        row = await queries.archive_dimension_type(self.pool, id=id)
-        if not row:
-            raise NotFoundError("Dimension type not found or already archived")
-        return dict(row)
+        return await require_row(
+            queries.archive_dimension_type, "Dimension type not found or already archived",
+            self.pool, id=id,
+        )
 
     async def unarchive_dimension_type(self, id: str) -> dict:
-        row = await queries.unarchive_dimension_type(self.pool, id=id)
-        if not row:
-            raise NotFoundError("Dimension type not found or not archived")
-        return dict(row)
+        return await require_row(
+            queries.unarchive_dimension_type, "Dimension type not found or not archived",
+            self.pool, id=id,
+        )

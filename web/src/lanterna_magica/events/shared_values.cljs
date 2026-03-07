@@ -1,11 +1,10 @@
 (ns lanterna-magica.events.shared-values
-  (:require [lanterna-magica.events :as-alias events]
+  (:require [lanterna-magica.config :as config]
+            [lanterna-magica.events :as-alias events]
             [lanterna-magica.events.helpers :as h]
             [lanterna-magica.gql :as gql]
             [re-frame.core :as rf]
             [re-graph.core :as re-graph]))
-
-(def ^:private page-size 30)
 
 ;; ---------------------------------------------------------------------------
 ;; Fetch Shared Values (paginated list)
@@ -19,7 +18,7 @@
       :dispatch [::re-graph/query
                  {:query     gql/shared-values-query
                   :variables {:includeArchived (boolean archived)
-                              :first           page-size}
+                              :first           config/page-size}
                   :callback  [::events/on-shared-values-fresh]}]})))
 
 (rf/reg-event-fx
@@ -31,7 +30,7 @@
       :dispatch [::re-graph/query
                  {:query     gql/shared-values-query
                   :variables {:includeArchived (boolean archived)
-                              :first           page-size
+                              :first           config/page-size
                               :after           cursor}
                   :callback  [::events/on-shared-values-append]}]})))
 
@@ -95,7 +94,7 @@
     :dispatch [::re-graph/query
                {:query     gql/shared-value-query
                 :variables {:id    shared-value-id
-                            :first page-size}
+                            :first config/page-size}
                 :callback  [::events/on-revisions-fresh]}]}))
 
 (rf/reg-event-fx
@@ -122,7 +121,7 @@
       :dispatch [::re-graph/query
                  {:query     gql/shared-value-query
                   :variables {:id    sv-id
-                              :first page-size
+                              :first config/page-size
                               :after cursor}
                   :callback  [::events/on-revisions-append]}]})))
 

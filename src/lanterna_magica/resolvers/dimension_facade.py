@@ -2,6 +2,7 @@ from ariadne import MutationType, QueryType
 
 from lanterna_magica.data.dimension_types import DimensionTypes
 from lanterna_magica.data.dimensions import Dimensions
+from lanterna_magica.errors import NotFoundError
 
 
 class DimensionFacadeResolver:
@@ -18,6 +19,8 @@ class DimensionFacadeResolver:
                 if t["name"] == self.type_name:
                     self._type_id = str(t["id"])
                     break
+            if self._type_id is None:
+                raise NotFoundError(f"Dimension type '{self.type_name}' not found")
         return self._type_id
 
     async def resolve_list(

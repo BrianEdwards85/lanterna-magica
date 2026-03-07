@@ -6,6 +6,7 @@
    ;; Dimension types (flat list, ordered by priority)
    :dimension-types       []
    :show-archived-types   false
+   :selected-dimension-type-id nil
 
    ;; Per-type dimension page state, keyed by type id:
    ;; {type-id {:edges [] :page-info {} :search "" :show-archived false}}

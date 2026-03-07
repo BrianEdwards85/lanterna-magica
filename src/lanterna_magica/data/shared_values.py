@@ -1,8 +1,8 @@
 from asyncpg import Pool
 
-from lanterna_magica.errors import NotFoundError, ValidationError
+from lanterna_magica.errors import ValidationError
 
-from .utils import build_connection, compute_scope_hash, decode_cursor, page_limit, queries, validate_name
+from .utils import build_connection, compute_scope_hash, decode_cursor, page_limit, queries, require_row, validate_name
 
 
 class SharedValues:
@@ -63,22 +63,22 @@ class SharedValues:
         if name is None:
             raise ValidationError("At least one field must be provided")
         validate_name(name)
-        row = await queries.update_shared_value(self.pool, id=id, name=name)
-        if not row:
-            raise NotFoundError("Shared value not found or is archived")
-        return dict(row)
+        return await require_row(
+            queries.update_shared_value, "Shared value not found or is archived",
+            self.pool, id=id, name=name,
+        )
 
     async def archive_shared_value(self, id: str) -> dict:
-        row = await queries.archive_shared_value(self.pool, id=id)
-        if not row:
-            raise NotFoundError("Shared value not found or already archived")
-        return dict(row)
+        return await require_row(
+            queries.archive_shared_value, "Shared value not found or already archived",
+            self.pool, id=id,
+        )
 
     async def unarchive_shared_value(self, id: str) -> dict:
-        row = await queries.unarchive_shared_value(self.pool, id=id)
-        if not row:
-            raise NotFoundError("Shared value not found or not archived")
-        return dict(row)
+        return await require_row(
+            queries.unarchive_shared_value, "Shared value not found or not archived",
+            self.pool, id=id,
+        )
 
     async def get_revisions(
         self,

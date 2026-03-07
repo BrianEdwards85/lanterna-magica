@@ -1,11 +1,10 @@
 (ns lanterna-magica.events.configurations
-  (:require [lanterna-magica.events :as-alias events]
+  (:require [lanterna-magica.config :as config]
+            [lanterna-magica.events :as-alias events]
             [lanterna-magica.events.helpers :as h]
             [lanterna-magica.gql :as gql]
             [re-frame.core :as rf]
             [re-graph.core :as re-graph]))
-
-(def ^:private page-size 30)
 
 ;; ---------------------------------------------------------------------------
 ;; Fetch Configurations (paginated, filtered by dimension ids)
@@ -19,7 +18,7 @@
       :dispatch [::re-graph/query
                  {:query     gql/configurations-query
                   :variables {:dimensionIds (when (seq dim-ids) dim-ids)
-                              :first        page-size}
+                              :first        config/page-size}
                   :callback  [::events/on-configurations-fresh]}]})))
 
 (rf/reg-event-fx
@@ -31,7 +30,7 @@
       :dispatch [::re-graph/query
                  {:query     gql/configurations-query
                   :variables {:dimensionIds (when (seq dim-ids) dim-ids)
-                              :first        page-size
+                              :first        config/page-size
                               :after        cursor}
                   :callback  [::events/on-configurations-append]}]})))
 

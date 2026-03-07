@@ -1,11 +1,10 @@
 (ns lanterna-magica.events.dimensions
-  (:require [lanterna-magica.events :as-alias events]
+  (:require [lanterna-magica.config :as config]
+            [lanterna-magica.events :as-alias events]
             [lanterna-magica.events.helpers :as h]
             [lanterna-magica.gql :as gql]
             [re-frame.core :as rf]
             [re-graph.core :as re-graph]))
-
-(def ^:private page-size 30)
 
 ;; ---------------------------------------------------------------------------
 ;; Dimension Types
@@ -187,7 +186,7 @@
                               :search          (when (seq search) search)
 
                               :includeArchived (boolean archived)
-                              :first           page-size}
+                              :first           config/page-size}
                   :callback  [::events/on-dimensions-fresh {:type-id type-id}]}]})))
 
 (rf/reg-event-fx
@@ -204,7 +203,7 @@
                               :search          (when (seq search) search)
 
                               :includeArchived (boolean archived)
-                              :first           page-size
+                              :first           config/page-size
                               :after           cursor}
                   :callback  [::events/on-dimensions-append {:type-id type-id}]}]})))
 

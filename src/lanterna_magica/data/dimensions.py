@@ -1,8 +1,8 @@
 from asyncpg import Pool
 
-from lanterna_magica.errors import NotFoundError, ValidationError
+from lanterna_magica.errors import ValidationError
 
-from .utils import build_connection, decode_cursor, page_limit, queries, sanitize_search, validate_name
+from .utils import build_connection, decode_cursor, page_limit, queries, require_row, sanitize_search, validate_name
 
 
 class Dimensions:
@@ -45,10 +45,10 @@ class Dimensions:
         return rows
 
     async def get_base_dimension(self, type_id: str) -> dict:
-        row = await queries.get_base_dimension(self.pool, type_id=type_id)
-        if not row:
-            raise NotFoundError("Base dimension not found for this type")
-        return dict(row)
+        return await require_row(
+            queries.get_base_dimension, "Base dimension not found for this type",
+            self.pool, type_id=type_id,
+        )
 
     async def create_dimension(
         self, *, type_id: str, name: str, description: str | None = None
@@ -66,21 +66,19 @@ class Dimensions:
             raise ValidationError("At least one field must be provided")
         if name is not None:
             validate_name(name)
-        row = await queries.update_dimension(
-            self.pool, id=id, name=name, description=description
+        return await require_row(
+            queries.update_dimension, "Dimension not found",
+            self.pool, id=id, name=name, description=description,
         )
-        if not row:
-            raise NotFoundError("Dimension not found")
-        return dict(row)
 
     async def archive_dimension(self, id: str) -> dict:
-        row = await queries.archive_dimension(self.pool, id=id)
-        if not row:
-            raise NotFoundError("Dimension not found or already archived")
-        return dict(row)
+        return await require_row(
+            queries.archive_dimension, "Dimension not found or already archived",
+            self.pool, id=id,
+        )
 
     async def unarchive_dimension(self, id: str) -> dict:
-        row = await queries.unarchive_dimension(self.pool, id=id)
-        if not row:
-            raise NotFoundError("Dimension not found or not archived")
-        return dict(row)
+        return await require_row(
+            queries.unarchive_dimension, "Dimension not found or not archived",
+            self.pool, id=id,
+        )

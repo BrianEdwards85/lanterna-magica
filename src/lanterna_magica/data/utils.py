@@ -6,7 +6,7 @@ from pathlib import Path
 
 import aiosql
 
-from lanterna_magica.errors import ValidationError
+from lanterna_magica.errors import NotFoundError, ValidationError
 
 SQL_DIR = Path(__file__).parent.parent / "sql"
 
@@ -38,8 +38,17 @@ def validate_name(name: str) -> None:
 
 
 def sanitize_search(search: str) -> str:
-    cleaned = INVALID_NAME_CHARS.sub('', search)
+    # 1. Strip chars that are dangerous in ILIKE patterns (% and \)
+    cleaned = re.sub(r'[%\\]', '', search)
+    # 2. Escape _ so it matches literally instead of acting as single-char wildcard
     return cleaned.replace('_', r'\_')
+
+
+async def require_row(query_fn, error_msg: str, *args, **kwargs) -> dict:
+    row = await query_fn(*args, **kwargs)
+    if not row:
+        raise NotFoundError(error_msg)
+    return dict(row)
 
 
 class InvalidCursorError(Exception):
