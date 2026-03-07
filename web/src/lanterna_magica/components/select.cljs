@@ -12,6 +12,7 @@
      :items           - vector of items (each with :id and :name)
      :selected-id     - currently selected item id (or nil/\"\")
      :on-select       - (fn [id]) called when user picks an item
+     :on-clear        - (fn []) called when user clears selection (optional)
      :on-query-change - re-frame event vector dispatched with query string
      :on-clear-search - re-frame event vector dispatched when query is cleared
      :placeholder     - button text when nothing selected
@@ -27,7 +28,7 @@
           (.cancel d)))
 
       :reagent-render
-      (fn [{:keys [items selected-id on-select on-query-change on-clear-search
+      (fn [{:keys [items selected-id on-select on-clear on-query-change on-clear-search
                     placeholder no-results-text fill icon]}]
         (let [items    (or items [])
               selected (some #(when (= (:id %) selected-id) %) items)
@@ -75,8 +76,22 @@
             ;; Disable client-side filtering — we filter server-side
             :item-list-predicate (fn [_query items] items)}
 
-           [bp/button {:text       (or (:name selected) placeholder "Select...")
-                       :right-icon "caret-down"
-                       :icon       icon
-                       :fill       fill?
-                       :align-text "left"}]]))})))
+           (if (and on-clear selected)
+             [:div.flex.items-center.gap-0 {:class (when fill? "w-full")}
+              [bp/button {:text       (:name selected)
+                          :right-icon "caret-down"
+                          :icon       icon
+                          :fill       fill?
+                          :align-text "left"
+                          :class      "flex-1"}]
+              [bp/button {:icon     "small-cross"
+                          :minimal  true
+                          :small    true
+                          :on-click (fn [e]
+                                     (.stopPropagation e)
+                                     (on-clear))}]]
+             [bp/button {:text       (or (:name selected) placeholder "Select...")
+                         :right-icon "caret-down"
+                         :icon       icon
+                         :fill       fill?
+                         :align-text "left"}])]))})))

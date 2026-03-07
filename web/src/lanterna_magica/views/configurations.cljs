@@ -1,9 +1,10 @@
 (ns lanterna-magica.views.configurations
   (:require [lanterna-magica.bp :as bp]
+            [lanterna-magica.components.dimension-picker :as dim-picker]
+            [lanterna-magica.components.select :as sel]
             [lanterna-magica.events :as events]
             [lanterna-magica.subs :as subs]
             [lanterna-magica.views.components :as comp]
-            [lanterna-magica.components.select :as sel]
             [re-frame.core :as rf]
             [reagent.core :as r]))
 
@@ -21,33 +22,6 @@
       (str (get-in dim [:type :name]) ": " (:name dim))])])
 
 ;; ---------------------------------------------------------------------------
-;; Dimension Picker for dialogs/filters
-;; ---------------------------------------------------------------------------
-
-(defn dimension-picker
-  "A per-type searchable select that toggles dimension IDs.
-   Props: :selected-ids (vec of IDs), :on-toggle (fn [id])"
-  [{:keys [selected-ids on-toggle]}]
-  (let [dim-types @(rf/subscribe [::subs/dimension-types])]
-    [:div
-     (for [dt dim-types]
-       (let [type-id (:id dt)
-             items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])]
-         ^{:key type-id}
-         [:div {:class "mb-3 flex items-center gap-3"}
-          [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}}
-           (:name dt)]
-          [:div.flex-1
-           [sel/searchable-select
-            {:items            items
-             :selected-id      (some (set selected-ids) (map :id items))
-             :on-select        on-toggle
-             :on-query-change  [::events/search-dimensions-list type-id]
-             :on-clear-search  [::events/clear-dimensions-search-results type-id]
-             :icon             "tag"
-             :placeholder      (str "Select " (:name dt) "...")}]]]))]))
-
-;; ---------------------------------------------------------------------------
 ;; Create Configuration Dialog
 ;; ---------------------------------------------------------------------------
 
@@ -62,8 +36,10 @@
                   :on-close #(rf/dispatch [::events/close-configuration-dialog])
                   :class    "w-full max-w-lg"}
        [bp/dialog-body
-        [dimension-picker {:selected-ids (:dimensionIds configuration)
-                           :on-toggle    #(rf/dispatch [::events/toggle-configuration-dimension %])}]
+        [dim-picker/dimension-picker
+         {:selected-ids (:dimensionIds configuration)
+          :on-toggle    #(rf/dispatch [::events/toggle-configuration-dimension %])
+          :on-clear     #(rf/dispatch [::events/toggle-configuration-dimension %])}]
         [:div.mb-4
          [:label.bp6-label "Configuration Body (JSON)"]
          [comp/local-textarea {:rows        12
@@ -138,13 +114,16 @@
     [:div {:class "flex items-center gap-3 mb-4 flex-wrap"}
      (for [dt dim-types]
        (let [type-id (:id dt)
-             items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])]
+             items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])
+             sel-id  (some (set dim-ids) (map :id items))]
          ^{:key type-id}
          [:div.flex-1
           [sel/searchable-select
            {:items            items
-            :selected-id      (some (set dim-ids) (map :id items))
+            :selected-id      sel-id
             :on-select        #(rf/dispatch [::events/set-config-filter-dimension %])
+            :on-clear         (when sel-id
+                                #(rf/dispatch [::events/set-config-filter-dimension sel-id]))
             :on-query-change  [::events/search-dimensions-list type-id]
             :on-clear-search  [::events/clear-dimensions-search-results type-id]
             :icon             "tag"

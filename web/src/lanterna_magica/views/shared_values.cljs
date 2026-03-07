@@ -1,9 +1,9 @@
 (ns lanterna-magica.views.shared-values
   (:require [lanterna-magica.bp :as bp]
+            [lanterna-magica.components.dimension-picker :as dim-picker]
             [lanterna-magica.events :as events]
             [lanterna-magica.subs :as subs]
             [lanterna-magica.views.components :as comp]
-            [lanterna-magica.components.select :as sel]
             [re-frame.core :as rf]
             [reagent.core :as r]))
 
@@ -17,32 +17,6 @@
      ^{:key (:id dim)}
      [bp/tag {:minimal true}
       (str (get-in dim [:type :name]) ": " (:name dim))])])
-
-;; ---------------------------------------------------------------------------
-;; Dimension Picker for revision dialog
-;; ---------------------------------------------------------------------------
-
-(defn- revision-dimension-picker []
-  (let [dim-types @(rf/subscribe [::subs/dimension-types])
-        {:keys [revision]} @(rf/subscribe [::subs/revision-dialog])
-        selected-ids (or (:dimensionIds revision) [])]
-    [:div
-     (for [dt dim-types]
-       (let [type-id (:id dt)
-             items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])]
-         ^{:key type-id}
-         [:div {:class "mb-3 flex items-center gap-3"}
-          [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}}
-           (:name dt)]
-          [:div.flex-1
-           [sel/searchable-select
-            {:items            items
-             :selected-id      (some (set selected-ids) (map :id items))
-             :on-select        #(rf/dispatch [::events/toggle-revision-dimension %])
-             :on-query-change  [::events/search-dimensions-list type-id]
-             :on-clear-search  [::events/clear-dimensions-search-results type-id]
-             :icon             "tag"
-             :placeholder      (str "Select " (:name dt) "...")}]]]))]))
 
 ;; ---------------------------------------------------------------------------
 ;; Create Shared Value Dialog
@@ -90,7 +64,10 @@
                   :on-close #(rf/dispatch [::events/close-revision-dialog])
                   :class    "w-full max-w-md"}
        [bp/dialog-body
-        [revision-dimension-picker]
+        [dim-picker/dimension-picker
+         {:selected-ids (or (:dimensionIds revision) [])
+          :on-toggle    #(rf/dispatch [::events/toggle-revision-dimension %])
+          :on-clear     #(rf/dispatch [::events/toggle-revision-dimension %])}]
         [:div.mb-4
          [:label.bp6-label "Value (JSON)"]
          [comp/local-textarea {:rows        6
