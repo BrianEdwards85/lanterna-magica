@@ -3,6 +3,8 @@ from importlib.resources import files
 
 from ariadne import load_schema_from_path, make_executable_schema
 from ariadne.asgi import GraphQL
+from ariadne.asgi.handlers import GraphQLHTTPHandler
+from ariadne.contrib.tracing.opentelemetry import opentelemetry_extension
 from graphql import GraphQLError
 
 from lanterna_magica.data.configurations import Configurations
@@ -60,4 +62,7 @@ def create_gql(pool) -> GraphQL:
             **create_loaders(pool),
         },
         error_formatter=format_error,
+        http_handler=GraphQLHTTPHandler(
+            extensions=[opentelemetry_extension()],
+        ),
     )
