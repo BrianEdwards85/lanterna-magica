@@ -151,10 +151,16 @@
 ;; Error Banner
 ;; ---------------------------------------------------------------------------
 
-(defn error-banner [message]
-  (when message
-    [bp/callout {:intent "danger" :class "mb-4" :icon "error"}
-     message]))
+(defn error-banner
+  "Show an error callout. Pass either a string or a fallback string + GraphQL errors vector."
+  ([message]
+   (when message
+     [bp/callout {:intent "danger" :class "mb-4" :icon "error"}
+      message]))
+  ([fallback errors]
+   (let [detail (some-> errors first (get "message"))]
+     [bp/callout {:intent "danger" :class "mb-4" :icon "error"}
+      (if detail (str fallback " " detail) fallback)])))
 
 ;; ---------------------------------------------------------------------------
 ;; Loading / Empty States

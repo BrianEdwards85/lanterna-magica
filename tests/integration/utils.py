@@ -4,19 +4,9 @@ from conftest import gql
 
 # -- Shared GQL Mutations --
 
-_CREATE_SERVICE = """
-mutation CreateService($input: CreateServiceInput!) {
-    createService(input: $input) {
-        id name description createdAt updatedAt archivedAt
-    }
-}
-"""
-
-_CREATE_ENVIRONMENT = """
-mutation CreateEnvironment($input: CreateEnvironmentInput!) {
-    createEnvironment(input: $input) {
-        id name description createdAt updatedAt archivedAt
-    }
+_GET_DIMENSION_TYPES = """
+query DimensionTypes {
+    dimensionTypes { id name }
 }
 """
 
@@ -64,18 +54,22 @@ def nodes(edges):
     return [e["node"] for e in edges]
 
 
+async def _get_type_id(client, type_name):
+    body = await gql(client, _GET_DIMENSION_TYPES)
+    for dt in body["data"]["dimensionTypes"]:
+        if dt["name"] == type_name:
+            return dt["id"]
+    raise ValueError(f"Dimension type '{type_name}' not found in seed data")
+
+
 async def create_service(client, name="traefik", description=None):
-    body = await gql(
-        client, _CREATE_SERVICE, {"input": {"name": name, "description": description}}
-    )
-    return body["data"]["createService"]
+    type_id = await _get_type_id(client, "service")
+    return await create_dimension(client, type_id, name, description)
 
 
 async def create_environment(client, name="production", description=None):
-    body = await gql(
-        client, _CREATE_ENVIRONMENT, {"input": {"name": name, "description": description}}
-    )
-    return body["data"]["createEnvironment"]
+    type_id = await _get_type_id(client, "environment")
+    return await create_dimension(client, type_id, name, description)
 
 
 async def create_dimension_type(client, name):

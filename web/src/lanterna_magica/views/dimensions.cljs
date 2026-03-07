@@ -42,7 +42,7 @@
                               :on-change   #(rf/dispatch [::events/set-dimension-field :description %])}]]
 
           (when save-error
-            [comp/error-banner "Failed to save dimension."])
+            [comp/error-banner "Failed to save dimension." save-error])
 
           (when editing
             [:div {:class "mt-6 pt-4 border-t border-tn-border"}
@@ -92,7 +92,7 @@
                               :disabled    (and editing archived?)
                               :on-change   #(rf/dispatch [::events/set-dimension-type-field :name %])}]]
           (when save-error
-            [comp/error-banner (str "Failed to " (if editing "update" "create") " dimension type.")])
+            [comp/error-banner (str "Failed to " (if editing "update" "create") " dimension type.") save-error])
           (when editing
             [:div {:class "mt-6 pt-4 border-t border-tn-border"}
              (if archived?
@@ -207,7 +207,7 @@
             page-error @(rf/subscribe [::subs/error :dimensions])]
         [:div.flex-1.pl-4
          (when page-error
-           [comp/error-banner (str "Failed to load " type-name " dimensions.")])
+           [comp/error-banner (str "Failed to load " type-name " dimensions.") page-error])
 
          [comp/page-header {:title      type-name
                             :loading?   loading?

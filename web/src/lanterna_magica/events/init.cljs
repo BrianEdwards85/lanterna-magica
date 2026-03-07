@@ -1,5 +1,6 @@
 (ns lanterna-magica.events.init
-  (:require [lanterna-magica.events :as-alias events]
+  (:require [lanterna-magica.config :as config]
+            [lanterna-magica.events :as-alias events]
             [lanterna-magica.db :as db]
             [lanterna-magica.routes :as routes]
             [re-frame.core :as rf]
@@ -19,5 +20,5 @@
  ::events/boot
  (fn [_ _]
    {:dispatch-n [[::re-graph/init {:ws   nil
-                                    :http {:url "http://localhost:8000/graphql"}}]
+                                    :http {:url config/GRAPHQL_URL}}]
                  [::events/fetch-dimension-types]]}))

@@ -39,7 +39,7 @@
                             :placeholder "DATABASE_URL"
                             :on-change   #(rf/dispatch [::events/set-shared-value-field :name %])}]]
         (when error
-          [comp/error-banner "Failed to create shared value."])]
+          [comp/error-banner "Failed to create shared value." error])]
        [bp/dialog-footer
         {:actions
          (r/as-element
@@ -76,7 +76,7 @@
                                :class       "font-mono text-sm"
                                :on-change   #(rf/dispatch [::events/set-revision-field :value-text %])}]]
         (when error
-          [comp/error-banner "Failed to create revision. Check your JSON."])]
+          [comp/error-banner "Failed to create revision." error])]
        [bp/dialog-footer
         {:actions
          (r/as-element
@@ -140,7 +140,7 @@
         page-error @(rf/subscribe [::subs/error :shared-values])]
     [:div {:class "max-w-2xl mx-auto px-4 py-4"}
      (when page-error
-       [comp/error-banner "Failed to load shared values."])
+       [comp/error-banner "Failed to load shared values." page-error])
 
      [comp/page-header {:title      "Shared Values"
                         :loading?   loading?

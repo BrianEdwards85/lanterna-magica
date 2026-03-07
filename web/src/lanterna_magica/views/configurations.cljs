@@ -48,7 +48,7 @@
                                :placeholder "{\n  \"key\": \"value\"\n}"
                                :on-change   #(rf/dispatch [::events/set-configuration-field :body-text %])}]]
         (when error
-          [comp/error-banner "Failed to create configuration. Check your JSON."])]
+          [comp/error-banner "Failed to create configuration." error])]
        [bp/dialog-footer
         {:actions
          (r/as-element
@@ -142,7 +142,7 @@
         page-error @(rf/subscribe [::subs/error :configurations])]
     [:div {:class "max-w-2xl mx-auto px-4 py-4"}
      (when page-error
-       [comp/error-banner "Failed to load configurations."])
+       [comp/error-banner "Failed to load configurations." page-error])
 
      [comp/page-header {:title      "Configurations"
                         :loading?   loading?

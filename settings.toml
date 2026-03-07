@@ -10,6 +10,7 @@ password = "lanterna_magica"
 [default.server]
 host = "0.0.0.0"
 port = 8000
+cors_origins = ["http://localhost:3000"]
 
 [development]
 dynaconf_merge = true
