@@ -70,13 +70,20 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     pool = app.state.pool
+    checks = {}
     try:
         async with pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
-        return JSONResponse({"status": "ok"})
+        checks["db"] = "ok"
     except (asyncpg.PostgresError, OSError):
-        logger.exception("Health check failed")
-        return JSONResponse({"status": "degraded"}, status_code=503)
+        logger.exception("Health check DB failure")
+        checks["db"] = "error"
+
+    healthy = all(v == "ok" for v in checks.values())
+    return JSONResponse(
+        {"status": "healthy" if healthy else "degraded", "checks": checks},
+        status_code=200 if healthy else 503,
+    )
 
 
 @app.api_route("/graphql", methods=["GET", "POST", "OPTIONS"])
