@@ -4,8 +4,8 @@
             [lanterna-magica.subs :as subs]
             [lanterna-magica.views.header :as header]
             [lanterna-magica.views.home :as home]
-            [lanterna-magica.views.services :as services]
-            [lanterna-magica.views.environments :as environments]
+            [lanterna-magica.views.dimensions :as dimensions]
+            [lanterna-magica.views.dimension-types :as dimension-types]
             [lanterna-magica.views.shared-values :as shared-values]
             [lanterna-magica.views.configurations :as configurations]
             [re-frame.core :as rf]
@@ -16,11 +16,11 @@
 (defn current-page []
   (let [route-name @(rf/subscribe [::subs/current-route-name])]
     (case route-name
-      :route/home           [home/home-screen]
-      :route/services       [services/services-screen]
-      :route/environments   [environments/environments-screen]
-      :route/shared-values  [shared-values/shared-values-screen]
-      :route/configurations [configurations/configurations-screen]
+      :route/home             [home/home-screen]
+      :route/dimensions       [dimensions/dimensions-screen]
+      :route/dimension-types  [dimension-types/dimension-types-screen]
+      :route/shared-values    [shared-values/shared-values-screen]
+      :route/configurations   [configurations/configurations-screen]
       [home/home-screen])))
 
 (defn app []

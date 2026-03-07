@@ -20,5 +20,4 @@
  (fn [_ _]
    {:dispatch-n [[::re-graph/init {:ws   nil
                                     :http {:url "http://localhost:8000/graphql"}}]
-                 [::events/fetch-services-list]
-                 [::events/fetch-environments-list]]}))
+                 [::events/fetch-dimension-types]]}))

@@ -5,11 +5,11 @@
             [reitit.frontend.easy :as rtfe]))
 
 (def routes
-  [["/"               {:name :route/home}]
-   ["/services"       {:name :route/services}]
-   ["/environments"   {:name :route/environments}]
-   ["/shared-values"  {:name :route/shared-values}]
-   ["/configurations" {:name :route/configurations}]])
+  [["/"                {:name :route/home}]
+   ["/dimensions"      {:name :route/dimensions}]
+   ["/dimension-types" {:name :route/dimension-types}]
+   ["/shared-values"   {:name :route/shared-values}]
+   ["/configurations"  {:name :route/configurations}]])
 
 (defn on-navigate [match _history]
   (when match
@@ -22,10 +22,10 @@
    {:use-fragment false}))
 
 (def ^:private route->fetch-event
-  {:route/services       [::events/fetch-services]
-   :route/environments   [::events/fetch-environments]
-   :route/shared-values  [::events/fetch-shared-values]
-   :route/configurations [::events/fetch-configurations]})
+  {:route/dimensions      [::events/fetch-dimension-types]
+   :route/dimension-types [::events/fetch-dimension-types]
+   :route/shared-values   [::events/fetch-shared-values]
+   :route/configurations  [::events/fetch-configurations]})
 
 (rf/reg-event-fx
  ::navigated

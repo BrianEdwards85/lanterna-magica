@@ -2,7 +2,71 @@
   "GraphQL query and mutation strings for lanterna-magica.")
 
 ;; ---------------------------------------------------------------------------
-;; Services
+;; Dimension Types
+;; ---------------------------------------------------------------------------
+
+(def dimension-types-query
+  "query DimensionTypes($includeArchived: Boolean) {
+     dimensionTypes(includeArchived: $includeArchived) {
+       id name priority createdAt archivedAt
+       dimensions(first: 0) { pageInfo { hasNextPage } }
+     }
+   }")
+
+(def create-dimension-type-mutation
+  "mutation CreateDimensionType($input: CreateDimensionTypeInput!) {
+     createDimensionType(input: $input) { id name priority createdAt archivedAt }
+   }")
+
+(def archive-dimension-type-mutation
+  "mutation ArchiveDimensionType($id: ID!) {
+     archiveDimensionType(id: $id) { id name priority createdAt archivedAt }
+   }")
+
+(def unarchive-dimension-type-mutation
+  "mutation UnarchiveDimensionType($id: ID!) {
+     unarchiveDimensionType(id: $id) { id name priority createdAt archivedAt }
+   }")
+
+;; ---------------------------------------------------------------------------
+;; Dimensions
+;; ---------------------------------------------------------------------------
+
+(def dimensions-query
+  "query Dimensions($typeId: ID!, $search: String, $includeArchived: Boolean, $first: Int, $after: String) {
+     dimensions(typeId: $typeId, search: $search, includeArchived: $includeArchived, first: $first, after: $after) {
+       edges { cursor node { id name description base createdAt updatedAt archivedAt type { id name } } }
+       pageInfo { hasNextPage endCursor }
+     }
+   }")
+
+(def dimension-query
+  "query Dimension($id: ID!) {
+     dimension(id: $id) { id name description base createdAt updatedAt archivedAt type { id name } }
+   }")
+
+(def create-dimension-mutation
+  "mutation CreateDimension($input: CreateDimensionInput!) {
+     createDimension(input: $input) { id name description base createdAt updatedAt archivedAt type { id name } }
+   }")
+
+(def update-dimension-mutation
+  "mutation UpdateDimension($input: UpdateDimensionInput!) {
+     updateDimension(input: $input) { id name description base createdAt updatedAt archivedAt type { id name } }
+   }")
+
+(def archive-dimension-mutation
+  "mutation ArchiveDimension($id: ID!) {
+     archiveDimension(id: $id) { id name description base createdAt updatedAt archivedAt type { id name } }
+   }")
+
+(def unarchive-dimension-mutation
+  "mutation UnarchiveDimension($id: ID!) {
+     unarchiveDimension(id: $id) { id name description base createdAt updatedAt archivedAt type { id name } }
+   }")
+
+;; ---------------------------------------------------------------------------
+;; Services (backward-compat facade)
 ;; ---------------------------------------------------------------------------
 
 (def services-query
@@ -39,7 +103,7 @@
    }")
 
 ;; ---------------------------------------------------------------------------
-;; Environments
+;; Environments (backward-compat facade)
 ;; ---------------------------------------------------------------------------
 
 (def environments-query
@@ -88,16 +152,15 @@
    }")
 
 (def shared-value-query
-  "query SharedValue($id: ID!, $serviceId: ID, $environmentId: ID, $includeGlobal: Boolean, $currentOnly: Boolean, $first: Int, $after: String) {
+  "query SharedValue($id: ID!, $dimensionIds: [ID!], $includeBase: Boolean, $currentOnly: Boolean, $first: Int, $after: String) {
      sharedValue(id: $id) {
        id name createdAt updatedAt archivedAt
-       revisions(serviceId: $serviceId, environmentId: $environmentId, includeGlobal: $includeGlobal, currentOnly: $currentOnly, first: $first, after: $after) {
+       revisions(dimensionIds: $dimensionIds, includeBase: $includeBase, currentOnly: $currentOnly, first: $first, after: $after) {
          edges {
            cursor
            node {
              id value isCurrent createdAt
-             service { id name }
-             environment { id name }
+             dimensions { id name type { id name } }
            }
          }
          pageInfo { hasNextPage endCursor }
@@ -130,8 +193,7 @@
      createSharedValueRevision(input: $input) {
        id value isCurrent createdAt
        sharedValue { id name }
-       service { id name }
-       environment { id name }
+       dimensions { id name type { id name } }
      }
    }")
 
@@ -140,14 +202,13 @@
 ;; ---------------------------------------------------------------------------
 
 (def configurations-query
-  "query Configurations($serviceId: ID, $environmentId: ID, $includeGlobal: Boolean, $first: Int, $after: String) {
-     configurations(serviceId: $serviceId, environmentId: $environmentId, includeGlobal: $includeGlobal, first: $first, after: $after) {
+  "query Configurations($dimensionIds: [ID!], $includeBase: Boolean, $first: Int, $after: String) {
+     configurations(dimensionIds: $dimensionIds, includeBase: $includeBase, first: $first, after: $after) {
        edges {
          cursor
          node {
            id body isCurrent createdAt
-           service { id name }
-           environment { id name }
+           dimensions { id name type { id name } }
          }
        }
        pageInfo { hasNextPage endCursor }
@@ -158,8 +219,7 @@
   "query Configuration($id: ID!) {
      configuration(id: $id) {
        id body isCurrent createdAt
-       service { id name }
-       environment { id name }
+       dimensions { id name type { id name } }
        substitutions {
          id jsonpath createdAt
          sharedValue { id name }
@@ -171,8 +231,7 @@
   "mutation CreateConfiguration($input: CreateConfigurationInput!) {
      createConfiguration(input: $input) {
        id body isCurrent createdAt
-       service { id name }
-       environment { id name }
+       dimensions { id name type { id name } }
        substitutions {
          id jsonpath createdAt
          sharedValue { id name }

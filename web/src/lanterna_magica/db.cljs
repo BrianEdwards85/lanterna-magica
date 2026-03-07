@@ -3,31 +3,41 @@
 (def default-db
   {:current-route    nil
 
-   ;; Entity page state — holds edges, page-info, search, filters
-   :services-page       {:edges [] :page-info {:hasNextPage false :endCursor nil}
-                          :search "" :show-archived false}
-   :environments-page   {:edges [] :page-info {:hasNextPage false :endCursor nil}
-                          :search "" :show-archived false}
+   ;; Dimension types (flat list, ordered by priority)
+   :dimension-types       []
+   :show-archived-types   false
+
+   ;; Per-type dimension page state, keyed by type id:
+   ;; {type-id {:edges [] :page-info {} :search "" :show-archived false}}
+   :dimensions-pages      {}
+
+   ;; Per-type dimension lists for dropdowns, keyed by type id:
+   ;; {type-id [dim1 dim2 ...]}
+   :all-dimensions        {}
+
+   ;; Per-type search results for searchable dropdowns, keyed by type id:
+   ;; {type-id [dim1 dim2 ...] | nil}
+   :dimensions-search-results {}
+
+   ;; Dialog state for dimension types
+   :dimension-type-dialog {:open? false}
+
+   ;; Dialog state for dimensions (any type)
+   :dimension-dialog      {:open? false}
+
+   ;; Shared values page
    :shared-values-page  {:edges [] :page-info {:hasNextPage false :endCursor nil}
                           :search "" :show-archived false
                           :selected-id nil
                           :revisions {:edges []}
                           :revisions-page-info nil}
+
+   ;; Configurations page — filter by dimension ids
    :configurations-page {:edges [] :page-info {:hasNextPage false :endCursor nil}
-                          :filter-service-id nil :filter-environment-id nil
+                          :filter-dimension-ids []
                           :selected-id nil :selected nil}
 
-   ;; Flat lists for dropdowns (initial set, no pagination)
-   :all-services     []
-   :all-environments []
-
-   ;; Search results for searchable dropdowns
-   :services-search-results     nil
-   :environments-search-results nil
-
-   ;; Dialog state per entity
-   :service-dialog      {:open? false}
-   :environment-dialog  {:open? false}
+   ;; Dialog state
    :shared-value-dialog {:open? false}
    :revision-dialog     {:open? false}
    :configuration-dialog {:open? false}

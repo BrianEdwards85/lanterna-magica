@@ -9,36 +9,44 @@
  :<- [::current-route]
  (fn [route _] (-> route :data :name)))
 
+;; -- Dimension Types ------------------------------------------------------
+
+(rf/reg-sub ::dimension-types    (fn [db _] (:dimension-types db)))
+(rf/reg-sub ::show-archived-types (fn [db _] (:show-archived-types db)))
+
+;; -- Dimensions (per type) ------------------------------------------------
+
+(rf/reg-sub ::dimensions-page
+ (fn [db [_ type-id]]
+   (get-in db [:dimensions-pages type-id]
+           {:edges [] :page-info {:hasNextPage false :endCursor nil}
+            :search "" :show-archived false})))
+
+(rf/reg-sub ::all-dimensions
+ (fn [db [_ type-id]]
+   (get-in db [:all-dimensions type-id] [])))
+
+(rf/reg-sub ::dimensions-search-results
+ (fn [db [_ type-id]]
+   (get-in db [:dimensions-search-results type-id])))
+
+(rf/reg-sub ::dimensions-dropdown-items
+ (fn [db [_ type-id]]
+   (or (get-in db [:dimensions-search-results type-id])
+       (get-in db [:all-dimensions type-id] []))))
+
 ;; -- Entity page state ----------------------------------------------------
 
-(rf/reg-sub ::services-page       (fn [db _] (:services-page db)))
-(rf/reg-sub ::environments-page   (fn [db _] (:environments-page db)))
 (rf/reg-sub ::shared-values-page  (fn [db _] (:shared-values-page db)))
 (rf/reg-sub ::configurations-page (fn [db _] (:configurations-page db)))
 
-;; -- Flat lists for dropdowns ---------------------------------------------
-
-(rf/reg-sub ::all-services     (fn [db _] (:all-services db)))
-(rf/reg-sub ::all-environments (fn [db _] (:all-environments db)))
-
-(rf/reg-sub ::services-search-results     (fn [db _] (:services-search-results db)))
-(rf/reg-sub ::environments-search-results (fn [db _] (:environments-search-results db)))
-
-(rf/reg-sub ::services-dropdown-items
- (fn [db _]
-   (or (:services-search-results db) (:all-services db))))
-
-(rf/reg-sub ::environments-dropdown-items
- (fn [db _]
-   (or (:environments-search-results db) (:all-environments db))))
-
 ;; -- Dialog state ---------------------------------------------------------
 
-(rf/reg-sub ::service-dialog      (fn [db _] (:service-dialog db)))
-(rf/reg-sub ::environment-dialog  (fn [db _] (:environment-dialog db)))
-(rf/reg-sub ::shared-value-dialog (fn [db _] (:shared-value-dialog db)))
-(rf/reg-sub ::revision-dialog     (fn [db _] (:revision-dialog db)))
-(rf/reg-sub ::configuration-dialog (fn [db _] (:configuration-dialog db)))
+(rf/reg-sub ::dimension-type-dialog (fn [db _] (:dimension-type-dialog db)))
+(rf/reg-sub ::dimension-dialog      (fn [db _] (:dimension-dialog db)))
+(rf/reg-sub ::shared-value-dialog   (fn [db _] (:shared-value-dialog db)))
+(rf/reg-sub ::revision-dialog       (fn [db _] (:revision-dialog db)))
+(rf/reg-sub ::configuration-dialog  (fn [db _] (:configuration-dialog db)))
 
 ;; -- Loading / Errors -----------------------------------------------------
 

@@ -8,6 +8,43 @@
             [reagent.core :as r]))
 
 ;; ---------------------------------------------------------------------------
+;; Helpers
+;; ---------------------------------------------------------------------------
+
+(defn- dimensions-label [dimensions]
+  [:div.flex.items-center.gap-1.flex-wrap
+   (for [dim dimensions]
+     ^{:key (:id dim)}
+     [bp/tag {:minimal true}
+      (str (get-in dim [:type :name]) ": " (:name dim))])])
+
+;; ---------------------------------------------------------------------------
+;; Dimension Picker for revision dialog
+;; ---------------------------------------------------------------------------
+
+(defn- revision-dimension-picker []
+  (let [dim-types @(rf/subscribe [::subs/dimension-types])
+        {:keys [revision]} @(rf/subscribe [::subs/revision-dialog])
+        selected-ids (or (:dimensionIds revision) [])]
+    [:div
+     (for [dt dim-types]
+       (let [type-id (:id dt)
+             items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])]
+         ^{:key type-id}
+         [:div {:class "mb-3 flex items-center gap-3"}
+          [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}}
+           (:name dt)]
+          [:div.flex-1
+           [sel/searchable-select
+            {:items            items
+             :selected-id      (some (set selected-ids) (map :id items))
+             :on-select        #(rf/dispatch [::events/toggle-revision-dimension %])
+             :on-query-change  [::events/search-dimensions-list type-id]
+             :on-clear-search  [::events/clear-dimensions-search-results type-id]
+             :icon             "tag"
+             :placeholder      (str "Select " (:name dt) "...")}]]]))]))
+
+;; ---------------------------------------------------------------------------
 ;; Create Shared Value Dialog
 ;; ---------------------------------------------------------------------------
 
@@ -45,40 +82,15 @@
 (defn revision-dialog []
   (let [{:keys [open? revision]} @(rf/subscribe [::subs/revision-dialog])
         saving?      @(rf/subscribe [::subs/loading? :save-revision])
-        error        @(rf/subscribe [::subs/error :save-revision])
-        services     @(rf/subscribe [::subs/services-dropdown-items])
-        environments @(rf/subscribe [::subs/environments-dropdown-items])]
+        error        @(rf/subscribe [::subs/error :save-revision])]
     (when open?
-      (let [valid? (and (seq (:serviceId revision))
-                        (seq (:environmentId revision)))]
-        [bp/dialog {:title    "Create Revision"
-                    :icon     "history"
-                    :is-open  true
-                    :on-close #(rf/dispatch [::events/close-revision-dialog])
-                    :class    "w-full max-w-md"}
-         [bp/dialog-body
-        [:div {:class "mb-4 flex items-center gap-3"}
-         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Service"]
-         [:div.flex-1
-          [sel/searchable-select
-           {:items            services
-            :selected-id      (:serviceId revision)
-            :on-select        #(rf/dispatch [::events/set-revision-field :serviceId %])
-            :on-query-change  [::events/search-services-list]
-            :on-clear-search  [::events/clear-services-search-results]
-            :icon             "applications"
-            :placeholder      "Select service..."}]]]
-        [:div {:class "mb-4 flex items-center gap-3"}
-         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Environment"]
-         [:div.flex-1
-          [sel/searchable-select
-           {:items            environments
-            :selected-id      (:environmentId revision)
-            :on-select        #(rf/dispatch [::events/set-revision-field :environmentId %])
-            :on-query-change  [::events/search-environments-list]
-            :on-clear-search  [::events/clear-environments-search-results]
-            :icon             "globe-network"
-            :placeholder      "Select environment..."}]]]
+      [bp/dialog {:title    "Create Revision"
+                  :icon     "history"
+                  :is-open  true
+                  :on-close #(rf/dispatch [::events/close-revision-dialog])
+                  :class    "w-full max-w-md"}
+       [bp/dialog-body
+        [revision-dimension-picker]
         [:div.mb-4
          [:label.bp6-label "Value (JSON)"]
          [comp/local-textarea {:rows        6
@@ -88,15 +100,14 @@
                                :on-change   #(rf/dispatch [::events/set-revision-field :value-text %])}]]
         (when error
           [comp/error-banner "Failed to create revision. Check your JSON."])]
-         [bp/dialog-footer
-          {:actions
-           (r/as-element
-            [:<>
-             [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-revision-dialog])}]
-             [bp/button {:text "Create" :intent "primary" :icon "tick"
-                         :loading  saving?
-                         :disabled (not valid?)
-                         :on-click #(rf/dispatch [::events/save-revision])}]])}]]))))
+       [bp/dialog-footer
+        {:actions
+         (r/as-element
+          [:<>
+           [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-revision-dialog])}]
+           [bp/button {:text "Create" :intent "primary" :icon "tick"
+                       :loading  saving?
+                       :on-click #(rf/dispatch [::events/save-revision])}]])}]])))
 
 ;; ---------------------------------------------------------------------------
 ;; Revisions Panel
@@ -125,13 +136,13 @@
        :else
        [:div
         (for [edge revisions]
-          (let [{:keys [id service environment value isCurrent createdAt]} (:node edge)]
+          (let [{:keys [id dimensions value isCurrent createdAt]} (:node edge)]
             ^{:key id}
             [:div {:class (str "mb-2 rounded p-3 bg-tn-bg-card"
                                (when isCurrent " ring-1 ring-tn-blue/50"))}
              [:div.flex.items-center.justify-between.mb-1
               [:div.flex.items-center.gap-2
-               [:span.font-semibold (str (:name service) " / " (:name environment))]
+               [dimensions-label dimensions]
                (when isCurrent
                  [bp/tag {:intent "success" :minimal true} "current"])]
               [:span.text-xs.text-tn-fg-dim createdAt]]

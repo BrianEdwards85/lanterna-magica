@@ -223,8 +223,7 @@
    (assoc db :revision-dialog
           {:open?    true
            :revision {:sharedValueId  shared-value-id
-                      :serviceId      ""
-                      :environmentId  ""
+                      :dimensionIds   []
                       :value-text     ""}})))
 
 (rf/reg-event-db
@@ -237,6 +236,16 @@
  (fn [db [_ field value]]
    (assoc-in db [:revision-dialog :revision field] value)))
 
+(rf/reg-event-db
+ ::events/toggle-revision-dimension
+ (fn [db [_ dimension-id]]
+   (let [path    [:revision-dialog :revision :dimensionIds]
+         current (get-in db path [])
+         updated (if (some #{dimension-id} current)
+                   (vec (remove #{dimension-id} current))
+                   (conj current dimension-id))]
+     (assoc-in db path updated))))
+
 (rf/reg-event-fx
  ::events/save-revision
  (fn [{:keys [db]} _]
@@ -244,10 +253,9 @@
          value-text (:value-text revision)]
      (try
        (let [parsed (.parse js/JSON value-text)
-             input  {:sharedValueId  (:sharedValueId revision)
-                     :serviceId      (:serviceId revision)
-                     :environmentId  (:environmentId revision)
-                     :value          parsed}]
+             input  {:sharedValueId (:sharedValueId revision)
+                     :dimensionIds  (:dimensionIds revision)
+                     :value         parsed}]
          {:db       (h/start-loading db :save-revision)
           :dispatch [::re-graph/mutate
                      {:query     gql/create-shared-value-revision-mutation

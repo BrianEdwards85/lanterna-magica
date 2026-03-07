@@ -8,46 +8,62 @@
             [reagent.core :as r]))
 
 ;; ---------------------------------------------------------------------------
+;; Helpers
+;; ---------------------------------------------------------------------------
+
+(defn- dimensions-label
+  "Render a list of dimensions as tags grouped by type."
+  [dimensions]
+  [:div.flex.items-center.gap-1.flex-wrap
+   (for [dim dimensions]
+     ^{:key (:id dim)}
+     [bp/tag {:minimal true}
+      (str (get-in dim [:type :name]) ": " (:name dim))])])
+
+;; ---------------------------------------------------------------------------
+;; Dimension Picker for dialogs/filters
+;; ---------------------------------------------------------------------------
+
+(defn dimension-picker
+  "A per-type searchable select that toggles dimension IDs.
+   Props: :selected-ids (vec of IDs), :on-toggle (fn [id])"
+  [{:keys [selected-ids on-toggle]}]
+  (let [dim-types @(rf/subscribe [::subs/dimension-types])]
+    [:div
+     (for [dt dim-types]
+       (let [type-id (:id dt)
+             items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])]
+         ^{:key type-id}
+         [:div {:class "mb-3 flex items-center gap-3"}
+          [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}}
+           (:name dt)]
+          [:div.flex-1
+           [sel/searchable-select
+            {:items            items
+             :selected-id      (some (set selected-ids) (map :id items))
+             :on-select        on-toggle
+             :on-query-change  [::events/search-dimensions-list type-id]
+             :on-clear-search  [::events/clear-dimensions-search-results type-id]
+             :icon             "tag"
+             :placeholder      (str "Select " (:name dt) "...")}]]]))]))
+
+;; ---------------------------------------------------------------------------
 ;; Create Configuration Dialog
 ;; ---------------------------------------------------------------------------
 
 (defn configuration-dialog []
   (let [{:keys [open? configuration]} @(rf/subscribe [::subs/configuration-dialog])
         saving?      @(rf/subscribe [::subs/loading? :save-configuration])
-        error        @(rf/subscribe [::subs/error :save-configuration])
-        services     @(rf/subscribe [::subs/services-dropdown-items])
-        environments @(rf/subscribe [::subs/environments-dropdown-items])]
+        error        @(rf/subscribe [::subs/error :save-configuration])]
     (when open?
-      (let [valid? (and (seq (:serviceId configuration))
-                        (seq (:environmentId configuration)))]
-        [bp/dialog {:title    "Create Configuration"
-                    :icon     "document"
-                    :is-open  true
-                    :on-close #(rf/dispatch [::events/close-configuration-dialog])
-                    :class    "w-full max-w-lg"}
-         [bp/dialog-body
-        [:div {:class "mb-4 flex items-center gap-3"}
-         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Service"]
-         [:div.flex-1
-          [sel/searchable-select
-           {:items            services
-            :selected-id      (:serviceId configuration)
-            :on-select        #(rf/dispatch [::events/set-configuration-field :serviceId %])
-            :on-query-change  [::events/search-services-list]
-            :on-clear-search  [::events/clear-services-search-results]
-            :icon             "applications"
-            :placeholder      "Select service..."}]]]
-        [:div {:class "mb-4 flex items-center gap-3"}
-         [:label.bp6-label.shrink-0 {:style {:margin 0 :line-height "30px"}} "Environment"]
-         [:div.flex-1
-          [sel/searchable-select
-           {:items            environments
-            :selected-id      (:environmentId configuration)
-            :on-select        #(rf/dispatch [::events/set-configuration-field :environmentId %])
-            :on-query-change  [::events/search-environments-list]
-            :on-clear-search  [::events/clear-environments-search-results]
-            :icon             "globe-network"
-            :placeholder      "Select environment..."}]]]
+      [bp/dialog {:title    "Create Configuration"
+                  :icon     "document"
+                  :is-open  true
+                  :on-close #(rf/dispatch [::events/close-configuration-dialog])
+                  :class    "w-full max-w-lg"}
+       [bp/dialog-body
+        [dimension-picker {:selected-ids (:dimensionIds configuration)
+                           :on-toggle    #(rf/dispatch [::events/toggle-configuration-dimension %])}]
         [:div.mb-4
          [:label.bp6-label "Configuration Body (JSON)"]
          [comp/local-textarea {:rows        12
@@ -55,17 +71,16 @@
                                :class       "font-mono text-sm"
                                :placeholder "{\n  \"key\": \"value\"\n}"
                                :on-change   #(rf/dispatch [::events/set-configuration-field :body-text %])}]]
-          (when error
-            [comp/error-banner "Failed to create configuration. Check your JSON."])]
-         [bp/dialog-footer
-          {:actions
-           (r/as-element
-            [:<>
-             [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-configuration-dialog])}]
-             [bp/button {:text "Create" :intent "primary" :icon "tick"
-                         :loading  saving?
-                         :disabled (not valid?)
-                         :on-click #(rf/dispatch [::events/save-configuration])}]])}]]))))
+        (when error
+          [comp/error-banner "Failed to create configuration. Check your JSON."])]
+       [bp/dialog-footer
+        {:actions
+         (r/as-element
+          [:<>
+           [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-configuration-dialog])}]
+           [bp/button {:text "Create" :intent "primary" :icon "tick"
+                       :loading  saving?
+                       :on-click #(rf/dispatch [::events/save-configuration])}]])}]])))
 
 ;; ---------------------------------------------------------------------------
 ;; Configuration Detail Panel
@@ -91,9 +106,7 @@
          :else
          [:div
           [:div.flex.items-center.gap-2.mb-3
-           [bp/tag {:minimal true} (str (get-in config [:service :name])
-                                        " / "
-                                        (get-in config [:environment :name]))]
+           [dimensions-label (:dimensions config)]
            (when (:isCurrent config)
              [bp/tag {:intent "success" :minimal true} "current"])
            [:span.text-xs.text-tn-fg-dim (:createdAt config)]]
@@ -119,28 +132,26 @@
 ;; ---------------------------------------------------------------------------
 
 (defn filter-bar []
-  (let [services     @(rf/subscribe [::subs/services-dropdown-items])
-        environments @(rf/subscribe [::subs/environments-dropdown-items])
-        page         @(rf/subscribe [::subs/configurations-page])]
-    [:div {:class "flex items-center gap-3 mb-4"}
-     [:div.flex-1
-      [sel/searchable-select
-       {:items            services
-        :selected-id      (:filter-service-id page)
-        :on-select        #(rf/dispatch [::events/set-config-filter-service %])
-        :on-query-change  [::events/search-services-list]
-        :on-clear-search  [::events/clear-services-search-results]
-        :icon             "applications"
-        :placeholder      "All services"}]]
-     [:div.flex-1
-      [sel/searchable-select
-       {:items            environments
-        :selected-id      (:filter-environment-id page)
-        :on-select        #(rf/dispatch [::events/set-config-filter-environment %])
-        :on-query-change  [::events/search-environments-list]
-        :on-clear-search  [::events/clear-environments-search-results]
-        :icon             "globe-network"
-        :placeholder      "All environments"}]]]))
+  (let [page      @(rf/subscribe [::subs/configurations-page])
+        dim-types @(rf/subscribe [::subs/dimension-types])
+        dim-ids   (or (:filter-dimension-ids page) [])]
+    [:div {:class "flex items-center gap-3 mb-4 flex-wrap"}
+     (for [dt dim-types]
+       (let [type-id (:id dt)
+             items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])]
+         ^{:key type-id}
+         [:div.flex-1
+          [sel/searchable-select
+           {:items            items
+            :selected-id      (some (set dim-ids) (map :id items))
+            :on-select        #(rf/dispatch [::events/set-config-filter-dimension %])
+            :on-query-change  [::events/search-dimensions-list type-id]
+            :on-clear-search  [::events/clear-dimensions-search-results type-id]
+            :icon             "tag"
+            :placeholder      (str "All " (:name dt) "s")}]]))
+     (when (seq dim-ids)
+       [bp/button {:icon "cross" :text "Clear" :minimal true :small true
+                   :on-click #(rf/dispatch [::events/clear-config-filters])}])]))
 
 ;; ---------------------------------------------------------------------------
 ;; Screen
@@ -181,8 +192,7 @@
                    :on-click #(rf/dispatch [::events/select-configuration (:id node)])}
              [:div.flex.items-center.justify-between
               [:div.flex.items-center.gap-2
-               [:span.font-semibold
-                (str (get-in node [:service :name]) " / " (get-in node [:environment :name]))]
+               [dimensions-label (:dimensions node)]
                (when (:isCurrent node)
                  [bp/tag {:intent "success" :minimal true} "current"])]
               [:span.text-xs.text-tn-fg-dim (:createdAt node)]]]))
