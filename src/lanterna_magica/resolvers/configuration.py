@@ -8,11 +8,12 @@ class ConfigurationsResolver:
         self.configurations = configurations
 
     async def resolve_configurations(
-        self, _obj, info, *, dimension_ids=None, include_base=None, first=None, after=None
+        self, _obj, info, *, dimension_ids=None, include_base=None, current_only=None, first=None, after=None
     ):
         return await self.configurations.get_configurations(
             dimension_ids=dimension_ids,
             include_base=include_base if include_base is not None else True,
+            current_only=current_only or False,
             first=first,
             after=after,
         )
@@ -32,6 +33,11 @@ class ConfigurationsResolver:
             configuration_id=input["configuration_id"],
             jsonpath=input["jsonpath"],
             shared_value_id=input["shared_value_id"],
+        )
+
+    async def resolve_set_configuration_current(self, _obj, info, *, id, is_current):
+        return await self.configurations.set_configuration_current(
+            id=id, is_current=is_current,
         )
 
     async def resolve_config_dimensions(self, obj, info):
@@ -59,6 +65,7 @@ def get_configuration_resolvers(configurations: Configurations) -> list:
     query.set_field("configuration", resolver.resolve_configuration)
     mutation.set_field("createConfiguration", resolver.resolve_create_configuration)
     mutation.set_field("updateConfigSubstitution", resolver.resolve_update_config_substitution)
+    mutation.set_field("setConfigurationCurrent", resolver.resolve_set_configuration_current)
     configuration_type.set_field("dimensions", resolver.resolve_config_dimensions)
     configuration_type.set_field("substitutions", resolver.resolve_config_substitutions)
     substitution_type.set_field("configuration", resolver.resolve_substitution_configuration)

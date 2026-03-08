@@ -49,6 +49,11 @@ class SharedValuesResolver:
             value=input["value"],
         )
 
+    async def resolve_set_revision_current(self, _obj, info, *, id, is_current):
+        return await self.shared_values.set_revision_current(
+            id=id, is_current=is_current,
+        )
+
     async def resolve_revisions(
         self, obj, info, *, dimension_ids=None, include_base=None, current_only=None, first=None, after=None
     ):
@@ -84,6 +89,7 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     mutation.set_field("archiveSharedValue", resolver.resolve_archive_shared_value)
     mutation.set_field("unarchiveSharedValue", resolver.resolve_unarchive_shared_value)
     mutation.set_field("createSharedValueRevision", resolver.resolve_create_shared_value_revision)
+    mutation.set_field("setRevisionCurrent", resolver.resolve_set_revision_current)
     shared_value_type.set_field("revisions", resolver.resolve_revisions)
     revision_type.set_field("sharedValue", resolver.resolve_revision_shared_value)
     revision_type.set_field("dimensions", resolver.resolve_revision_dimensions)

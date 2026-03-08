@@ -91,14 +91,19 @@
 ;; ---------------------------------------------------------------------------
 
 (defn revisions-panel [selected-id]
-  (let [page       @(rf/subscribe [::subs/shared-values-page])
-        revisions  (get-in page [:revisions :edges])
-        rev-pi     (:revisions-page-info page)
-        loading?   @(rf/subscribe [::subs/loading? :revisions])]
+  (let [page          @(rf/subscribe [::subs/shared-values-page])
+        revisions     (get-in page [:revisions :edges])
+        rev-pi        (:revisions-page-info page)
+        current-only  (:current-only page)
+        loading?      @(rf/subscribe [::subs/loading? :revisions])]
     [:div {:class "mt-4 p-4 rounded bg-tn-bg-dark border border-tn-border"}
      [:div.flex.items-center.justify-between.mb-3
       [:h4.bp6-heading.m-0 "Revisions"]
-      [:div.flex.gap-2
+      [:div.flex.items-center.gap-2
+       [bp/switch-control {:checked   (boolean current-only)
+                           :label     "Current only"
+                           :class     "mb-0"
+                           :on-change (fn [_] (rf/dispatch [::events/toggle-revisions-current-only]))}]
        [bp/button {:icon "plus" :text "New Revision" :minimal true :intent "primary"
                    :on-click #(rf/dispatch [::events/open-revision-dialog selected-id])}]
        [bp/button {:icon "cross" :minimal true
@@ -122,7 +127,15 @@
                [dimensions-label dimensions]
                (when isCurrent
                  [bp/tag {:intent "success" :minimal true} "current"])]
-              [:span.text-xs.text-tn-fg-dim createdAt]]
+              [:div.flex.items-center.gap-2
+               (if isCurrent
+                 [bp/button {:text "Deactivate" :minimal true :small true
+                             :intent "danger"
+                             :on-click #(rf/dispatch [::events/set-revision-current id false])}]
+                 [bp/button {:text "Make Current" :minimal true :small true
+                             :intent "success"
+                             :on-click #(rf/dispatch [::events/set-revision-current id true])}])
+               [:span.text-xs.text-tn-fg-dim createdAt]]]
              [:pre.json-display.text-xs.mt-1
               (.stringify js/JSON (clj->js value) nil 2)]]))
         [comp/load-more-button

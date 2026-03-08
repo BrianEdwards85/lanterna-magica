@@ -77,4 +77,5 @@ extend type Mutation {
   archiveSharedValue(id: ID!): SharedValue!
   unarchiveSharedValue(id: ID!): SharedValue!
   createSharedValueRevision(input: CreateSharedValueRevisionInput!): SharedValueRevision!
+  setRevisionCurrent(id: ID!, isCurrent: Boolean!): SharedValueRevision!
 }

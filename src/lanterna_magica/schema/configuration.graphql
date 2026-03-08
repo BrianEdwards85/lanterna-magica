@@ -46,6 +46,7 @@ extend type Query {
   configurations(
     dimensionIds: [ID!]
     includeBase: Boolean
+    currentOnly: Boolean
     first: Int
     after: String
   ): ConfigurationConnection!
@@ -55,4 +56,5 @@ extend type Query {
 extend type Mutation {
   createConfiguration(input: CreateConfigurationInput!): Configuration!
   updateConfigSubstitution(input: SetConfigSubstitutionInput!): ConfigSubstitution!
+  setConfigurationCurrent(id: ID!, isCurrent: Boolean!): Configuration!
 }

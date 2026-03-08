@@ -776,3 +776,99 @@ async def test_partial_dimensions_env_only(client):
     assert_that(by_type["environment"]).described_as(
         "environment is the one we specified"
     ).is_equal_to(env["name"])
+
+
+# -- Set/Unset revision current tests --
+
+SET_REVISION_CURRENT = """
+mutation SetRevisionCurrent($id: ID!, $isCurrent: Boolean!) {
+    setRevisionCurrent(id: $id, isCurrent: $isCurrent) {
+        id value isCurrent
+    }
+}
+"""
+
+
+async def test_set_noncurrent_revision_to_current(client):
+    """Making a non-current revision current should unset the old current."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    rev1 = await create_revision(client, sv["id"], [svc["id"], env["id"]], "v1")
+    rev2 = await create_revision(client, sv["id"], [svc["id"], env["id"]], "v2")
+
+    # rev1 is not current, rev2 is current — make rev1 current again
+    body = await gql(client, SET_REVISION_CURRENT, {"id": rev1["id"], "isCurrent": True})
+    result = body["data"]["setRevisionCurrent"]
+    assert_that(result["id"]).is_equal_to(rev1["id"])
+    assert_that(result["isCurrent"]).described_as("rev1 now current").is_true()
+
+    # Verify rev2 is no longer current
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
+    by_id = {e["node"]["id"]: e["node"] for e in body["data"]["sharedValue"]["revisions"]["edges"]}
+    assert_that(by_id[rev1["id"]]["isCurrent"]).described_as("rev1 is current").is_true()
+    assert_that(by_id[rev2["id"]]["isCurrent"]).described_as("rev2 no longer current").is_false()
+
+
+async def test_deactivate_current_revision(client):
+    """Unsetting current should leave no current revision for that scope."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    rev = await create_revision(client, sv["id"], [svc["id"], env["id"]], "v1")
+
+    body = await gql(client, SET_REVISION_CURRENT, {"id": rev["id"], "isCurrent": False})
+    result = body["data"]["setRevisionCurrent"]
+    assert_that(result["isCurrent"]).described_as("revision deactivated").is_false()
+
+    # currentOnly should return nothing
+    body = await gql(
+        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "currentOnly": True}
+    )
+    current_revs = body["data"]["sharedValue"]["revisions"]["edges"]
+    assert_that(current_revs).described_as("no current revisions").is_empty()
+
+
+async def test_set_current_only_affects_same_scope(client):
+    """Setting current should only unset revisions with the same scope."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+    env1 = await create_environment(client, "production")
+    env2 = await create_environment(client, "staging")
+
+    rev_prod = await create_revision(client, sv["id"], [svc["id"], env1["id"]], "prod")
+    rev_staging = await create_revision(client, sv["id"], [svc["id"], env2["id"]], "staging")
+
+    # Both should be current (different scopes)
+    assert_that(rev_prod["isCurrent"]).is_true()
+    assert_that(rev_staging["isCurrent"]).is_true()
+
+    # Add a second prod revision, then re-activate the first
+    rev_prod2 = await create_revision(client, sv["id"], [svc["id"], env1["id"]], "prod2")
+    await gql(client, SET_REVISION_CURRENT, {"id": rev_prod["id"], "isCurrent": True})
+
+    # Staging should still be current
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
+    by_id = {e["node"]["id"]: e["node"] for e in body["data"]["sharedValue"]["revisions"]["edges"]}
+    assert_that(by_id[rev_staging["id"]]["isCurrent"]).described_as(
+        "staging unaffected"
+    ).is_true()
+    assert_that(by_id[rev_prod["id"]]["isCurrent"]).described_as(
+        "old prod now current"
+    ).is_true()
+    assert_that(by_id[rev_prod2["id"]]["isCurrent"]).described_as(
+        "new prod no longer current"
+    ).is_false()
+
+
+async def test_set_current_not_found(client):
+    """Setting current on a non-existent revision should error."""
+    body = await gql(
+        client,
+        SET_REVISION_CURRENT,
+        {"id": "00000000-0000-0000-0000-ffffffffffff", "isCurrent": True},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("not found error").contains_key("errors")

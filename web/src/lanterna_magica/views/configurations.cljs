@@ -151,6 +151,12 @@
 
      [filter-bar]
 
+     [:div {:class "flex items-center gap-3 mb-4"}
+      [bp/switch-control {:checked   (boolean (:current-only @(rf/subscribe [::subs/configurations-page])))
+                          :label     "Current only"
+                          :class     "mb-0"
+                          :on-change (fn [_] (rf/dispatch [::events/toggle-configurations-current-only]))}]]
+
      (cond
        (and loading? (empty? edges))
        [comp/loading-spinner]
@@ -174,7 +180,17 @@
                [dimensions-label (:dimensions node)]
                (when (:isCurrent node)
                  [bp/tag {:intent "success" :minimal true} "current"])]
-              [:span.text-xs.text-tn-fg-dim (:createdAt node)]]]))
+              [:div.flex.items-center.gap-2
+               (if (:isCurrent node)
+                 [bp/button {:text "Deactivate" :minimal true :small true
+                             :intent "danger"
+                             :on-click (fn [e] (.stopPropagation e)
+                                         (rf/dispatch [::events/set-configuration-current (:id node) false]))}]
+                 [bp/button {:text "Make Current" :minimal true :small true
+                             :intent "success"
+                             :on-click (fn [e] (.stopPropagation e)
+                                         (rf/dispatch [::events/set-configuration-current (:id node) true]))}])
+               [:span.text-xs.text-tn-fg-dim (:createdAt node)]]]]))
         [comp/load-more-button
          {:has-next? (:hasNextPage page-info)
           :loading?  loading?

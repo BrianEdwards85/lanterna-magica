@@ -677,3 +677,82 @@ async def test_partial_dimensions_env_only(client):
     assert_that(by_type["environment"]).described_as(
         "environment is the one we specified"
     ).is_equal_to(env["name"])
+
+
+# -- Set/Unset configuration current tests --
+
+SET_CONFIGURATION_CURRENT = """
+mutation SetConfigurationCurrent($id: ID!, $isCurrent: Boolean!) {
+    setConfigurationCurrent(id: $id, isCurrent: $isCurrent) {
+        id body isCurrent
+    }
+}
+"""
+
+
+async def test_set_noncurrent_configuration_to_current(client):
+    """Making a non-current configuration current should unset the old current."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    cfg1 = await _create_configuration(client, [svc["id"], env["id"]], {"v": 1})
+    cfg2 = await _create_configuration(client, [svc["id"], env["id"]], {"v": 2})
+
+    # cfg1 is not current, cfg2 is current — make cfg1 current again
+    body = await gql(client, SET_CONFIGURATION_CURRENT, {"id": cfg1["id"], "isCurrent": True})
+    result = body["data"]["setConfigurationCurrent"]
+    assert_that(result["id"]).is_equal_to(cfg1["id"])
+    assert_that(result["isCurrent"]).described_as("cfg1 now current").is_true()
+
+    # Verify cfg2 is no longer current
+    body = await gql(client, CONFIGURATION, {"id": cfg2["id"]})
+    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+        "cfg2 no longer current"
+    ).is_false()
+
+
+async def test_deactivate_current_configuration(client):
+    """Unsetting current should leave no current configuration for that scope."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    cfg = await _create_configuration(client, [svc["id"], env["id"]], {"v": 1})
+
+    body = await gql(client, SET_CONFIGURATION_CURRENT, {"id": cfg["id"], "isCurrent": False})
+    result = body["data"]["setConfigurationCurrent"]
+    assert_that(result["isCurrent"]).described_as("configuration deactivated").is_false()
+
+
+async def test_set_current_only_affects_same_scope_configurations(client):
+    """Setting current should only unset configurations with the same scope."""
+    svc = await create_service(client)
+    env1 = await create_environment(client, "production")
+    env2 = await create_environment(client, "staging")
+
+    cfg_prod = await _create_configuration(client, [svc["id"], env1["id"]], {"env": "prod"})
+    cfg_staging = await _create_configuration(client, [svc["id"], env2["id"]], {"env": "staging"})
+
+    # Both should be current (different scopes)
+    assert_that(cfg_prod["isCurrent"]).is_true()
+    assert_that(cfg_staging["isCurrent"]).is_true()
+
+    # Add a second prod config, then re-activate the first
+    await _create_configuration(client, [svc["id"], env1["id"]], {"env": "prod2"})
+    await gql(client, SET_CONFIGURATION_CURRENT, {"id": cfg_prod["id"], "isCurrent": True})
+
+    # Staging should still be current
+    body = await gql(client, CONFIGURATION, {"id": cfg_staging["id"]})
+    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+        "staging unaffected"
+    ).is_true()
+
+
+async def test_set_configuration_current_not_found(client):
+    """Setting current on a non-existent configuration should error."""
+    body = await gql(
+        client,
+        SET_CONFIGURATION_CURRENT,
+        {"id": "00000000-0000-0000-0000-ffffffffffff", "isCurrent": True},
+        expect_errors=True,
+    )
+    assert_that(body).described_as("not found error").contains_key("errors")

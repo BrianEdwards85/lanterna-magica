@@ -132,13 +132,21 @@
      }
    }")
 
+(def set-revision-current-mutation
+  "mutation SetRevisionCurrent($id: ID!, $isCurrent: Boolean!) {
+     setRevisionCurrent(id: $id, isCurrent: $isCurrent) {
+       id value isCurrent createdAt
+       dimensions { id name type { id name } }
+     }
+   }")
+
 ;; ---------------------------------------------------------------------------
 ;; Configurations
 ;; ---------------------------------------------------------------------------
 
 (def configurations-query
-  "query Configurations($dimensionIds: [ID!], $includeBase: Boolean, $first: Int, $after: String) {
-     configurations(dimensionIds: $dimensionIds, includeBase: $includeBase, first: $first, after: $after) {
+  "query Configurations($dimensionIds: [ID!], $includeBase: Boolean, $currentOnly: Boolean, $first: Int, $after: String) {
+     configurations(dimensionIds: $dimensionIds, includeBase: $includeBase, currentOnly: $currentOnly, first: $first, after: $after) {
        edges {
          cursor
          node {
@@ -171,6 +179,14 @@
          id jsonpath createdAt
          sharedValue { id name }
        }
+     }
+   }")
+
+(def set-configuration-current-mutation
+  "mutation SetConfigurationCurrent($id: ID!, $isCurrent: Boolean!) {
+     setConfigurationCurrent(id: $id, isCurrent: $isCurrent) {
+       id body isCurrent createdAt
+       dimensions { id name type { id name } }
      }
    }")
 

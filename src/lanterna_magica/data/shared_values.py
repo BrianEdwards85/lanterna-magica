@@ -1,6 +1,6 @@
 from asyncpg import Pool
 
-from lanterna_magica.errors import ValidationError
+from lanterna_magica.errors import NotFoundError, ValidationError
 
 from .utils import (
     build_connection,
@@ -161,3 +161,30 @@ class SharedValues:
                 )
 
         return revision
+
+    async def set_revision_current(self, *, id: str, is_current: bool) -> dict:
+        if is_current:
+            rows = [
+                dict(r)
+                async for r in queries.get_revision_by_ids(self.pool, ids=[id])
+            ]
+            if not rows:
+                raise NotFoundError("Revision not found")
+            rev = rows[0]
+            async with self.pool.acquire() as conn, conn.transaction():
+                await queries.unset_current_revision(
+                    conn,
+                    shared_value_id=str(rev["shared_value_id"]),
+                    scope_hash=str(rev["scope_hash"]),
+                )
+                row = await queries.set_revision_current(conn, id=id)
+                if not row:
+                    raise NotFoundError("Revision not found or already current")
+                return dict(row)
+        else:
+            return await require_row(
+                queries.unset_single_revision_current,
+                "Revision not found or already not current",
+                self.pool,
+                id=id,
+            )

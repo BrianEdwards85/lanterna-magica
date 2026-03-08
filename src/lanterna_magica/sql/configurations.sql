@@ -1,4 +1,4 @@
--- name: get_configurations(dimension_ids, include_base, after_id, page_limit)
+-- name: get_configurations(dimension_ids, include_base, current_only, after_id, page_limit)
 select distinct c.id, c.scope_hash, c.body, c.is_current, c.created_at
 from configurations c
 join configuration_scopes cs on cs.configuration_id = c.id
@@ -6,6 +6,7 @@ where (:dimension_ids::uuid[] IS NULL OR cs.dimension_id = any(:dimension_ids)
        OR (:include_base::boolean AND cs.dimension_id IN (
            select d.id from dimensions d where d.base = true
        )))
+  and (:current_only::boolean IS FALSE OR c.is_current = true)
   and (:after_id::uuid IS NULL OR c.id < :after_id)
 order by c.id desc
 limit :page_limit;
@@ -67,6 +68,20 @@ set shared_value_id = :shared_value_id
 where configuration_id = :configuration_id
   and jsonpath = :jsonpath
 returning id, configuration_id, jsonpath, shared_value_id, created_at;
+
+-- name: set_configuration_current(id)^
+update configurations
+set is_current = true
+where id = :id
+  and is_current = false
+returning id, scope_hash, body, is_current, created_at;
+
+-- name: unset_single_configuration_current(id)^
+update configurations
+set is_current = false
+where id = :id
+  and is_current = true
+returning id, scope_hash, body, is_current, created_at;
 
 -- name: backfill_configuration_scopes(dimension_id)!
 insert into configuration_scopes (configuration_id, dimension_id)

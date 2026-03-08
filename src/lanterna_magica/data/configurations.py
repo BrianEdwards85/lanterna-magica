@@ -8,6 +8,7 @@ from .utils import (
     decode_cursor,
     page_limit,
     queries,
+    require_row,
 )
 
 
@@ -20,6 +21,7 @@ class Configurations:
         *,
         dimension_ids: list[str] | None = None,
         include_base: bool = True,
+        current_only: bool = False,
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
@@ -32,6 +34,7 @@ class Configurations:
                 self.pool,
                 dimension_ids=dimension_ids,
                 include_base=include_base,
+                current_only=current_only,
                 after_id=after_id,
                 page_limit=limit + 1,
             )
@@ -90,6 +93,31 @@ class Configurations:
             config["substitutions"] = created_subs
 
         return config
+
+    async def set_configuration_current(self, *, id: str, is_current: bool) -> dict:
+        if is_current:
+            rows = [
+                dict(r)
+                async for r in queries.get_configurations_by_ids(self.pool, ids=[id])
+            ]
+            if not rows:
+                raise NotFoundError("Configuration not found")
+            config = rows[0]
+            async with self.pool.acquire() as conn, conn.transaction():
+                await queries.unset_current_configuration(
+                    conn, scope_hash=str(config["scope_hash"]),
+                )
+                row = await queries.set_configuration_current(conn, id=id)
+                if not row:
+                    raise NotFoundError("Configuration not found or already current")
+                return dict(row)
+        else:
+            return await require_row(
+                queries.unset_single_configuration_current,
+                "Configuration not found or already not current",
+                self.pool,
+                id=id,
+            )
 
     async def update_config_substitution(
         self,

@@ -70,6 +70,20 @@
     :dispatch [::events/fetch-shared-values]}))
 
 ;; ---------------------------------------------------------------------------
+;; Current-Only Toggle (Revisions)
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/toggle-revisions-current-only
+ (fn [{:keys [db]} _]
+   (let [sv-id (get-in db [:shared-values-page :selected-id])]
+     {:db       (-> db
+                    (update-in [:shared-values-page :current-only] not)
+                    (assoc-in [:shared-values-page :revisions] {:edges []})
+                    (assoc-in [:shared-values-page :revisions-page-info] nil))
+      :dispatch [::events/fetch-revisions sv-id]})))
+
+;; ---------------------------------------------------------------------------
 ;; Select Shared Value + Load Revisions
 ;; ---------------------------------------------------------------------------
 
@@ -90,12 +104,14 @@
 (rf/reg-event-fx
  ::events/fetch-revisions
  (fn [{:keys [db]} [_ shared-value-id]]
-   {:db       (h/start-loading db :revisions)
-    :dispatch [::re-graph/query
-               {:query     gql/shared-value-query
-                :variables {:id    shared-value-id
-                            :first config/page-size}
-                :callback  [::events/on-revisions-fresh]}]}))
+   (let [current-only (get-in db [:shared-values-page :current-only])]
+     {:db       (h/start-loading db :revisions)
+      :dispatch [::re-graph/query
+                 {:query     gql/shared-value-query
+                  :variables {:id          shared-value-id
+                              :currentOnly (boolean current-only)
+                              :first       config/page-size}
+                  :callback  [::events/on-revisions-fresh]}]})))
 
 (rf/reg-event-fx
  ::events/on-revisions-fresh
@@ -115,14 +131,16 @@
 (rf/reg-event-fx
  ::events/load-more-revisions
  (fn [{:keys [db]} _]
-   (let [sv-id  (get-in db [:shared-values-page :selected-id])
-         cursor (get-in db [:shared-values-page :revisions-page-info :endCursor])]
+   (let [sv-id        (get-in db [:shared-values-page :selected-id])
+         current-only (get-in db [:shared-values-page :current-only])
+         cursor       (get-in db [:shared-values-page :revisions-page-info :endCursor])]
      {:db       (h/start-loading db :revisions)
       :dispatch [::re-graph/query
                  {:query     gql/shared-value-query
-                  :variables {:id    sv-id
-                              :first config/page-size
-                              :after cursor}
+                  :variables {:id          sv-id
+                              :currentOnly (boolean current-only)
+                              :first       config/page-size
+                              :after       cursor}
                   :callback  [::events/on-revisions-append]}]})))
 
 (rf/reg-event-fx
@@ -211,6 +229,30 @@
        {:db (h/stop-loading db :archive-shared-value errors)}
        {:db       (h/stop-loading db :archive-shared-value)
         :dispatch [::events/fetch-shared-values]}))))
+
+;; ---------------------------------------------------------------------------
+;; Set / Unset Revision Current
+;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/set-revision-current
+ (fn [{:keys [db]} [_ id is-current]]
+   {:db       (h/start-loading db :set-revision-current)
+    :dispatch [::re-graph/mutate
+               {:query     gql/set-revision-current-mutation
+                :variables {:id id :isCurrent is-current}
+                :callback  [::events/on-revision-current-set]}]}))
+
+(rf/reg-event-fx
+ ::events/on-revision-current-set
+ [rf/unwrap]
+ (fn [{:keys [db]} {:keys [response]}]
+   (let [{:keys [errors]} response
+         sv-id (get-in db [:shared-values-page :selected-id])]
+     (if errors
+       {:db (h/stop-loading db :set-revision-current errors)}
+       {:db       (h/stop-loading db :set-revision-current)
+        :dispatch [::events/fetch-revisions sv-id]}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Create Revision Dialog

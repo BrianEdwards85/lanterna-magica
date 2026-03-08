@@ -92,6 +92,25 @@ join dimensions d on d.id = rs.dimension_id
 where rs.revision_id = any(:ids::uuid[])
 order by rs.revision_id, d.type_id;
 
+-- name: get_revision_by_ids(ids)
+select id, shared_value_id, scope_hash, value, is_current, created_at
+from shared_value_revisions
+where id = any(:ids::uuid[]);
+
+-- name: set_revision_current(id)^
+update shared_value_revisions
+set is_current = true
+where id = :id
+  and is_current = false
+returning id, shared_value_id, scope_hash, value, is_current, created_at;
+
+-- name: unset_single_revision_current(id)^
+update shared_value_revisions
+set is_current = false
+where id = :id
+  and is_current = true
+returning id, shared_value_id, scope_hash, value, is_current, created_at;
+
 -- name: backfill_revision_scopes(dimension_id)!
 insert into revision_scopes (revision_id, dimension_id)
 select r.id, :dimension_id::uuid
