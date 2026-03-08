@@ -79,8 +79,8 @@
 ;; ---------------------------------------------------------------------------
 
 (def shared-values-query
-  "query SharedValues($includeArchived: Boolean, $first: Int, $after: String) {
-     sharedValues(includeArchived: $includeArchived, first: $first, after: $after) {
+  "query SharedValues($includeArchived: Boolean, $search: String, $first: Int, $after: String) {
+     sharedValues(includeArchived: $includeArchived, search: $search, first: $first, after: $after) {
        edges { cursor node { id name createdAt updatedAt archivedAt } }
        pageInfo { hasNextPage endCursor }
      }

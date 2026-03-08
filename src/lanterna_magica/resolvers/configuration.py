@@ -8,7 +8,9 @@ class ConfigurationsResolver:
         self.configurations = configurations
 
     async def resolve_configurations(
-        self, _obj, info, *, dimension_ids=None, include_base=None, current_only=None, first=None, after=None
+        self, _obj, info, *,
+        dimension_ids=None, include_base=None, current_only=None,
+        first=None, after=None,
     ):
         return await self.configurations.get_configurations(
             dimension_ids=dimension_ids,

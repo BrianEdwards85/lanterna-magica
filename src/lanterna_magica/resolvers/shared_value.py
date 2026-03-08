@@ -8,21 +8,13 @@ class SharedValuesResolver:
         self.shared_values = shared_values
 
     async def resolve_shared_values(
-        self, _obj, info, *, include_archived=False, first=None, after=None
+        self, _obj, info, *, include_archived=False, search=None, first=None, after=None
     ):
         return await self.shared_values.get_shared_values(
             include_archived=include_archived,
+            search=search,
             first=first,
             after=after,
-        )
-
-    async def resolve_search_shared_values(
-        self, _obj, info, *, search, include_archived=False, limit=None
-    ):
-        return await self.shared_values.search_shared_values(
-            search=search,
-            include_archived=include_archived,
-            limit=limit,
         )
 
     async def resolve_shared_value(self, _obj, info, *, id):
@@ -82,7 +74,6 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     revision_type = ObjectType("SharedValueRevision")
 
     query.set_field("sharedValues", resolver.resolve_shared_values)
-    query.set_field("searchSharedValues", resolver.resolve_search_shared_values)
     query.set_field("sharedValue", resolver.resolve_shared_value)
     mutation.set_field("createSharedValue", resolver.resolve_create_shared_value)
     mutation.set_field("updateSharedValue", resolver.resolve_update_shared_value)

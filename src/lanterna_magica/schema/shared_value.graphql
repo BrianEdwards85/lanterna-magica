@@ -60,14 +60,10 @@ input CreateSharedValueRevisionInput {
 extend type Query {
   sharedValues(
     includeArchived: Boolean
+    search: String
     first: Int
     after: String
   ): SharedValueConnection!
-  searchSharedValues(
-    search: String!
-    includeArchived: Boolean
-    limit: Int
-  ): [SharedValue!]!
   sharedValue(id: ID!): SharedValue
 }
 

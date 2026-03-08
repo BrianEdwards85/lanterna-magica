@@ -58,10 +58,14 @@ query SharedValues($includeArchived: Boolean, $first: Int, $after: String) {
 }
 """
 
-SEARCH_SHARED_VALUES = """
-query SearchSharedValues($search: String!, $includeArchived: Boolean, $limit: Int) {
-    searchSharedValues(search: $search, includeArchived: $includeArchived, limit: $limit) {
-        id name createdAt updatedAt archivedAt
+SHARED_VALUES_WITH_SEARCH = """
+query SharedValuesWithSearch($search: String, $includeArchived: Boolean, $first: Int, $after: String) {
+    sharedValues(search: $search, includeArchived: $includeArchived, first: $first, after: $after) {
+        edges {
+            node { id name createdAt updatedAt archivedAt }
+            cursor
+        }
+        pageInfo { hasNextPage endCursor }
     }
 }
 """
@@ -275,23 +279,27 @@ async def test_search_by_name(client):
     await create_shared_value(client, "db_password")
     await create_shared_value(client, "api_key")
 
-    body = await gql(client, SEARCH_SHARED_VALUES, {"search": "db_pass"})
-    results = body["data"]["searchSharedValues"]
+    body = await gql(client, SHARED_VALUES_WITH_SEARCH, {"search": "db_pass"})
+    results = nodes(body["data"]["sharedValues"]["edges"])
     assert_that(results).described_as("search by name result count").is_length(1)
     assert_that(results[0]["name"]).described_as(
         "matched shared value name"
     ).is_equal_to("db_password")
 
 
-async def test_search_respects_limit(client):
-    """Search should return up to `limit` results."""
+async def test_search_respects_pagination(client):
+    """Search should respect first/after pagination."""
     for i in range(5):
         await create_shared_value(client, f"db_val_{i:02d}")
     await create_shared_value(client, "api_key")
 
-    body = await gql(client, SEARCH_SHARED_VALUES, {"search": "db_val", "limit": 3})
-    results = body["data"]["searchSharedValues"]
-    assert_that(results).described_as("search limited to limit").is_length(3)
+    body = await gql(client, SHARED_VALUES_WITH_SEARCH, {"search": "db_val", "first": 3})
+    page = body["data"]["sharedValues"]
+    results = nodes(page["edges"])
+    assert_that(results).described_as("search limited to first").is_length(3)
+    assert_that(page["pageInfo"]["hasNextPage"]).described_as(
+        "more search results available"
+    ).is_true()
 
 
 async def test_pagination(client):

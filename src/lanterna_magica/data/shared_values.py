@@ -21,6 +21,7 @@ class SharedValues:
         self,
         *,
         include_archived: bool = False,
+        search: str | None = None,
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
@@ -31,29 +32,12 @@ class SharedValues:
             async for r in queries.get_shared_values(
                 self.pool,
                 include_archived=include_archived,
+                search=search,
                 after_id=after_id,
                 page_limit=limit + 1,
             )
         ]
         return build_connection(rows, "id", limit)
-
-    async def search_shared_values(
-        self,
-        *,
-        search: str,
-        include_archived: bool = False,
-        limit: int | None = None,
-    ) -> list[dict]:
-        effective_limit = page_limit(limit)
-        return [
-            dict(r)
-            async for r in queries.search_shared_values(
-                self.pool,
-                query=search,
-                include_archived=include_archived,
-                page_limit=effective_limit,
-            )
-        ]
 
     async def get_shared_values_by_ids(self, ids: list[str]) -> list[dict]:
         rows = [

@@ -1,17 +1,10 @@
--- name: get_shared_values(include_archived, after_id, page_limit)
+-- name: get_shared_values(include_archived, search, after_id, page_limit)
 select id, name, created_at, updated_at, archived_at
 from shared_values
 where (:include_archived::boolean OR archived_at IS NULL)
+  and (:search::text IS NULL OR name ILIKE '%' || :search || '%' ESCAPE '\')
   and (:after_id::uuid IS NULL OR id < :after_id)
 order by id desc
-limit :page_limit;
-
--- name: search_shared_values(query, include_archived, page_limit)
-select id, name, created_at, updated_at, archived_at
-from shared_values
-where name % :query
-  and (:include_archived::boolean OR archived_at IS NULL)
-order by similarity(name, :query) desc, id
 limit :page_limit;
 
 -- name: get_shared_values_by_ids(ids)
