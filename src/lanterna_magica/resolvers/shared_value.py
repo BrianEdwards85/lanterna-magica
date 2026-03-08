@@ -8,21 +8,13 @@ class SharedValuesResolver:
         self.shared_values = shared_values
 
     async def resolve_shared_values(
-        self, _obj, info, *, include_archived=False, first=None, after=None
+        self, _obj, info, *, include_archived=False, search=None, first=None, after=None
     ):
         return await self.shared_values.get_shared_values(
             include_archived=include_archived,
+            search=search,
             first=first,
             after=after,
-        )
-
-    async def resolve_search_shared_values(
-        self, _obj, info, *, search, include_archived=False, limit=None
-    ):
-        return await self.shared_values.search_shared_values(
-            search=search,
-            include_archived=include_archived,
-            limit=limit,
         )
 
     async def resolve_shared_value(self, _obj, info, *, id):
@@ -45,34 +37,32 @@ class SharedValuesResolver:
     async def resolve_create_shared_value_revision(self, _obj, info, *, input):
         return await self.shared_values.create_revision(
             shared_value_id=input["shared_value_id"],
-            service_id=input["service_id"],
-            environment_id=input["environment_id"],
+            dimension_ids=input["dimension_ids"],
             value=input["value"],
         )
 
+    async def resolve_set_revision_current(self, _obj, info, *, id, is_current):
+        return await self.shared_values.set_revision_current(
+            id=id, is_current=is_current,
+        )
+
     async def resolve_revisions(
-        self, obj, info, *, service_id=None, environment_id=None, include_global=None, current_only=None, first=None, after=None
+        self, obj, info, *, dimension_ids=None, include_base=None, current_only=None, first=None, after=None
     ):
         return await self.shared_values.get_revisions(
             shared_value_id=str(obj["id"]),
-            service_id=service_id,
-            environment_id=environment_id,
-            include_global=include_global if include_global is not None else True,
+            dimension_ids=dimension_ids,
+            include_base=include_base if include_base is not None else True,
             current_only=current_only or False,
             first=first,
             after=after,
         )
 
-    # -- SharedValueRevision field resolvers --
-
     async def resolve_revision_shared_value(self, obj, info):
         return await info.context["shared_value_loader"].load(str(obj["shared_value_id"]))
 
-    async def resolve_revision_service(self, obj, info):
-        return await info.context["service_loader"].load(str(obj["service_id"]))
-
-    async def resolve_revision_environment(self, obj, info):
-        return await info.context["environment_loader"].load(str(obj["environment_id"]))
+    async def resolve_revision_dimensions(self, obj, info):
+        return await info.context["revision_scopes_loader"].load(str(obj["id"]))
 
 
 def get_shared_value_resolvers(shared_values: SharedValues) -> list:
@@ -84,16 +74,15 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     revision_type = ObjectType("SharedValueRevision")
 
     query.set_field("sharedValues", resolver.resolve_shared_values)
-    query.set_field("searchSharedValues", resolver.resolve_search_shared_values)
     query.set_field("sharedValue", resolver.resolve_shared_value)
     mutation.set_field("createSharedValue", resolver.resolve_create_shared_value)
     mutation.set_field("updateSharedValue", resolver.resolve_update_shared_value)
     mutation.set_field("archiveSharedValue", resolver.resolve_archive_shared_value)
     mutation.set_field("unarchiveSharedValue", resolver.resolve_unarchive_shared_value)
     mutation.set_field("createSharedValueRevision", resolver.resolve_create_shared_value_revision)
+    mutation.set_field("setRevisionCurrent", resolver.resolve_set_revision_current)
     shared_value_type.set_field("revisions", resolver.resolve_revisions)
     revision_type.set_field("sharedValue", resolver.resolve_revision_shared_value)
-    revision_type.set_field("service", resolver.resolve_revision_service)
-    revision_type.set_field("environment", resolver.resolve_revision_environment)
+    revision_type.set_field("dimensions", resolver.resolve_revision_dimensions)
 
     return [query, mutation, shared_value_type, revision_type]

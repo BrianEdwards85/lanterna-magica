@@ -2,7 +2,14 @@ from asyncpg import Pool
 
 from lanterna_magica.errors import NotFoundError
 
-from .utils import build_connection, decode_cursor, page_limit, queries
+from .utils import (
+    build_connection,
+    compute_scope_hash,
+    decode_cursor,
+    page_limit,
+    queries,
+    require_row,
+)
 
 
 class Configurations:
@@ -12,9 +19,9 @@ class Configurations:
     async def get_configurations(
         self,
         *,
-        service_id: str | None = None,
-        environment_id: str | None = None,
-        include_global: bool = True,
+        dimension_ids: list[str] | None = None,
+        include_base: bool = True,
+        current_only: bool = False,
         first: int | None = None,
         after: str | None = None,
     ) -> dict:
@@ -25,52 +32,92 @@ class Configurations:
             dict(r)
             async for r in queries.get_configurations(
                 self.pool,
-                service_id=service_id,
-                environment_id=environment_id,
-                include_global=include_global,
+                dimension_ids=dimension_ids,
+                include_base=include_base,
+                current_only=current_only,
                 after_id=after_id,
                 page_limit=limit + 1,
             )
         ]
         return build_connection(rows, "id", limit)
 
+    async def get_configurations_by_ids(self, ids: list[str]) -> list[dict]:
+        rows = [
+            dict(r) async for r in queries.get_configurations_by_ids(self.pool, ids=ids)
+        ]
+        return rows
+
     async def create_configuration(
         self,
         *,
-        service_id: str,
-        environment_id: str,
+        dimension_ids: list[str],
         body: dict | list,
         substitutions: list[dict] | None = None,
     ) -> dict:
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                await queries.unset_current_configuration(
-                    conn,
-                    service_id=service_id,
-                    environment_id=environment_id,
-                )
-                row = await queries.create_configuration(
-                    conn,
-                    service_id=service_id,
-                    environment_id=environment_id,
-                    body=body,
-                )
-                config = dict(row)
+        effective_ids = list(dimension_ids)
+        missing = [
+            dict(r)
+            async for r in queries.get_missing_base_dimensions(
+                self.pool, dimension_ids=effective_ids,
+            )
+        ]
+        effective_ids.extend(str(d["id"]) for d in missing)
 
-                created_subs = []
-                if substitutions:
-                    for sub in substitutions:
-                        sub_row = await queries.create_config_substitution(
-                            conn,
-                            configuration_id=str(config["id"]),
-                            jsonpath=sub["jsonpath"],
-                            shared_value_id=sub["shared_value_id"],
-                        )
-                        created_subs.append(dict(sub_row))
+        scope_hash = compute_scope_hash(effective_ids)
 
-                config["substitutions"] = created_subs
+        async with self.pool.acquire() as conn, conn.transaction():
+            await queries.unset_current_configuration(conn, scope_hash=scope_hash)
+            row = await queries.create_configuration(
+                conn, scope_hash=scope_hash, body=body
+            )
+            config = dict(row)
+
+            for dim_id in effective_ids:
+                await queries.insert_configuration_scope(
+                    conn,
+                    configuration_id=str(config["id"]),
+                    dimension_id=dim_id,
+                )
+
+            created_subs = []
+            if substitutions:
+                for sub in substitutions:
+                    sub_row = await queries.create_config_substitution(
+                        conn,
+                        configuration_id=str(config["id"]),
+                        jsonpath=sub["jsonpath"],
+                        shared_value_id=sub["shared_value_id"],
+                    )
+                    created_subs.append(dict(sub_row))
+
+            config["substitutions"] = created_subs
 
         return config
+
+    async def set_configuration_current(self, *, id: str, is_current: bool) -> dict:
+        if is_current:
+            rows = [
+                dict(r)
+                async for r in queries.get_configurations_by_ids(self.pool, ids=[id])
+            ]
+            if not rows:
+                raise NotFoundError("Configuration not found")
+            config = rows[0]
+            async with self.pool.acquire() as conn, conn.transaction():
+                await queries.unset_current_configuration(
+                    conn, scope_hash=str(config["scope_hash"]),
+                )
+                row = await queries.set_configuration_current(conn, id=id)
+                if not row:
+                    raise NotFoundError("Configuration not found or already current")
+                return dict(row)
+        else:
+            return await require_row(
+                queries.unset_single_configuration_current,
+                "Configuration not found or already not current",
+                self.pool,
+                id=id,
+            )
 
     async def update_config_substitution(
         self,
