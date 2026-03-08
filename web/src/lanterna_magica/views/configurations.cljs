@@ -21,6 +21,16 @@
      [bp/tag {:minimal true}
       (str (get-in dim [:type :name]) ": " (:name dim))])])
 
+(defn- body-preview
+  "Render a truncated single-line preview of a JSON body."
+  [body]
+  (let [s (.stringify js/JSON (clj->js body))
+        max-len 80
+        truncated (if (> (count s) max-len)
+                    (str (subs s 0 max-len) "…")
+                    s)]
+    [:span.text-xs.font-mono.text-tn-fg-dim.truncate truncated]))
+
 ;; ---------------------------------------------------------------------------
 ;; Create Configuration Dialog
 ;; ---------------------------------------------------------------------------
@@ -81,11 +91,19 @@
 
          :else
          [:div
-          [:div.flex.items-center.gap-2.mb-3
-           [dimensions-label (:dimensions config)]
-           (when (:isCurrent config)
-             [bp/tag {:intent "success" :minimal true} "current"])
-           [:span.text-xs.text-tn-fg-dim (:createdAt config)]]
+          [:div.flex.items-center.justify-between.mb-3
+           [:div.flex.items-center.gap-2
+            [dimensions-label (:dimensions config)]
+            (when (:isCurrent config)
+              [bp/tag {:intent "success" :minimal true} "current"])
+            [:span.text-xs.text-tn-fg-dim (:createdAt config)]]
+           (if (:isCurrent config)
+             [bp/button {:text "Deactivate" :minimal true :small true
+                         :intent "danger"
+                         :on-click #(rf/dispatch [::events/set-configuration-current (:id config) false])}]
+             [bp/button {:text "Make Current" :minimal true :small true
+                         :intent "success"
+                         :on-click #(rf/dispatch [::events/set-configuration-current (:id config) true])}])]
 
           [:h5.bp6-heading.mb-2 "Body"]
           [:pre.json-display
@@ -155,7 +173,10 @@
       [bp/switch-control {:checked   (boolean (:current-only @(rf/subscribe [::subs/configurations-page])))
                           :label     "Current only"
                           :class     "mb-0"
-                          :on-change (fn [_] (rf/dispatch [::events/toggle-configurations-current-only]))}]]
+                          :on-change (fn [_] (rf/dispatch [::events/toggle-configurations-current-only]))}]
+      (when (seq (:filter-dimension-ids @(rf/subscribe [::subs/configurations-page])))
+        [:span.text-xs.text-tn-fg-dim
+         (str (count edges) " result" (when (not= (count edges) 1) "s"))])]
 
      (cond
        (and loading? (empty? edges))
@@ -169,11 +190,12 @@
        :else
        [:div
         (for [edge edges]
-          (let [node (:node edge)]
+          (let [node (:node edge)
+                selected? (= (:id node) selected-id)]
             ^{:key (:id node)}
             [:div {:class (str "mb-2 rounded p-3 cursor-pointer transition-all "
                                "bg-tn-bg-card hover:brightness-110"
-                               (when (= (:id node) selected-id) " ring-1 ring-tn-blue/50"))
+                               (when selected? " ring-1 ring-tn-blue/50"))
                    :on-click #(rf/dispatch [::events/select-configuration (:id node)])}
              [:div.flex.items-center.justify-between
               [:div.flex.items-center.gap-2
@@ -190,7 +212,10 @@
                              :intent "success"
                              :on-click (fn [e] (.stopPropagation e)
                                          (rf/dispatch [::events/set-configuration-current (:id node) true]))}])
-               [:span.text-xs.text-tn-fg-dim (:createdAt node)]]]]))
+               [bp/icon {:icon "chevron-right" :class "opacity-50"}]]]
+             [:div.flex.items-center.justify-between.mt-1
+              [body-preview (:body node)]
+              [:span.text-xs.text-tn-fg-dim (:createdAt node)]]]))
         [comp/load-more-button
          {:has-next? (:hasNextPage page-info)
           :loading?  loading?

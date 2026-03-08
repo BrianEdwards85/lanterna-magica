@@ -13,11 +13,13 @@
 (rf/reg-event-fx
  ::events/fetch-shared-values
  (fn [{:keys [db]} _]
-   (let [archived (get-in db [:shared-values-page :show-archived])]
+   (let [archived (get-in db [:shared-values-page :show-archived])
+         search   (get-in db [:shared-values-page :search])]
      {:db       (h/start-loading db :shared-values)
       :dispatch [::re-graph/query
                  {:query     gql/shared-values-query
                   :variables {:includeArchived (boolean archived)
+                              :search          (when (seq search) search)
                               :first           config/page-size}
                   :callback  [::events/on-shared-values-fresh]}]})))
 
@@ -25,11 +27,13 @@
  ::events/load-more-shared-values
  (fn [{:keys [db]} _]
    (let [archived (get-in db [:shared-values-page :show-archived])
+         search   (get-in db [:shared-values-page :search])
          cursor   (get-in db [:shared-values-page :page-info :endCursor])]
      {:db       (h/start-loading db :shared-values)
       :dispatch [::re-graph/query
                  {:query     gql/shared-values-query
                   :variables {:includeArchived (boolean archived)
+                              :search          (when (seq search) search)
                               :first           config/page-size
                               :after           cursor}
                   :callback  [::events/on-shared-values-append]}]})))
@@ -57,8 +61,17 @@
               (h/stop-loading :shared-values errors))})))
 
 ;; ---------------------------------------------------------------------------
-;; Archive Toggle
+;; Search + Archive Toggle
 ;; ---------------------------------------------------------------------------
+
+(rf/reg-event-fx
+ ::events/set-shared-values-search
+ (fn [{:keys [db]} [_ text]]
+   {:db       (-> db
+                  (assoc-in [:shared-values-page :search] text)
+                  (assoc-in [:shared-values-page :edges] [])
+                  (assoc-in [:shared-values-page :page-info] {:hasNextPage false :endCursor nil}))
+    :dispatch [::events/fetch-shared-values]}))
 
 (rf/reg-event-fx
  ::events/toggle-shared-values-archived
@@ -160,10 +173,11 @@
 
 (rf/reg-event-db
  ::events/open-shared-value-dialog
- (fn [db _]
+ (fn [db [_ shared-value]]
    (assoc db :shared-value-dialog
           {:open?        true
-           :shared-value {:name ""}})))
+           :editing      (some? shared-value)
+           :shared-value (or shared-value {:name ""})})))
 
 (rf/reg-event-db
  ::events/close-shared-value-dialog
@@ -178,11 +192,16 @@
 (rf/reg-event-fx
  ::events/save-shared-value
  (fn [{:keys [db]} _]
-   (let [{:keys [shared-value]} (:shared-value-dialog db)
-         input (select-keys shared-value [:name])]
+   (let [{:keys [editing shared-value]} (:shared-value-dialog db)
+         mutation (if editing
+                    gql/update-shared-value-mutation
+                    gql/create-shared-value-mutation)
+         input    (if editing
+                    (select-keys shared-value [:id :name])
+                    (select-keys shared-value [:name]))]
      {:db       (h/start-loading db :save-shared-value)
       :dispatch [::re-graph/mutate
-                 {:query     gql/create-shared-value-mutation
+                 {:query     mutation
                   :variables {:input input}
                   :callback  [::events/on-shared-value-saved]}]})))
 
@@ -227,7 +246,9 @@
    (let [{:keys [errors]} response]
      (if errors
        {:db (h/stop-loading db :archive-shared-value errors)}
-       {:db       (h/stop-loading db :archive-shared-value)
+       {:db       (-> db
+                      (h/stop-loading :archive-shared-value)
+                      (assoc :shared-value-dialog {:open? false}))
         :dispatch [::events/fetch-shared-values]}))))
 
 ;; ---------------------------------------------------------------------------
