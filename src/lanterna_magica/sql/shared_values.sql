@@ -91,3 +91,24 @@ from revision_scopes rs
 join dimensions d on d.id = rs.dimension_id
 where rs.revision_id = any(:ids::uuid[])
 order by rs.revision_id, d.type_id;
+
+-- name: backfill_revision_scopes(dimension_id)!
+insert into revision_scopes (revision_id, dimension_id)
+select r.id, :dimension_id::uuid
+from shared_value_revisions r
+where not exists (
+    select 1 from revision_scopes rs
+    where rs.revision_id = r.id and rs.dimension_id = :dimension_id::uuid
+);
+
+-- name: recompute_revision_scope_hashes()!
+update shared_value_revisions r
+set scope_hash = sub.new_hash
+from (
+    select rs.revision_id,
+           md5(string_agg(rs.dimension_id::text, ',' order by rs.dimension_id::text))::uuid as new_hash
+    from revision_scopes rs
+    group by rs.revision_id
+) sub
+where r.id = sub.revision_id
+  and r.scope_hash is distinct from sub.new_hash;

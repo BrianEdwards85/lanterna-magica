@@ -2,7 +2,13 @@ from asyncpg import Pool
 
 from lanterna_magica.errors import NotFoundError
 
-from .utils import build_connection, compute_scope_hash, decode_cursor, page_limit, queries
+from .utils import (
+    build_connection,
+    compute_scope_hash,
+    decode_cursor,
+    page_limit,
+    queries,
+)
 
 
 class Configurations:
@@ -34,8 +40,7 @@ class Configurations:
 
     async def get_configurations_by_ids(self, ids: list[str]) -> list[dict]:
         rows = [
-            dict(r)
-            async for r in queries.get_configurations_by_ids(self.pool, ids=ids)
+            dict(r) async for r in queries.get_configurations_by_ids(self.pool, ids=ids)
         ]
         return rows
 
@@ -46,37 +51,43 @@ class Configurations:
         body: dict | list,
         substitutions: list[dict] | None = None,
     ) -> dict:
-        scope_hash = compute_scope_hash(dimension_ids)
+        effective_ids = list(dimension_ids)
+        missing = [
+            dict(r)
+            async for r in queries.get_missing_base_dimensions(
+                self.pool, dimension_ids=effective_ids,
+            )
+        ]
+        effective_ids.extend(str(d["id"]) for d in missing)
 
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                await queries.unset_current_configuration(
-                    conn, scope_hash=scope_hash
-                )
-                row = await queries.create_configuration(
-                    conn, scope_hash=scope_hash, body=body
-                )
-                config = dict(row)
+        scope_hash = compute_scope_hash(effective_ids)
 
-                for dim_id in dimension_ids:
-                    await queries.insert_configuration_scope(
+        async with self.pool.acquire() as conn, conn.transaction():
+            await queries.unset_current_configuration(conn, scope_hash=scope_hash)
+            row = await queries.create_configuration(
+                conn, scope_hash=scope_hash, body=body
+            )
+            config = dict(row)
+
+            for dim_id in effective_ids:
+                await queries.insert_configuration_scope(
+                    conn,
+                    configuration_id=str(config["id"]),
+                    dimension_id=dim_id,
+                )
+
+            created_subs = []
+            if substitutions:
+                for sub in substitutions:
+                    sub_row = await queries.create_config_substitution(
                         conn,
                         configuration_id=str(config["id"]),
-                        dimension_id=dim_id,
+                        jsonpath=sub["jsonpath"],
+                        shared_value_id=sub["shared_value_id"],
                     )
+                    created_subs.append(dict(sub_row))
 
-                created_subs = []
-                if substitutions:
-                    for sub in substitutions:
-                        sub_row = await queries.create_config_substitution(
-                            conn,
-                            configuration_id=str(config["id"]),
-                            jsonpath=sub["jsonpath"],
-                            shared_value_id=sub["shared_value_id"],
-                        )
-                        created_subs.append(dict(sub_row))
-
-                config["substitutions"] = created_subs
+            config["substitutions"] = created_subs
 
         return config
 

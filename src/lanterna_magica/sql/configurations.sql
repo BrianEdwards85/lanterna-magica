@@ -67,3 +67,24 @@ set shared_value_id = :shared_value_id
 where configuration_id = :configuration_id
   and jsonpath = :jsonpath
 returning id, configuration_id, jsonpath, shared_value_id, created_at;
+
+-- name: backfill_configuration_scopes(dimension_id)!
+insert into configuration_scopes (configuration_id, dimension_id)
+select c.id, :dimension_id::uuid
+from configurations c
+where not exists (
+    select 1 from configuration_scopes cs
+    where cs.configuration_id = c.id and cs.dimension_id = :dimension_id::uuid
+);
+
+-- name: recompute_configuration_scope_hashes()!
+update configurations c
+set scope_hash = sub.new_hash
+from (
+    select cs.configuration_id,
+           md5(string_agg(cs.dimension_id::text, ',' order by cs.dimension_id::text))::uuid as new_hash
+    from configuration_scopes cs
+    group by cs.configuration_id
+) sub
+where c.id = sub.configuration_id
+  and c.scope_hash is distinct from sub.new_hash;

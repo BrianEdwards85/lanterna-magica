@@ -20,6 +20,21 @@ from dimensions
 where type_id = :type_id
   and base = true;
 
+-- name: get_all_base_dimensions()
+select id, type_id, name, description, base, created_at, updated_at, archived_at
+from dimensions
+where base = true
+order by type_id;
+
+-- name: get_missing_base_dimensions(dimension_ids)
+select id, type_id, name, description, base, created_at, updated_at, archived_at
+from dimensions
+where base = true
+  and type_id not in (
+    select type_id from dimensions where id = any(:dimension_ids::uuid[])
+  )
+order by type_id;
+
 -- name: create_dimension(type_id, name, description)^
 insert into dimensions (type_id, name, description)
 values (:type_id, :name, :description)

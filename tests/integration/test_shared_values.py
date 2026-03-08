@@ -1,6 +1,14 @@
 from assertpy import assert_that
 from conftest import gql
-from utils import create_environment, create_revision, create_service, create_shared_value, nodes, parse_dt
+from utils import (
+    create_dimension_type,
+    create_environment,
+    create_revision,
+    create_service,
+    create_shared_value,
+    nodes,
+    parse_dt,
+)
 
 # -- Mutations --
 
@@ -92,6 +100,34 @@ query SharedValueWithRevisions(
 }
 """
 
+SHARED_VALUE_WITH_REVISIONS_INCLUDE_BASE = """
+query SharedValueWithRevisionsIncludeBase(
+    $id: ID!,
+    $dimensionIds: [ID!],
+    $includeBase: Boolean,
+    $currentOnly: Boolean,
+    $first: Int,
+    $after: String
+) {
+    sharedValue(id: $id) {
+        id name
+        revisions(
+            dimensionIds: $dimensionIds,
+            includeBase: $includeBase,
+            currentOnly: $currentOnly,
+            first: $first,
+            after: $after
+        ) {
+            edges {
+                node { id sharedValue { id } dimensions { id name } value isCurrent createdAt }
+                cursor
+            }
+            pageInfo { hasNextPage endCursor }
+        }
+    }
+}
+"""
+
 
 # -- Shared Value CRUD Tests --
 
@@ -114,19 +150,27 @@ async def test_create_shared_value_duplicate_name(client):
         {"input": {"name": "db_password"}},
         expect_errors=True,
     )
-    assert_that(body).described_as("duplicate name should return errors").contains_key("errors")
+    assert_that(body).described_as("duplicate name should return errors").contains_key(
+        "errors"
+    )
 
 
 async def test_shared_value_by_id(client):
     sv = await create_shared_value(client)
     body = await gql(client, SHARED_VALUE, {"id": sv["id"]})
     found = body["data"]["sharedValue"]
-    assert_that(found["id"]).described_as("fetched shared value id").is_equal_to(sv["id"])
-    assert_that(found["name"]).described_as("fetched shared value name").is_equal_to(sv["name"])
+    assert_that(found["id"]).described_as("fetched shared value id").is_equal_to(
+        sv["id"]
+    )
+    assert_that(found["name"]).described_as("fetched shared value name").is_equal_to(
+        sv["name"]
+    )
 
 
 async def test_shared_value_by_id_not_found(client):
-    body = await gql(client, SHARED_VALUE, {"id": "00000000-0000-0000-0000-ffffffffffff"})
+    body = await gql(
+        client, SHARED_VALUE, {"id": "00000000-0000-0000-0000-ffffffffffff"}
+    )
     assert_that(body["data"]["sharedValue"]).described_as("non-existent id").is_none()
 
 
@@ -150,9 +194,9 @@ async def test_update_shared_value(client):
     )
     updated = body["data"]["updateSharedValue"]
     assert_that(updated["name"]).described_as("name updated").is_equal_to("db_pass")
-    assert_that(parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(
-        parse_dt(sv["updatedAt"])
-    )
+    assert_that(parse_dt(updated["updatedAt"])).described_as(
+        "updatedAt advanced"
+    ).is_after(parse_dt(sv["updatedAt"]))
 
 
 async def test_update_shared_value_no_fields_fails(client):
@@ -176,7 +220,9 @@ async def test_update_archived_shared_value_fails(client):
         {"input": {"id": sv["id"], "name": "new_name"}},
         expect_errors=True,
     )
-    assert_that(body).described_as("updating archived shared value").contains_key("errors")
+    assert_that(body).described_as("updating archived shared value").contains_key(
+        "errors"
+    )
 
 
 async def test_archive_shared_value(client):
@@ -184,7 +230,9 @@ async def test_archive_shared_value(client):
 
     body = await gql(client, ARCHIVE_SHARED_VALUE, {"id": sv["id"]})
     archived = body["data"]["archiveSharedValue"]
-    assert_that(archived["archivedAt"]).described_as("archivedAt should be set").is_not_none()
+    assert_that(archived["archivedAt"]).described_as(
+        "archivedAt should be set"
+    ).is_not_none()
 
 
 async def test_archive_hides_from_list(client):
@@ -230,9 +278,9 @@ async def test_search_by_name(client):
     body = await gql(client, SEARCH_SHARED_VALUES, {"search": "db_pass"})
     results = body["data"]["searchSharedValues"]
     assert_that(results).described_as("search by name result count").is_length(1)
-    assert_that(results[0]["name"]).described_as("matched shared value name").is_equal_to(
-        "db_password"
-    )
+    assert_that(results[0]["name"]).described_as(
+        "matched shared value name"
+    ).is_equal_to("db_password")
 
 
 async def test_search_respects_limit(client):
@@ -253,14 +301,22 @@ async def test_pagination(client):
     body = await gql(client, SHARED_VALUES, {"first": 2})
     page1 = body["data"]["sharedValues"]
     assert_that(page1["edges"]).described_as("page 1 edge count").is_length(2)
-    assert_that(page1["pageInfo"]["hasNextPage"]).described_as("page 1 has next page").is_true()
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
+        "page 1 has next page"
+    ).is_true()
 
-    body = await gql(client, SHARED_VALUES, {"first": 2, "after": page1["pageInfo"]["endCursor"]})
+    body = await gql(
+        client, SHARED_VALUES, {"first": 2, "after": page1["pageInfo"]["endCursor"]}
+    )
     page2 = body["data"]["sharedValues"]
     assert_that(page2["edges"]).described_as("page 2 edge count").is_length(2)
-    assert_that(page2["pageInfo"]["hasNextPage"]).described_as("page 2 has next page").is_true()
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
+        "page 2 has next page"
+    ).is_true()
 
-    body = await gql(client, SHARED_VALUES, {"first": 2, "after": page2["pageInfo"]["endCursor"]})
+    body = await gql(
+        client, SHARED_VALUES, {"first": 2, "after": page2["pageInfo"]["endCursor"]}
+    )
     page3 = body["data"]["sharedValues"]
     assert_that(page3["edges"]).described_as("page 3 edge count").is_length(1)
     assert_that(page3["pageInfo"]["hasNextPage"]).described_as(
@@ -277,13 +333,17 @@ async def test_create_revision(client):
     env = await create_environment(client)
 
     rev = await create_revision(client, sv["id"], [svc["id"], env["id"]], "secret123")
-    assert_that(rev["sharedValue"]["id"]).described_as("revision shared value id").is_equal_to(
-        sv["id"]
-    )
+    assert_that(rev["sharedValue"]["id"]).described_as(
+        "revision shared value id"
+    ).is_equal_to(sv["id"])
     dim_ids = [d["id"] for d in rev["dimensions"]]
-    assert_that(dim_ids).described_as("revision dimension ids").contains(svc["id"], env["id"])
+    assert_that(dim_ids).described_as("revision dimension ids").contains(
+        svc["id"], env["id"]
+    )
     assert_that(rev["value"]).described_as("revision value").is_equal_to("secret123")
-    assert_that(rev["isCurrent"]).described_as("new revision should be current").is_true()
+    assert_that(rev["isCurrent"]).described_as(
+        "new revision should be current"
+    ).is_true()
 
 
 async def test_new_revision_replaces_current(client):
@@ -294,7 +354,9 @@ async def test_new_revision_replaces_current(client):
     rev1 = await create_revision(client, sv["id"], [svc["id"], env["id"]], "v1")
     rev2 = await create_revision(client, sv["id"], [svc["id"], env["id"]], "v2")
 
-    assert_that(rev2["isCurrent"]).described_as("newest revision should be current").is_true()
+    assert_that(rev2["isCurrent"]).described_as(
+        "newest revision should be current"
+    ).is_true()
 
     # Check all revisions — rev1 should no longer be current
     body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
@@ -319,7 +381,9 @@ async def test_revisions_scoped_by_dimension(client):
 
     # Filter by svc1
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "dimensionIds": [svc1["id"]]}
+        client,
+        SHARED_VALUE_WITH_REVISIONS,
+        {"id": sv["id"], "dimensionIds": [svc1["id"]]},
     )
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc1").is_length(1)
@@ -329,7 +393,9 @@ async def test_revisions_scoped_by_dimension(client):
 
     # Filter by svc2
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "dimensionIds": [svc2["id"]]}
+        client,
+        SHARED_VALUE_WITH_REVISIONS,
+        {"id": sv["id"], "dimensionIds": [svc2["id"]]},
     )
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc2").is_length(1)
@@ -373,9 +439,7 @@ async def test_revisions_pagination(client):
     for i in range(5):
         await create_revision(client, sv["id"], [svc["id"], env["id"]], f"v{i}")
 
-    body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "first": 2}
-    )
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "first": 2})
     page1 = body["data"]["sharedValue"]["revisions"]
     assert_that(page1["edges"]).described_as("revision page 1 edge count").is_length(2)
     assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
@@ -415,10 +479,14 @@ async def test_revisions_filter_by_environment(client):
     await create_revision(client, sv["id"], [svc["id"], env2["id"]], "staging-val")
 
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "dimensionIds": [env1["id"]]}
+        client,
+        SHARED_VALUE_WITH_REVISIONS,
+        {"id": sv["id"], "dimensionIds": [env1["id"]]},
     )
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
-    assert_that(revisions).described_as("revisions filtered by production env").is_length(1)
+    assert_that(revisions).described_as(
+        "revisions filtered by production env"
+    ).is_length(1)
     assert_that(revisions).extracting("value").described_as(
         "production revision value"
     ).contains("prod-val")
@@ -433,7 +501,10 @@ async def test_create_shared_value_with_percent_in_name_fails(client):
 
 async def test_create_shared_value_with_backslash_in_name_fails(client):
     body = await gql(
-        client, CREATE_SHARED_VALUE, {"input": {"name": "bad\\name"}}, expect_errors=True
+        client,
+        CREATE_SHARED_VALUE,
+        {"input": {"name": "bad\\name"}},
+        expect_errors=True,
     )
     assert_that(body).described_as("backslash in name rejected").contains_key("errors")
 
@@ -446,7 +517,9 @@ async def test_update_shared_value_with_percent_in_name_fails(client):
         {"input": {"id": sv["id"], "name": "bad%name"}},
         expect_errors=True,
     )
-    assert_that(body).described_as("percent in update name rejected").contains_key("errors")
+    assert_that(body).described_as("percent in update name rejected").contains_key(
+        "errors"
+    )
 
 
 async def test_shared_value_name_with_underscore_allowed(client):
@@ -486,8 +559,12 @@ async def test_revision_dimensions_include_type(client):
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
     assert_that(revisions).is_length(1)
     for dim in revisions[0]["dimensions"]:
-        assert_that(dim["type"]).described_as("dimension has type").contains_key("id", "name")
-        assert_that(dim["type"]["name"]).described_as("type name").is_in("service", "environment")
+        assert_that(dim["type"]).described_as("dimension has type").contains_key(
+            "id", "name"
+        )
+        assert_that(dim["type"]["name"]).described_as("type name").is_in(
+            "service", "environment"
+        )
 
 
 async def test_revision_shared_value_resolved(client):
@@ -499,5 +576,203 @@ async def test_revision_shared_value_resolved(client):
 
     body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
     revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
-    assert_that(revisions[0]["sharedValue"]["id"]).described_as("revision -> sv id").is_equal_to(sv["id"])
-    assert_that(revisions[0]["sharedValue"]["name"]).described_as("revision -> sv name").is_equal_to("my_secret")
+    assert_that(revisions[0]["sharedValue"]["id"]).described_as(
+        "revision -> sv id"
+    ).is_equal_to(sv["id"])
+    assert_that(revisions[0]["sharedValue"]["name"]).described_as(
+        "revision -> sv name"
+    ).is_equal_to("my_secret")
+
+
+# -- Base dimension auto-population tests --
+
+
+async def test_create_revision_empty_dimensions_assigns_base(client):
+    """Creating a revision with no dimensions should auto-assign all base dimensions."""
+    sv = await create_shared_value(client)
+    rev = await create_revision(client, sv["id"], [], "base-val")
+
+    assert_that(rev["value"]).described_as("revision value").is_equal_to("base-val")
+    assert_that(rev["isCurrent"]).described_as("revision is current").is_true()
+    dim_names = [d["name"] for d in rev["dimensions"]]
+    assert_that(dim_names).described_as(
+        "empty dimensionIds should resolve to base dimensions"
+    ).contains("global")
+    assert_that(rev["dimensions"]).described_as(
+        "should have one base dimension per type"
+    ).is_length(2)
+
+
+async def test_base_revision_appears_in_unfiltered_list(client):
+    """A revision with empty dimensions should appear when listing all revisions."""
+    sv = await create_shared_value(client)
+    rev = await create_revision(client, sv["id"], [], "base-val")
+
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions).described_as("unfiltered revisions include base").is_length(
+        1
+    )
+    assert_that(revisions[0]["id"]).described_as("revision id matches").is_equal_to(
+        rev["id"]
+    )
+
+
+async def test_base_revision_appears_with_include_base(client):
+    """Filtering by dimension with includeBase=true should include base revision."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    await create_revision(client, sv["id"], [], "base-val")
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "specific-val")
+
+    body = await gql(
+        client,
+        SHARED_VALUE_WITH_REVISIONS_INCLUDE_BASE,
+        {"id": sv["id"], "dimensionIds": [svc["id"]], "includeBase": True},
+    )
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    values = [r["value"] for r in revisions]
+    assert_that(values).described_as(
+        "includeBase=true should return both base and specific revisions"
+    ).contains("base-val", "specific-val")
+
+
+async def test_base_revision_excluded_without_include_base(client):
+    """Filtering by dimension with includeBase=false should exclude base revision."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    await create_revision(client, sv["id"], [], "base-val")
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "specific-val")
+
+    body = await gql(
+        client,
+        SHARED_VALUE_WITH_REVISIONS_INCLUDE_BASE,
+        {"id": sv["id"], "dimensionIds": [svc["id"]], "includeBase": False},
+    )
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    values = [r["value"] for r in revisions]
+    assert_that(values).described_as(
+        "includeBase=false should exclude base revision"
+    ).contains("specific-val").does_not_contain("base-val")
+
+
+async def test_new_base_revision_replaces_current_base(client):
+    """Second revision with empty dims should replace the first as current."""
+    sv = await create_shared_value(client)
+    rev1 = await create_revision(client, sv["id"], [], "base-v1")
+    rev2 = await create_revision(client, sv["id"], [], "base-v2")
+
+    assert_that(rev2["isCurrent"]).described_as(
+        "new base revision is current"
+    ).is_true()
+
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    by_id = {r["id"]: r for r in revisions}
+    assert_that(by_id[rev1["id"]]["isCurrent"]).described_as(
+        "old base revision no longer current"
+    ).is_false()
+    assert_that(by_id[rev2["id"]]["isCurrent"]).described_as(
+        "new base revision is current"
+    ).is_true()
+
+
+async def test_new_dimension_type_backfills_base_into_revisions(client):
+    """Adding a dimension type should backfill base dim into revisions.
+
+    The old base revision gets the new global dimension added to its
+    scope and its scope_hash is recomputed, so a new empty-dimensions
+    revision replaces it rather than creating a separate scope.
+    """
+    sv = await create_shared_value(client)
+    rev_before = await create_revision(client, sv["id"], [], "before-new-type")
+
+    # Add a new dimension type — should backfill base dim into existing revision
+    await create_dimension_type(client, "region")
+
+    # Old revision should now have 3 dimensions (all globals)
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions).described_as("revision still visible").is_length(1)
+    assert_that(revisions[0]["id"]).is_equal_to(rev_before["id"])
+    type_names = sorted(d["type"]["name"] for d in revisions[0]["dimensions"])
+    assert_that(type_names).described_as(
+        "old revision now includes all base dimensions"
+    ).is_equal_to(["environment", "region", "service"])
+
+    # A new empty-dimensions revision should replace the old one as current (same scope)
+    rev_after = await create_revision(client, sv["id"], [], "after-new-type")
+    assert_that(rev_after["isCurrent"]).described_as(
+        "new revision is current"
+    ).is_true()
+
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    by_id = {r["id"]: r for r in revisions}
+    assert_that(by_id[rev_before["id"]]["isCurrent"]).described_as(
+        "old base revision replaced as current"
+    ).is_false()
+    assert_that(by_id[rev_after["id"]]["isCurrent"]).described_as(
+        "new base revision is current"
+    ).is_true()
+
+
+async def test_new_dimension_type_backfills_scoped_revisions(client):
+    """Adding a new dimension type should also backfill into non-base revisions."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+    env = await create_environment(client)
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "scoped-val")
+
+    await create_dimension_type(client, "region")
+
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    assert_that(revisions).is_length(1)
+    type_names = sorted(d["type"]["name"] for d in revisions[0]["dimensions"])
+    assert_that(type_names).described_as(
+        "scoped revision gets new base dimension added"
+    ).is_equal_to(["environment", "region", "service"])
+
+
+async def test_partial_dimensions_fills_missing_with_global(client):
+    """Specifying only some dimensions should fill the rest with globals."""
+    sv = await create_shared_value(client)
+    svc = await create_service(client)
+
+    rev = await create_revision(client, sv["id"], [svc["id"]], "svc-only")
+    dim_names = {d["name"] for d in rev["dimensions"]}
+    assert_that(dim_names).described_as(
+        "should include specified service and global environment"
+    ).contains(svc["name"], "global")
+    assert_that(rev["dimensions"]).described_as(
+        "one per dimension type"
+    ).is_length(2)
+
+
+async def test_partial_dimensions_env_only(client):
+    """Specifying only environment should fill service with global."""
+    sv = await create_shared_value(client)
+    env = await create_environment(client)
+
+    await create_revision(client, sv["id"], [env["id"]], "env-only")
+
+    body = await gql(
+        client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]}
+    )
+    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    dims = revisions[0]["dimensions"]
+    by_type = {d["type"]["name"]: d["name"] for d in dims}
+    assert_that(by_type).described_as("types covered").contains_key(
+        "service", "environment"
+    )
+    assert_that(by_type["service"]).described_as(
+        "service auto-filled with global"
+    ).is_equal_to("global")
+    assert_that(by_type["environment"]).described_as(
+        "environment is the one we specified"
+    ).is_equal_to(env["name"])

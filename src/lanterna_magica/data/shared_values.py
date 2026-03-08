@@ -2,7 +2,15 @@ from asyncpg import Pool
 
 from lanterna_magica.errors import ValidationError
 
-from .utils import build_connection, compute_scope_hash, decode_cursor, page_limit, queries, require_row, validate_name
+from .utils import (
+    build_connection,
+    compute_scope_hash,
+    decode_cursor,
+    page_limit,
+    queries,
+    require_row,
+    validate_name,
+)
 
 
 class SharedValues:
@@ -49,8 +57,7 @@ class SharedValues:
 
     async def get_shared_values_by_ids(self, ids: list[str]) -> list[dict]:
         rows = [
-            dict(r)
-            async for r in queries.get_shared_values_by_ids(self.pool, ids=ids)
+            dict(r) async for r in queries.get_shared_values_by_ids(self.pool, ids=ids)
         ]
         return rows
 
@@ -64,20 +71,27 @@ class SharedValues:
             raise ValidationError("At least one field must be provided")
         validate_name(name)
         return await require_row(
-            queries.update_shared_value, "Shared value not found or is archived",
-            self.pool, id=id, name=name,
+            queries.update_shared_value,
+            "Shared value not found or is archived",
+            self.pool,
+            id=id,
+            name=name,
         )
 
     async def archive_shared_value(self, id: str) -> dict:
         return await require_row(
-            queries.archive_shared_value, "Shared value not found or already archived",
-            self.pool, id=id,
+            queries.archive_shared_value,
+            "Shared value not found or already archived",
+            self.pool,
+            id=id,
         )
 
     async def unarchive_shared_value(self, id: str) -> dict:
         return await require_row(
-            queries.unarchive_shared_value, "Shared value not found or not archived",
-            self.pool, id=id,
+            queries.unarchive_shared_value,
+            "Shared value not found or not archived",
+            self.pool,
+            id=id,
         )
 
     async def get_revisions(
@@ -114,28 +128,36 @@ class SharedValues:
         dimension_ids: list[str],
         value: dict | list | str | int | float | bool | None,
     ) -> dict:
-        scope_hash = compute_scope_hash(dimension_ids)
+        effective_ids = list(dimension_ids)
+        missing = [
+            dict(r)
+            async for r in queries.get_missing_base_dimensions(
+                self.pool, dimension_ids=effective_ids,
+            )
+        ]
+        effective_ids.extend(str(d["id"]) for d in missing)
 
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                await queries.unset_current_revision(
-                    conn,
-                    shared_value_id=shared_value_id,
-                    scope_hash=scope_hash,
-                )
-                row = await queries.create_revision(
-                    conn,
-                    shared_value_id=shared_value_id,
-                    scope_hash=scope_hash,
-                    value=value,
-                )
-                revision = dict(row)
+        scope_hash = compute_scope_hash(effective_ids)
 
-                for dim_id in dimension_ids:
-                    await queries.insert_revision_scope(
-                        conn,
-                        revision_id=str(revision["id"]),
-                        dimension_id=dim_id,
-                    )
+        async with self.pool.acquire() as conn, conn.transaction():
+            await queries.unset_current_revision(
+                conn,
+                shared_value_id=shared_value_id,
+                scope_hash=scope_hash,
+            )
+            row = await queries.create_revision(
+                conn,
+                shared_value_id=shared_value_id,
+                scope_hash=scope_hash,
+                value=value,
+            )
+            revision = dict(row)
+
+            for dim_id in effective_ids:
+                await queries.insert_revision_scope(
+                    conn,
+                    revision_id=str(revision["id"]),
+                    dimension_id=dim_id,
+                )
 
         return revision

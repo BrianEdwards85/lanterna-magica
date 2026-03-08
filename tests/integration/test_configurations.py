@@ -1,7 +1,14 @@
 from assertpy import assert_that
 from conftest import gql
+from utils import (
+    create_dimension_type,
+    create_environment,
+    create_service,
+    create_shared_value,
+    nodes,
+)
+
 from lanterna_magica.data.configurations import Configurations
-from utils import create_environment, create_service, create_shared_value, nodes
 
 # -- Mutations --
 
@@ -109,7 +116,9 @@ async def test_create_configuration(client):
     assert_that(cfg["body"]).described_as("configuration body").is_equal_to(config_body)
     assert_that(cfg["isCurrent"]).described_as("new configuration is current").is_true()
     dim_ids = [d["id"] for d in cfg["dimensions"]]
-    assert_that(dim_ids).described_as("dimension references").contains(svc["id"], env["id"])
+    assert_that(dim_ids).described_as("dimension references").contains(
+        svc["id"], env["id"]
+    )
     assert_that(cfg["createdAt"]).described_as("createdAt timestamp").is_not_none()
     assert_that(cfg["substitutions"]).described_as("no substitutions").is_empty()
 
@@ -122,15 +131,17 @@ async def test_create_configuration_with_substitutions(client):
     config_body = {"database": {"password": "placeholder"}}
     substitutions = [{"jsonpath": "$.database.password", "sharedValueId": sv["id"]}]
 
-    cfg = await _create_configuration(client, [svc["id"], env["id"]], config_body, substitutions)
+    cfg = await _create_configuration(
+        client, [svc["id"], env["id"]], config_body, substitutions
+    )
     assert_that(cfg["substitutions"]).described_as("substitutions count").is_length(1)
     sub = cfg["substitutions"][0]
     assert_that(sub["jsonpath"]).described_as("substitution jsonpath").is_equal_to(
         "$.database.password"
     )
-    assert_that(sub["sharedValue"]["id"]).described_as("substitution shared value id").is_equal_to(
-        sv["id"]
-    )
+    assert_that(sub["sharedValue"]["id"]).described_as(
+        "substitution shared value id"
+    ).is_equal_to(sv["id"])
 
 
 async def test_new_configuration_replaces_current(client):
@@ -156,14 +167,18 @@ async def test_configuration_by_id(client):
     cfg = await _create_configuration(client, [svc["id"], env["id"]], {"key": "value"})
     body = await gql(client, CONFIGURATION, {"id": cfg["id"]})
     found = body["data"]["configuration"]
-    assert_that(found["id"]).described_as("fetched configuration id").is_equal_to(cfg["id"])
+    assert_that(found["id"]).described_as("fetched configuration id").is_equal_to(
+        cfg["id"]
+    )
     assert_that(found["body"]).described_as("fetched configuration body").is_equal_to(
         {"key": "value"}
     )
 
 
 async def test_configuration_by_id_not_found(client):
-    body = await gql(client, CONFIGURATION, {"id": "00000000-0000-0000-0000-ffffffffffff"})
+    body = await gql(
+        client, CONFIGURATION, {"id": "00000000-0000-0000-0000-ffffffffffff"}
+    )
     assert_that(body["data"]["configuration"]).described_as("non-existent id").is_none()
 
 
@@ -192,7 +207,9 @@ async def test_configurations_filter_by_dimension(client):
     body = await gql(client, CONFIGURATIONS, {"dimensionIds": [svc1["id"]]})
     items = nodes(body["data"]["configurations"]["edges"])
     assert_that(items).described_as("configs filtered by dimension").is_length(1)
-    assert_that(items[0]["body"]).described_as("filtered config body").is_equal_to({"app": "traefik"})
+    assert_that(items[0]["body"]).described_as("filtered config body").is_equal_to(
+        {"app": "traefik"}
+    )
 
 
 async def test_configurations_pagination(client):
@@ -205,14 +222,18 @@ async def test_configurations_pagination(client):
     body = await gql(client, CONFIGURATIONS, {"first": 2})
     page1 = body["data"]["configurations"]
     assert_that(page1["edges"]).described_as("page 1 edge count").is_length(2)
-    assert_that(page1["pageInfo"]["hasNextPage"]).described_as("page 1 has next page").is_true()
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
+        "page 1 has next page"
+    ).is_true()
 
     body = await gql(
         client, CONFIGURATIONS, {"first": 2, "after": page1["pageInfo"]["endCursor"]}
     )
     page2 = body["data"]["configurations"]
     assert_that(page2["edges"]).described_as("page 2 edge count").is_length(2)
-    assert_that(page2["pageInfo"]["hasNextPage"]).described_as("page 2 has next page").is_true()
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
+        "page 2 has next page"
+    ).is_true()
 
     body = await gql(
         client, CONFIGURATIONS, {"first": 2, "after": page2["pageInfo"]["endCursor"]}
@@ -331,9 +352,9 @@ async def test_configuration_substitutions_field(client):
     config_node = next(n for n in items if n["id"] == cfg["id"])
     subs = config_node["substitutions"]
     assert_that(subs).described_as("substitutions count").is_length(2)
-    assert_that(subs).extracting("jsonpath").described_as("substitution jsonpaths").contains(
-        "$.database.host", "$.database.port"
-    )
+    assert_that(subs).extracting("jsonpath").described_as(
+        "substitution jsonpaths"
+    ).contains("$.database.host", "$.database.port")
 
 
 # -- includeBase Tests --
@@ -404,8 +425,12 @@ async def test_create_configuration_data_layer_returns_substitutions(client, poo
         substitutions=[{"jsonpath": "$.key", "shared_value_id": sv["id"]}],
     )
 
-    assert_that(result).described_as("result has substitutions key").contains_key("substitutions")
-    assert_that(result["substitutions"]).described_as("substitutions count").is_length(1)
+    assert_that(result).described_as("result has substitutions key").contains_key(
+        "substitutions"
+    )
+    assert_that(result["substitutions"]).described_as("substitutions count").is_length(
+        1
+    )
     assert_that(result["substitutions"][0]["jsonpath"]).described_as(
         "substitution jsonpath"
     ).is_equal_to("$.key")
@@ -414,7 +439,9 @@ async def test_create_configuration_data_layer_returns_substitutions(client, poo
     ).is_equal_to(sv["id"])
 
 
-async def test_create_configuration_data_layer_returns_empty_substitutions(client, pool):
+async def test_create_configuration_data_layer_returns_empty_substitutions(
+    client, pool
+):
     """When no substitutions are provided, the data layer returns an empty list."""
     configs = Configurations(pool)
 
@@ -426,8 +453,12 @@ async def test_create_configuration_data_layer_returns_empty_substitutions(clien
         body={"key": "value"},
     )
 
-    assert_that(result).described_as("result has substitutions key").contains_key("substitutions")
-    assert_that(result["substitutions"]).described_as("substitutions is empty").is_empty()
+    assert_that(result).described_as("result has substitutions key").contains_key(
+        "substitutions"
+    )
+    assert_that(result["substitutions"]).described_as(
+        "substitutions is empty"
+    ).is_empty()
 
 
 # -- Edge case tests --
@@ -483,8 +514,12 @@ async def test_configuration_dimensions_include_type(client):
     body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg["id"]})
     config = body["data"]["configuration"]
     for dim in config["dimensions"]:
-        assert_that(dim["type"]).described_as("dimension has type").contains_key("id", "name")
-        assert_that(dim["type"]["name"]).described_as("type name").is_in("service", "environment")
+        assert_that(dim["type"]).described_as("dimension has type").contains_key(
+            "id", "name"
+        )
+        assert_that(dim["type"]["name"]).described_as("type name").is_in(
+            "service", "environment"
+        )
 
 
 async def test_configuration_substitutions_resolve_nested(client):
@@ -503,9 +538,15 @@ async def test_configuration_substitutions_resolve_nested(client):
     body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg["id"]})
     subs = body["data"]["configuration"]["substitutions"]
     assert_that(subs).described_as("substitutions count").is_length(1)
-    assert_that(subs[0]["configuration"]["id"]).described_as("sub -> config id").is_equal_to(cfg["id"])
-    assert_that(subs[0]["sharedValue"]["id"]).described_as("sub -> shared value id").is_equal_to(sv["id"])
-    assert_that(subs[0]["sharedValue"]["name"]).described_as("sub -> shared value name").is_equal_to("db_host")
+    assert_that(subs[0]["configuration"]["id"]).described_as(
+        "sub -> config id"
+    ).is_equal_to(cfg["id"])
+    assert_that(subs[0]["sharedValue"]["id"]).described_as(
+        "sub -> shared value id"
+    ).is_equal_to(sv["id"])
+    assert_that(subs[0]["sharedValue"]["name"]).described_as(
+        "sub -> shared value name"
+    ).is_equal_to("db_host")
 
 
 async def test_update_config_substitution_not_found(client):
@@ -523,4 +564,116 @@ async def test_update_config_substitution_not_found(client):
         },
         expect_errors=True,
     )
-    assert_that(body).described_as("not-found substitution update").contains_key("errors")
+    assert_that(body).described_as("not-found substitution update").contains_key(
+        "errors"
+    )
+
+
+# -- Base dimension auto-population tests --
+
+
+async def test_create_configuration_empty_dimensions_assigns_base(client):
+    """Creating a config with no dimensions should auto-assign all base dimensions."""
+    cfg = await _create_configuration(client, [], {"key": "value"})
+
+    assert_that(cfg["body"]).described_as("configuration body").is_equal_to(
+        {"key": "value"}
+    )
+    assert_that(cfg["isCurrent"]).described_as("configuration is current").is_true()
+    dim_names = [d["name"] for d in cfg["dimensions"]]
+    assert_that(dim_names).described_as(
+        "empty dimensionIds should resolve to base dimensions"
+    ).contains("global")
+    assert_that(cfg["dimensions"]).described_as(
+        "should have one base dimension per type"
+    ).is_length(2)
+
+
+async def test_base_configuration_appears_in_unfiltered_list(client):
+    """A config created with empty dimensions should appear in unfiltered queries."""
+    cfg = await _create_configuration(client, [], {"key": "value"})
+
+    body = await gql(client, CONFIGURATIONS)
+    items = nodes(body["data"]["configurations"]["edges"])
+    assert_that(items).described_as("unfiltered configs include base").is_length(1)
+    assert_that(items[0]["id"]).described_as("config id matches").is_equal_to(cfg["id"])
+
+
+async def test_new_base_configuration_replaces_current_base(client):
+    """Creating a second config with empty dims should replace the first."""
+    cfg1 = await _create_configuration(client, [], {"version": 1})
+    cfg2 = await _create_configuration(client, [], {"version": 2})
+
+    assert_that(cfg2["isCurrent"]).described_as("new base config is current").is_true()
+
+    body = await gql(client, CONFIGURATION, {"id": cfg1["id"]})
+    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+        "old base config no longer current"
+    ).is_false()
+
+
+async def test_new_dimension_type_backfills_base_into_configurations(client):
+    """Adding a new dimension type should backfill base dim into existing configs."""
+    cfg_before = await _create_configuration(client, [], {"before": True})
+
+    await create_dimension_type(client, "region")
+
+    body = await gql(
+        client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg_before["id"]}
+    )
+    config = body["data"]["configuration"]
+    type_names = sorted(d["type"]["name"] for d in config["dimensions"])
+    assert_that(type_names).described_as(
+        "old configuration now includes all base dimensions"
+    ).is_equal_to(["environment", "region", "service"])
+
+    # A new empty-dimensions config should replace the old one as current (same scope)
+    cfg_after = await _create_configuration(client, [], {"after": True})
+    assert_that(cfg_after["isCurrent"]).described_as("new config is current").is_true()
+
+    body = await gql(client, CONFIGURATION, {"id": cfg_before["id"]})
+    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+        "old base config replaced as current"
+    ).is_false()
+
+
+async def test_partial_dimensions_fills_missing_with_global(client):
+    """Specifying only some dimensions should fill the rest with globals."""
+    svc = await create_service(client)
+
+    cfg = await _create_configuration(client, [svc["id"]], {"k": "v"})
+    dim_names = {d["name"] for d in cfg["dimensions"]}
+    assert_that(dim_names).described_as(
+        "should include specified service and global environment"
+    ).contains(svc["name"], "global")
+    assert_that(cfg["dimensions"]).described_as(
+        "one per dimension type"
+    ).is_length(2)
+
+
+async def test_partial_dimensions_env_only(client):
+    """Specifying only environment should fill service with global."""
+    env = await create_environment(client)
+
+    cfg = await _create_configuration(
+        client, [env["id"]], {"k": "v"}
+    )
+
+    body = await gql(
+        client,
+        CONFIGURATION_WITH_TYPED_DIMENSIONS,
+        {"id": cfg["id"]},
+    )
+    config = body["data"]["configuration"]
+    by_type = {
+        d["type"]["name"]: d["name"] for d in config["dimensions"]
+    }
+    assert_that(by_type).described_as("types covered").contains_key(
+        "service", "environment"
+    )
+    assert_that(by_type["service"]).described_as(
+        "service auto-filled with global"
+    ).is_equal_to("global")
+    assert_that(by_type["environment"]).described_as(
+        "environment is the one we specified"
+    ).is_equal_to(env["name"])
