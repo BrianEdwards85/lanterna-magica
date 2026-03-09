@@ -132,18 +132,16 @@
   (fn [db _]
     (assoc db :configuration-dialog
            {:open?         true
-            :configuration {:dimensionIds []
-                            :body-text    "{}"}})))
+            :configuration {:dimensionIds [] :body-text "{}"}
+            :sentinel-paths []
+            :substitutions  {}
+            :active-step    1
+            :body-valid?    true})))
 
 (rf/reg-event-db
   ::events/close-configuration-dialog
   (fn [db _]
     (assoc db :configuration-dialog {:open? false})))
-
-(rf/reg-event-db
-  ::events/set-configuration-field
-  (fn [db [_ field value]]
-    (assoc-in db [:configuration-dialog :configuration field] value)))
 
 (rf/reg-event-db
   ::events/toggle-configuration-dimension
@@ -155,15 +153,71 @@
                     (conj current dimension-id))]
       (assoc-in db path updated))))
 
+(rf/reg-event-db
+  ::events/set-configuration-body
+  (fn [db [_ value]]
+    (let [valid? (try
+                   (js/JSON.parse value)
+                   true
+                   (catch :default _
+                     false))]
+      (-> db
+          (assoc-in [:configuration-dialog :configuration :body-text] value)
+          (assoc-in [:configuration-dialog :body-valid?] valid?)))))
+
+(rf/reg-event-fx
+  ::events/extract-sentinel-paths
+  (fn [{:keys [db]} _]
+    (when (get-in db [:configuration-dialog :body-valid?])
+      (let [body-text (get-in db [:configuration-dialog :configuration :body-text])
+            parsed    (.parse js/JSON body-text)]
+        {:db       (h/start-loading db :extract-sentinel-paths)
+         :dispatch [::re-graph/query
+                    {:query     gql/extract-sentinel-paths-query
+                     :variables {:body parsed}
+                     :callback  [::events/on-sentinel-paths-result]}]}))))
+
+(rf/reg-event-fx
+  ::events/on-sentinel-paths-result
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [response]}]
+    (let [{:keys [data errors]} response]
+      (if errors
+        {:db (h/stop-loading db :extract-sentinel-paths errors)}
+        (let [paths (get data :extractSentinelPaths)]
+          {:db (-> db
+                   (assoc-in [:configuration-dialog :sentinel-paths] paths)
+                   (h/stop-loading :extract-sentinel-paths))})))))
+
+(rf/reg-event-db
+  ::events/set-substitution
+  (fn [db [_ jsonpath shared-value-id]]
+    (assoc-in db [:configuration-dialog :substitutions jsonpath] shared-value-id)))
+
+(rf/reg-event-db
+  ::events/set-config-dialog-step
+  (fn [db [_ step]]
+    (assoc-in db [:configuration-dialog :active-step] step)))
+
+(rf/reg-event-fx
+  ::events/ensure-shared-values-loaded
+  (fn [{:keys [db]} _]
+    (when (empty? (get-in db [:shared-values-page :edges]))
+      {:dispatch [::events/fetch-shared-values]})))
+
 (rf/reg-event-fx
   ::events/save-configuration
   (fn [{:keys [db]} _]
-    (let [{:keys [configuration]} (:configuration-dialog db)
+    (let [{:keys [configuration substitutions]} (:configuration-dialog db)
           body-text (:body-text configuration)]
       (try
-        (let [parsed (.parse js/JSON body-text)
-              input  {:dimensionIds (:dimensionIds configuration)
-                      :body         parsed}]
+        (let [parsed        (.parse js/JSON body-text)
+              subs-vec      (mapv (fn [[path sv-id]]
+                                    {:jsonpath path :sharedValueId sv-id})
+                                  substitutions)
+              input         {:dimensionIds  (:dimensionIds configuration)
+                             :body          parsed
+                             :substitutions subs-vec}]
           {:db       (h/start-loading db :save-configuration)
            :dispatch [::re-graph/mutate
                       {:query     gql/create-configuration-mutation
@@ -195,6 +249,7 @@
     (if id
       {:db       (-> db
                      (assoc-in [:configurations-page :selected-id] id)
+                     (assoc-in [:configurations-page :config-view-mode] :body)
                      (h/start-loading :configuration-detail))
        :dispatch [::re-graph/query
                   {:query     gql/configuration-query
@@ -203,6 +258,11 @@
       {:db (-> db
                (assoc-in [:configurations-page :selected-id] nil)
                (assoc-in [:configurations-page :selected] nil))})))
+
+(rf/reg-event-db
+  ::events/set-config-view-mode
+  (fn [db [_ mode]]
+    (assoc-in db [:configurations-page :config-view-mode] mode)))
 
 (rf/reg-event-fx
   ::events/on-configuration-detail

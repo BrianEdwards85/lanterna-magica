@@ -36,12 +36,17 @@
    ;; Configurations page — filter by dimension ids
    :configurations-page {:edges [] :page-info {:hasNextPage false :endCursor nil}
                          :filter-dimension-ids []
-                         :selected-id nil :selected nil}
+                         :selected-id nil :selected nil
+                         :config-view-mode :body}
 
    ;; Dialog state
    :shared-value-dialog {:open? false}
    :revision-dialog     {:open? false}
-   :configuration-dialog {:open? false}
+   :configuration-dialog {:open? false
+                          :sentinel-paths []
+                          :substitutions  {}
+                          :active-step    1
+                          :body-valid?    true}
 
    ;; Loading keys (set of keywords) and per-key error map
    :loading          #{}

@@ -2,6 +2,7 @@
   (:require
    [lanterna-magica.bp :as bp]
    [lanterna-magica.components.current-status :as current-status]
+   [lanterna-magica.components.debounce :as deb]
    [lanterna-magica.components.dimension-picker :as dim-picker]
    [lanterna-magica.components.dimensions-label :as dimensions-label]
    [lanterna-magica.components.error-banner :as error-banner]
@@ -16,41 +17,127 @@
    [reagent.core :as r]))
 
 ;; ---------------------------------------------------------------------------
-;; Create Configuration Dialog
+;; Create Configuration Dialog — Step 1: dimensions + JSON body
+;; ---------------------------------------------------------------------------
+
+(defn- config-dialog-step1 []
+  (let [debounced-extract (deb/make-debounced-fn
+                            #(rf/dispatch [::events/extract-sentinel-paths]))]
+    (r/create-class
+      {:component-will-unmount
+       (fn [_]
+         (deb/cancel-debounced-fn! debounced-extract))
+
+       :reagent-render
+       (fn []
+
+         (let [{:keys [configuration]} @(rf/subscribe [::subs/configuration-dialog])
+               body-valid?    @(rf/subscribe [::subs/config-body-valid?])
+               extracting?    @(rf/subscribe [::subs/loading? :extract-sentinel-paths])
+               error          @(rf/subscribe [::subs/error :save-configuration])
+               next-disabled? (not (true? body-valid?))]
+           [:<>
+            [bp/dialog-body
+             [dim-picker/dimension-picker
+              {:selected-ids (:dimensionIds configuration)
+               :on-toggle    #(rf/dispatch [::events/toggle-configuration-dimension %])
+               :on-clear     #(rf/dispatch [::events/toggle-configuration-dimension %])}]
+             [:div.mb-4
+              [:label.bp6-label "Configuration Body (JSON)"]
+              [inputs/local-textarea {:rows        12
+                                      :value       (or (:body-text configuration) "")
+                                      :class       "font-mono text-sm"
+                                      :placeholder "{\n  \"key\": \"value\"\n}"
+                                      :on-change   (fn [v]
+                                                     (rf/dispatch [::events/set-configuration-body v])
+                                                     (@debounced-extract))}]
+              (when (false? body-valid?)
+                [:div.mt-1.flex.items-center.gap-1
+                 [bp/icon {:icon "warning-sign" :size 12 :intent "danger"}]
+                 [:span.text-xs.text-red-400 "Invalid JSON"]])]
+             (when error
+               [error-banner/error-banner "Failed to create configuration." error])]
+            [bp/dialog-footer
+             {:actions
+              (r/as-element
+                [:<>
+                 [bp/button {:text     "Cancel"
+                             :on-click #(rf/dispatch [::events/close-configuration-dialog])}]
+                 [bp/button {:text     "Next"
+                             :intent   "primary"
+                             :icon     "arrow-right"
+                             :loading  extracting?
+                             :disabled next-disabled?
+                             :on-click (fn []
+                                         (deb/cancel-debounced-fn! debounced-extract)
+                                         (rf/dispatch [::events/extract-sentinel-paths])
+                                         (rf/dispatch [::events/ensure-shared-values-loaded])
+                                         (rf/dispatch [::events/set-config-dialog-step 2]))}]])}]]))})))
+
+;; ---------------------------------------------------------------------------
+;; Create Configuration Dialog — Step 2: map sentinel paths to shared values
+;; ---------------------------------------------------------------------------
+
+(defn- config-dialog-step2 []
+  (let [{:keys [edges]} @(rf/subscribe [::subs/shared-values-page])
+        sentinel-paths @(rf/subscribe [::subs/config-sentinel-paths])
+        substitutions  @(rf/subscribe [::subs/config-substitutions])
+        saving?        @(rf/subscribe [::subs/loading? :save-configuration])
+        extracting?    @(rf/subscribe [::subs/loading? :extract-sentinel-paths])
+        error          @(rf/subscribe [::subs/error :save-configuration])
+        sv-items       (mapv :node edges)
+        all-mapped?    (every? #(get substitutions %) sentinel-paths)]
+    [:<>
+     [bp/dialog-body
+      [:p.text-sm.text-tn-fg-muted.mb-3
+       "Map each sentinel placeholder to a shared value."]
+      (for [path sentinel-paths]
+        (let [sel-id (get substitutions path)]
+          ^{:key path}
+          [:div {:class "flex items-center gap-3 mb-3"}
+           [:code {:class "text-sm text-tn-cyan flex-1 min-w-0 truncate"} path]
+           [:div {:class "flex-1 min-w-0"}
+            [sel/searchable-select
+             {:items           sv-items
+              :selected-id     sel-id
+              :on-select       #(rf/dispatch [::events/set-substitution path %])
+              :on-clear        (when sel-id
+                                 #(rf/dispatch [::events/set-substitution path nil]))
+              :on-query-change [::events/set-shared-values-search]
+              :on-clear-search [::events/set-shared-values-search ""]
+              :placeholder     "Select shared value..."}]]]))
+      (when error
+        [error-banner/error-banner "Failed to create configuration." error])]
+     [bp/dialog-footer
+      {:actions
+       (r/as-element
+         [:<>
+          [bp/button {:text     "Back"
+                      :icon     "arrow-left"
+                      :on-click #(rf/dispatch [::events/set-config-dialog-step 1])}]
+          [bp/button {:text     "Create"
+                      :intent   "primary"
+                      :icon     "tick"
+                      :loading  (or saving? extracting?)
+                      :disabled (or extracting? (not all-mapped?))
+                      :on-click #(rf/dispatch [::events/save-configuration])}]])}]]))
+
+;; ---------------------------------------------------------------------------
+;; Create Configuration Dialog — top-level wrapper
 ;; ---------------------------------------------------------------------------
 
 (defn configuration-dialog []
-  (let [{:keys [open? configuration]} @(rf/subscribe [::subs/configuration-dialog])
-        saving?      @(rf/subscribe [::subs/loading? :save-configuration])
-        error        @(rf/subscribe [::subs/error :save-configuration])]
+  (let [{:keys [open?]} @(rf/subscribe [::subs/configuration-dialog])
+        step @(rf/subscribe [::subs/config-dialog-step])]
     (when open?
-      [bp/dialog {:title    "Create Configuration"
-                  :icon     "document"
+      [bp/dialog {:title    (if (= step 2) "Map Sentinel Values" "Create Configuration")
+                  :icon     (if (= step 2) "flows" "document")
                   :is-open  true
                   :on-close #(rf/dispatch [::events/close-configuration-dialog])
                   :class    "w-full max-w-lg"}
-       [bp/dialog-body
-        [dim-picker/dimension-picker
-         {:selected-ids (:dimensionIds configuration)
-          :on-toggle    #(rf/dispatch [::events/toggle-configuration-dimension %])
-          :on-clear     #(rf/dispatch [::events/toggle-configuration-dimension %])}]
-        [:div.mb-4
-         [:label.bp6-label "Configuration Body (JSON)"]
-         [inputs/local-textarea {:rows        12
-                                 :value       (or (:body-text configuration) "")
-                                 :class       "font-mono text-sm"
-                                 :placeholder "{\n  \"key\": \"value\"\n}"
-                                 :on-change   #(rf/dispatch [::events/set-configuration-field :body-text %])}]]
-        (when error
-          [error-banner/error-banner "Failed to create configuration." error])]
-       [bp/dialog-footer
-        {:actions
-         (r/as-element
-           [:<>
-            [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-configuration-dialog])}]
-            [bp/button {:text "Create" :intent "primary" :icon "tick"
-                        :loading  saving?
-                        :on-click #(rf/dispatch [::events/save-configuration])}]])}]])))
+       (if (= step 2)
+         [config-dialog-step2]
+         [config-dialog-step1])])))
 
 ;; ---------------------------------------------------------------------------
 ;; Left sidebar — filter bar + config list
@@ -141,7 +228,8 @@
 
 (defn- config-main []
   (let [{:keys [selected-id selected]} @(rf/subscribe [::subs/configurations-page])
-        loading? @(rf/subscribe [::subs/loading? :configuration-detail])]
+        loading?   @(rf/subscribe [::subs/loading? :configuration-detail])
+        view-mode  @(rf/subscribe [::subs/config-view-mode])]
     [:div.flex-1.pl-4
      (if-not selected-id
        [states/empty-state {:icon        "document"
@@ -176,8 +264,23 @@
               :on-make-current #(rf/dispatch [::events/set-configuration-current (:id selected) true])
               :on-deactivate   #(rf/dispatch [::events/set-configuration-current (:id selected) false])}]]
 
-           [:h5.bp6-heading.mb-2 "Body"]
-           [json-block/json-block {:value (:body selected)}]
+           (if (some? (:projection selected))
+             [:<>
+              [:div.flex.items-center.gap-2.mb-2
+               [bp/button {:text     "Body"
+                           :small    true
+                           :active   (= view-mode :body)
+                           :on-click #(rf/dispatch [::events/set-config-view-mode :body])}]
+               [bp/button {:text     "Projected"
+                           :small    true
+                           :active   (= view-mode :projected)
+                           :on-click #(rf/dispatch [::events/set-config-view-mode :projected])}]]
+              (if (= view-mode :projected)
+                [json-block/json-block {:value (:projection selected)}]
+                [json-block/json-block {:value (:body selected)}])]
+             [:<>
+              [:h5.bp6-heading.mb-2 "Body"]
+              [json-block/json-block {:value (:body selected)}]])
 
            (when (seq (:substitutions selected))
              [:div.mt-4

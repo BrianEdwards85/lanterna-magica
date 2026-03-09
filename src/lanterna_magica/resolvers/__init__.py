@@ -13,6 +13,7 @@ from lanterna_magica.data.dimensions import Dimensions
 from lanterna_magica.data.loaders import create_loaders
 from lanterna_magica.data.shared_values import SharedValues
 from lanterna_magica.errors import AppError
+from lanterna_magica.orchestrator import ConfigurationOrchestrator
 from lanterna_magica.resolvers.configuration import get_configuration_resolvers
 from lanterna_magica.resolvers.dimension import get_dimension_resolvers
 from lanterna_magica.resolvers.dimension_facade import get_facade_resolvers
@@ -42,11 +43,14 @@ def create_gql(pool) -> GraphQL:
     dimension_types = DimensionTypes(pool)
     dimensions = Dimensions(pool)
     shared_values = SharedValues(pool)
+    configuration_orchestrator = ConfigurationOrchestrator(
+        configurations, shared_values
+    )
 
     type_defs = load_schema_from_path(str(SCHEMA_DIR))
     schema = make_executable_schema(
         type_defs,
-        *get_configuration_resolvers(configurations),
+        *get_configuration_resolvers(configurations, configuration_orchestrator),
         *get_dimension_type_resolvers(dimension_types, dimensions),
         *get_dimension_resolvers(dimensions),
         *get_facade_resolvers(dimensions, dimension_types, "service"),

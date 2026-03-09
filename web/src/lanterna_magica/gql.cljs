@@ -144,13 +144,18 @@
 ;; Configurations
 ;; ---------------------------------------------------------------------------
 
+(def extract-sentinel-paths-query
+  "query ExtractSentinelPaths($body: JSON!) {
+     extractSentinelPaths(body: $body)
+   }")
+
 (def configurations-query
   "query Configurations($dimensionIds: [ID!], $includeBase: Boolean, $currentOnly: Boolean, $first: Int, $after: String) {
      configurations(dimensionIds: $dimensionIds, includeBase: $includeBase, currentOnly: $currentOnly, first: $first, after: $after) {
        edges {
          cursor
          node {
-           id body isCurrent createdAt
+           id body isCurrent createdAt projection
            dimensions { id name type { id name } }
          }
        }
@@ -161,7 +166,7 @@
 (def configuration-query
   "query Configuration($id: ID!) {
      configuration(id: $id) {
-       id body isCurrent createdAt
+       id body isCurrent createdAt projection
        dimensions { id name type { id name } }
        substitutions {
          id jsonpath createdAt
@@ -173,7 +178,7 @@
 (def create-configuration-mutation
   "mutation CreateConfiguration($input: CreateConfigurationInput!) {
      createConfiguration(input: $input) {
-       id body isCurrent createdAt
+       id body isCurrent createdAt projection
        dimensions { id name type { id name } }
        substitutions {
          id jsonpath createdAt
@@ -185,7 +190,7 @@
 (def set-configuration-current-mutation
   "mutation SetConfigurationCurrent($id: ID!, $isCurrent: Boolean!) {
      setConfigurationCurrent(id: $id, isCurrent: $isCurrent) {
-       id body isCurrent createdAt
+       id body isCurrent createdAt projection
        dimensions { id name type { id name } }
      }
    }")

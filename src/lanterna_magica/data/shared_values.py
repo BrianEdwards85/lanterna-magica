@@ -1,4 +1,4 @@
-from asyncpg import Pool
+from asyncpg import Connection, Pool
 
 from lanterna_magica.errors import NotFoundError, ValidationError
 
@@ -145,6 +145,21 @@ class SharedValues:
                 )
 
         return revision
+
+    async def resolve_for_scope(
+        self,
+        *,
+        shared_value_id: str,
+        dimension_ids: list[str],
+        conn: Connection | Pool | None = None,
+    ) -> dict | None:
+        conn_or_pool = conn if conn is not None else self.pool
+        row = await queries.resolve_shared_value_for_scope(
+            conn_or_pool,
+            shared_value_id=shared_value_id,
+            dimension_ids=dimension_ids,
+        )
+        return dict(row) if row else None
 
     async def set_revision_current(self, *, id: str, is_current: bool) -> dict:
         if is_current:

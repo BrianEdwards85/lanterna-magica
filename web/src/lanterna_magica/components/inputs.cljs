@@ -1,8 +1,8 @@
 (ns lanterna-magica.components.inputs
   "Local-state text input components."
   (:require
-   ["lodash.debounce" :as debounce]
    [lanterna-magica.bp :as bp]
+   [lanterna-magica.components.debounce :as deb]
    [reagent.core :as r]))
 
 ;; ---------------------------------------------------------------------------
@@ -47,22 +47,26 @@
 ;; ---------------------------------------------------------------------------
 
 (defn search-input
-  "Search input with local state and 500ms debounce on on-change."
-  [{:keys [value]}]
+  "Search input with local state and 500ms debounce on on-change.
+
+   The `on-change` prop is threaded through an atom that is updated on every
+   render, so it is safe to pass a new function reference each render (e.g.
+   an inline `#(rf/dispatch ...)` form). The debounced closure always calls
+   the most-recently-rendered `on-change`, preventing stale-closure bugs."
+  [{:keys [value on-change]}]
   (let [local           (r/atom (or value ""))
-        debounced-fn    (atom nil)]
+        on-change-ref   (atom on-change)
+        debounced-fn    (deb/make-debounced-fn (fn [v] (when-let [f @on-change-ref] (f v))))]
     (r/create-class
       {:component-will-unmount
        (fn [_]
-         (when-let [d @debounced-fn]
-           (.cancel d)))
+         (deb/cancel-debounced-fn! debounced-fn))
 
        :reagent-render
        (fn [{:keys [value on-change placeholder]}]
+         (reset! on-change-ref on-change)
          (when (and (some? value) (not= value @local))
            (reset! local value))
-         (when (nil? @debounced-fn)
-           (reset! debounced-fn (debounce (fn [v] (on-change v)) 500)))
          [bp/input-group {:left-icon   "search"
                           :placeholder (or placeholder "Search...")
                           :value       (or @local "")

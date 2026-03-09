@@ -52,6 +52,28 @@
 (rf/reg-sub ::revision-dialog       (fn [db _] (:revision-dialog db)))
 (rf/reg-sub ::configuration-dialog  (fn [db _] (:configuration-dialog db)))
 
+;; -- Configuration dialog sub-keys ----------------------------------------
+
+(rf/reg-sub ::config-sentinel-paths
+  :<- [::configuration-dialog]
+  (fn [d _] (:sentinel-paths d)))
+
+(rf/reg-sub ::config-substitutions
+  :<- [::configuration-dialog]
+  (fn [d _] (:substitutions d)))
+
+(rf/reg-sub ::config-dialog-step
+  :<- [::configuration-dialog]
+  (fn [d _] (:active-step d)))
+
+(rf/reg-sub ::config-body-valid?
+  :<- [::configuration-dialog]
+  (fn [d _] (:body-valid? d)))
+
+(rf/reg-sub ::config-view-mode
+  :<- [::configurations-page]
+  (fn [p _] (:config-view-mode p)))
+
 ;; -- Loading / Errors -----------------------------------------------------
 
 (rf/reg-sub ::loading        (fn [db _] (:loading db)))

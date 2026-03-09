@@ -124,3 +124,29 @@ from (
 ) sub
 where r.id = sub.revision_id
   and r.scope_hash is distinct from sub.new_hash;
+
+-- name: resolve_shared_value_for_scope(shared_value_id, dimension_ids)^
+SELECT svr.id, svr.shared_value_id, svr.scope_hash, svr.value, svr.is_current, svr.created_at
+FROM shared_value_revisions svr
+WHERE svr.shared_value_id = :shared_value_id
+  AND svr.is_current = true
+  -- revision's non-base dimensions must all be within the config's dimensions
+  AND NOT EXISTS (
+    SELECT 1 FROM revision_scopes rs
+    JOIN dimensions d ON d.id = rs.dimension_id
+    WHERE rs.revision_id = svr.id
+      AND d.base = false
+      AND rs.dimension_id != ALL(:dimension_ids::uuid[])
+  )
+ORDER BY
+  -- lower priority number = higher importance = wins
+  (SELECT MIN(dt.priority)
+   FROM revision_scopes rs
+   JOIN dimensions d ON d.id = rs.dimension_id
+   JOIN dimension_types dt ON dt.id = d.type_id
+   WHERE rs.revision_id = svr.id AND d.base = false) ASC NULLS LAST,
+  -- among ties, more specific (more non-base dimensions) wins
+  (SELECT COUNT(*) FROM revision_scopes rs
+   JOIN dimensions d ON d.id = rs.dimension_id
+   WHERE rs.revision_id = svr.id AND d.base = false) DESC
+LIMIT 1;

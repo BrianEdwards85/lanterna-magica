@@ -1,8 +1,8 @@
 (ns lanterna-magica.components.select
   "Searchable dropdown select built on Blueprint Select + lodash debounce."
   (:require
-   ["lodash.debounce" :as debounce]
    [lanterna-magica.bp :as bp]
+   [lanterna-magica.components.debounce :as deb]
    [re-frame.core :as rf]
    [reagent.core :as r]))
 
@@ -20,13 +20,13 @@
      :no-results-text - text shown when items is empty
      :fill            - whether to fill parent width (default true)
      :icon            - icon for the trigger button (default nil)"
-  [{:keys [items]}]
-  (let [debounced-search (atom nil)]
+  [{:keys [items on-query-change]}]
+  (let [debounced-search (deb/make-debounced-fn
+                           (fn [query] (rf/dispatch (conj on-query-change query))))]
     (r/create-class
       {:component-will-unmount
        (fn [_]
-         (when-let [d @debounced-search]
-           (.cancel d)))
+         (deb/cancel-debounced-fn! debounced-search))
 
        :reagent-render
        (fn [{:keys [items selected-id on-select on-clear on-query-change on-clear-search
@@ -34,13 +34,6 @@
          (let [items    (or items [])
                selected (some #(when (= (:id %) selected-id) %) items)
                fill?    (if (some? fill) fill true)]
-
-           ;; Create the debounced function once
-           (when (nil? @debounced-search)
-             (reset! debounced-search
-                     (debounce (fn [query]
-                                 (rf/dispatch (conj on-query-change query)))
-                               500)))
 
            [:> bp/select-component
             {:items             (clj->js items)
@@ -61,8 +54,7 @@
                                   (if (seq query)
                                     (@debounced-search query)
                                     (do
-                                      (when-let [d @debounced-search]
-                                        (.cancel d))
+                                      (deb/cancel-debounced-fn! debounced-search)
                                       (rf/dispatch on-clear-search))))
              :items-equal       "id"
              :no-results        (r/as-element

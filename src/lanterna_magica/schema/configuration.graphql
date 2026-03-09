@@ -5,6 +5,7 @@ type Configuration {
   isCurrent: Boolean!
   createdAt: DateTime!
   substitutions: [ConfigSubstitution!]!
+  projection: JSON
 }
 
 type ConfigurationEdge {
@@ -51,6 +52,7 @@ extend type Query {
     after: String
   ): ConfigurationConnection!
   configuration(id: ID!): Configuration
+  extractSentinelPaths(body: JSON!): [String!]!
 }
 
 extend type Mutation {

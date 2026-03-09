@@ -3,6 +3,7 @@ from conftest import gql
 from utils import (
     create_dimension_type,
     create_environment,
+    create_revision,
     create_service,
     create_shared_value,
     nodes,
@@ -128,7 +129,7 @@ async def test_create_configuration_with_substitutions(client):
     env = await create_environment(client)
     sv = await create_shared_value(client, "db_password")
 
-    config_body = {"database": {"password": "placeholder"}}
+    config_body = {"database": {"password": "_"}}
     substitutions = [{"jsonpath": "$.database.password", "sharedValueId": sv["id"]}]
 
     cfg = await _create_configuration(
@@ -257,7 +258,7 @@ async def test_update_config_substitution(client):
     cfg = await _create_configuration(
         client,
         [svc["id"], env["id"]],
-        {"database": {"password": "placeholder"}},
+        {"database": {"password": "_"}},
         [{"jsonpath": "$.database.password", "sharedValueId": sv1["id"]}],
     )
 
@@ -292,7 +293,7 @@ async def test_update_config_substitution_targets_single_jsonpath(client):
     cfg = await _create_configuration(
         client,
         [svc["id"], env["id"]],
-        {"database": {"host": "placeholder", "port": 0}},
+        {"database": {"host": "_", "port": "_"}},
         [
             {"jsonpath": "$.database.host", "sharedValueId": sv_host["id"]},
             {"jsonpath": "$.database.port", "sharedValueId": sv_port["id"]},
@@ -339,7 +340,7 @@ async def test_configuration_substitutions_field(client):
     cfg = await _create_configuration(
         client,
         [svc["id"], env["id"]],
-        {"database": {"host": "placeholder", "port": 0}},
+        {"database": {"host": "_", "port": "_"}},
         [
             {"jsonpath": "$.database.host", "sharedValueId": sv1["id"]},
             {"jsonpath": "$.database.port", "sharedValueId": sv2["id"]},
@@ -531,7 +532,7 @@ async def test_configuration_substitutions_resolve_nested(client):
     cfg = await _create_configuration(
         client,
         [svc["id"], env["id"]],
-        {"host": "placeholder"},
+        {"host": "_"},
         [{"jsonpath": "$.host", "sharedValueId": sv["id"]}],
     )
 
@@ -756,3 +757,151 @@ async def test_set_configuration_current_not_found(client):
         expect_errors=True,
     )
     assert_that(body).described_as("not found error").contains_key("errors")
+
+
+# -- Orchestrator validation tests --
+
+
+async def test_create_configuration_with_sentinel_and_substitution_succeeds(client):
+    """Happy path: body with sentinel and matching substitution succeeds."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv = await create_shared_value(client, "my_secret")
+
+    cfg = await _create_configuration(
+        client,
+        [svc["id"], env["id"]],
+        {"x": "_"},
+        [{"jsonpath": "$.x", "sharedValueId": sv["id"]}],
+    )
+    assert_that(cfg["id"]).described_as("configuration id").is_not_none()
+    assert_that(cfg["substitutions"]).described_as("substitutions count").is_length(1)
+    assert_that(cfg["substitutions"][0]["jsonpath"]).described_as(
+        "substitution jsonpath"
+    ).is_equal_to("$.x")
+
+
+async def test_create_configuration_missing_substitution_for_sentinel_raises_error(client):
+    """Body has a sentinel but no substitution provided — should raise ValidationError."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    body = await gql(
+        client,
+        CREATE_CONFIGURATION,
+        {
+            "input": {
+                "dimensionIds": [svc["id"], env["id"]],
+                "body": {"x": "_"},
+            }
+        },
+        expect_errors=True,
+    )
+    assert_that(body).described_as("validation error response").contains_key("errors")
+    error_message = body["errors"][0]["message"]
+    assert_that(error_message).described_as(
+        "error mentions missing path"
+    ).contains("$.x")
+
+
+async def test_create_configuration_extra_substitution_path_raises_error(client):
+    """Substitution provided for a path that has no sentinel in body — should raise ValidationError."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv = await create_shared_value(client, "unused_secret")
+
+    body = await gql(
+        client,
+        CREATE_CONFIGURATION,
+        {
+            "input": {
+                "dimensionIds": [svc["id"], env["id"]],
+                "body": {"x": 1},
+                "substitutions": [{"jsonpath": "$.y", "sharedValueId": sv["id"]}],
+            }
+        },
+        expect_errors=True,
+    )
+    assert_that(body).described_as("validation error response").contains_key("errors")
+    error_message = body["errors"][0]["message"]
+    assert_that(error_message).described_as(
+        "error mentions extra path"
+    ).contains("$.y")
+
+
+# -- projection field tests --
+
+CONFIGURATION_WITH_PROJECTION = """
+query Configuration($id: ID!) {
+    configuration(id: $id) {
+        id
+        body
+        projection
+    }
+}
+"""
+
+
+async def test_projection_with_resolved_substitution(client):
+    """projection returns body with sentinel replaced by the current revision value."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv = await create_shared_value(client, "db_password")
+
+    # Create a revision scoped to svc+env and mark it current
+    await create_revision(client, sv["id"], [svc["id"], env["id"]], "s3cr3t")
+
+    cfg = await _create_configuration(
+        client,
+        [svc["id"], env["id"]],
+        {"database": {"password": "_"}},
+        [{"jsonpath": "$.database.password", "sharedValueId": sv["id"]}],
+    )
+
+    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"id": cfg["id"]})
+    config = body["data"]["configuration"]
+    assert_that(config["projection"]).described_as(
+        "projection replaces sentinel with resolved value"
+    ).is_equal_to({"database": {"password": "s3cr3t"}})
+    assert_that(config["body"]).described_as(
+        "original body unchanged"
+    ).is_equal_to({"database": {"password": "_"}})
+
+
+async def test_projection_with_no_substitutions(client):
+    """projection on a configuration with no substitutions returns the body unchanged."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    cfg = await _create_configuration(
+        client,
+        [svc["id"], env["id"]],
+        {"host": "localhost", "port": 5432},
+    )
+
+    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"id": cfg["id"]})
+    config = body["data"]["configuration"]
+    assert_that(config["projection"]).described_as(
+        "projection equals body when no substitutions"
+    ).is_equal_to({"host": "localhost", "port": 5432})
+
+
+async def test_projection_with_unresolvable_substitution_leaves_sentinel(client):
+    """When a substitution has no current revision for the scope, projection leaves '_'."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv = await create_shared_value(client, "unresolved_secret")
+
+    # No revision created — substitution cannot be resolved
+    cfg = await _create_configuration(
+        client,
+        [svc["id"], env["id"]],
+        {"api_key": "_"},
+        [{"jsonpath": "$.api_key", "sharedValueId": sv["id"]}],
+    )
+
+    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"id": cfg["id"]})
+    config = body["data"]["configuration"]
+    assert_that(config["projection"]).described_as(
+        "unresolvable substitution keeps sentinel in projection"
+    ).is_equal_to({"api_key": "_"})
