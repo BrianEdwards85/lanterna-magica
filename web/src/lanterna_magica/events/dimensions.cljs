@@ -1,156 +1,157 @@
 (ns lanterna-magica.events.dimensions
-  (:require [lanterna-magica.config :as config]
-            [lanterna-magica.events :as-alias events]
-            [lanterna-magica.events.helpers :as h]
-            [lanterna-magica.gql :as gql]
-            [re-frame.core :as rf]
-            [re-graph.core :as re-graph]))
+  (:require
+   [lanterna-magica.config :as config]
+   [lanterna-magica.events :as-alias events]
+   [lanterna-magica.events.helpers :as h]
+   [lanterna-magica.gql :as gql]
+   [re-frame.core :as rf]
+   [re-graph.core :as re-graph]))
 
 ;; ---------------------------------------------------------------------------
 ;; Dimension Types
 ;; ---------------------------------------------------------------------------
 
 (rf/reg-event-fx
- ::events/fetch-dimension-types
- (fn [{:keys [db]} _]
-   (let [archived (:show-archived-types db)]
-     {:db       (h/start-loading db :dimension-types)
-      :dispatch [::re-graph/query
-                 {:query     gql/dimension-types-query
-                  :variables {:includeArchived (boolean archived)}
-                  :callback  [::events/on-dimension-types]}]})))
+  ::events/fetch-dimension-types
+  (fn [{:keys [db]} _]
+    (let [archived (:show-archived-types db)]
+      {:db       (h/start-loading db :dimension-types)
+       :dispatch [::re-graph/query
+                  {:query     gql/dimension-types-query
+                   :variables {:includeArchived (boolean archived)}
+                   :callback  [::events/on-dimension-types]}]})))
 
 (rf/reg-event-fx
- ::events/on-dimension-types
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [response]}]
-   (let [{:keys [data errors]} response
-         types (or (:dimensionTypes data) [])
-         current-sel (:selected-dimension-type-id db)
-         still-valid? (some #(= current-sel (:id %)) types)
-         selected (if still-valid? current-sel (:id (first types)))]
-     (cond-> {:db (-> db
-                      (assoc :dimension-types types)
-                      (assoc :selected-dimension-type-id selected)
-                      (h/stop-loading :dimension-types errors))}
-       (seq types)
-       (assoc :dispatch-n (into (mapv (fn [dt] [::events/fetch-dimensions-list (:id dt)]) types)
-                                (when selected [[::events/fetch-dimensions selected]])))))))
+  ::events/on-dimension-types
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [response]}]
+    (let [{:keys [data errors]} response
+          types (or (:dimensionTypes data) [])
+          current-sel (:selected-dimension-type-id db)
+          still-valid? (some #(= current-sel (:id %)) types)
+          selected (if still-valid? current-sel (:id (first types)))]
+      (cond-> {:db (-> db
+                       (assoc :dimension-types types)
+                       (assoc :selected-dimension-type-id selected)
+                       (h/stop-loading :dimension-types errors))}
+        (seq types)
+        (assoc :dispatch-n (into (mapv (fn [dt] [::events/fetch-dimensions-list (:id dt)]) types)
+                                 (when selected [[::events/fetch-dimensions selected]])))))))
 
 (rf/reg-event-fx
- ::events/select-dimension-type
- (fn [{:keys [db]} [_ type-id]]
-   {:db       (assoc db :selected-dimension-type-id type-id)
-    :dispatch [::events/fetch-dimensions type-id]}))
+  ::events/select-dimension-type
+  (fn [{:keys [db]} [_ type-id]]
+    {:db       (assoc db :selected-dimension-type-id type-id)
+     :dispatch [::events/fetch-dimensions type-id]}))
 
 (rf/reg-event-fx
- ::events/toggle-dimension-types-archived
- (fn [{:keys [db]} _]
-   {:db       (update db :show-archived-types not)
-    :dispatch [::events/fetch-dimension-types]}))
+  ::events/toggle-dimension-types-archived
+  (fn [{:keys [db]} _]
+    {:db       (update db :show-archived-types not)
+     :dispatch [::events/fetch-dimension-types]}))
 
 ;; --- Dimension Type Dialog ---
 
 (rf/reg-event-db
- ::events/open-dimension-type-dialog
- (fn [db [_ dt]]
-   (assoc db :dimension-type-dialog
-          {:open?          true
-           :editing        (some? dt)
-           :dimension-type (or dt {:name "" :priority 0})})))
+  ::events/open-dimension-type-dialog
+  (fn [db [_ dt]]
+    (assoc db :dimension-type-dialog
+           {:open?          true
+            :editing        (some? dt)
+            :dimension-type (or dt {:name "" :priority 0})})))
 
 (rf/reg-event-db
- ::events/close-dimension-type-dialog
- (fn [db _]
-   (assoc db :dimension-type-dialog {:open? false})))
+  ::events/close-dimension-type-dialog
+  (fn [db _]
+    (assoc db :dimension-type-dialog {:open? false})))
 
 (rf/reg-event-db
- ::events/set-dimension-type-field
- (fn [db [_ field value]]
-   (assoc-in db [:dimension-type-dialog :dimension-type field] value)))
+  ::events/set-dimension-type-field
+  (fn [db [_ field value]]
+    (assoc-in db [:dimension-type-dialog :dimension-type field] value)))
 
 (rf/reg-event-fx
- ::events/save-dimension-type
- (fn [{:keys [db]} _]
-   (let [{:keys [editing dimension-type]} (:dimension-type-dialog db)
-         mutation (if editing gql/update-dimension-type-mutation gql/create-dimension-type-mutation)
-         input    (if editing
-                    (select-keys dimension-type [:id :name])
-                    (select-keys dimension-type [:name]))]
-     {:db       (h/start-loading db :save-dimension-type)
-      :dispatch [::re-graph/mutate
-                 {:query     mutation
-                  :variables {:input input}
-                  :callback  [::events/on-dimension-type-saved]}]})))
+  ::events/save-dimension-type
+  (fn [{:keys [db]} _]
+    (let [{:keys [editing dimension-type]} (:dimension-type-dialog db)
+          mutation (if editing gql/update-dimension-type-mutation gql/create-dimension-type-mutation)
+          input    (if editing
+                     (select-keys dimension-type [:id :name])
+                     (select-keys dimension-type [:name]))]
+      {:db       (h/start-loading db :save-dimension-type)
+       :dispatch [::re-graph/mutate
+                  {:query     mutation
+                   :variables {:input input}
+                   :callback  [::events/on-dimension-type-saved]}]})))
 
 (rf/reg-event-fx
- ::events/on-dimension-type-saved
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [response]}]
-   (let [{:keys [errors]} response]
-     (if errors
-       {:db (h/stop-loading db :save-dimension-type errors)}
-       {:db       (-> db
-                      (h/stop-loading :save-dimension-type)
-                      (assoc :dimension-type-dialog {:open? false}))
-        :dispatch [::events/fetch-dimension-types]}))))
+  ::events/on-dimension-type-saved
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [response]}]
+    (let [{:keys [errors]} response]
+      (if errors
+        {:db (h/stop-loading db :save-dimension-type errors)}
+        {:db       (-> db
+                       (h/stop-loading :save-dimension-type)
+                       (assoc :dimension-type-dialog {:open? false}))
+         :dispatch [::events/fetch-dimension-types]}))))
 
 ;; --- Archive / Unarchive Dimension Type ---
 
 (rf/reg-event-fx
- ::events/archive-dimension-type
- (fn [{:keys [db]} [_ id]]
-   {:db       (h/start-loading db :archive-dimension-type)
-    :dispatch [::re-graph/mutate
-               {:query     gql/archive-dimension-type-mutation
-                :variables {:id id}
-                :callback  [::events/on-dimension-type-archive-toggled]}]}))
+  ::events/archive-dimension-type
+  (fn [{:keys [db]} [_ id]]
+    {:db       (h/start-loading db :archive-dimension-type)
+     :dispatch [::re-graph/mutate
+                {:query     gql/archive-dimension-type-mutation
+                 :variables {:id id}
+                 :callback  [::events/on-dimension-type-archive-toggled]}]}))
 
 (rf/reg-event-fx
- ::events/unarchive-dimension-type
- (fn [{:keys [db]} [_ id]]
-   {:db       (h/start-loading db :archive-dimension-type)
-    :dispatch [::re-graph/mutate
-               {:query     gql/unarchive-dimension-type-mutation
-                :variables {:id id}
-                :callback  [::events/on-dimension-type-archive-toggled]}]}))
+  ::events/unarchive-dimension-type
+  (fn [{:keys [db]} [_ id]]
+    {:db       (h/start-loading db :archive-dimension-type)
+     :dispatch [::re-graph/mutate
+                {:query     gql/unarchive-dimension-type-mutation
+                 :variables {:id id}
+                 :callback  [::events/on-dimension-type-archive-toggled]}]}))
 
 (rf/reg-event-fx
- ::events/on-dimension-type-archive-toggled
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [response]}]
-   (let [{:keys [errors]} response]
-     (if errors
-       {:db (h/stop-loading db :archive-dimension-type errors)}
-       {:db       (h/stop-loading db :archive-dimension-type)
-        :dispatch [::events/fetch-dimension-types]}))))
+  ::events/on-dimension-type-archive-toggled
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [response]}]
+    (let [{:keys [errors]} response]
+      (if errors
+        {:db (h/stop-loading db :archive-dimension-type errors)}
+        {:db       (h/stop-loading db :archive-dimension-type)
+         :dispatch [::events/fetch-dimension-types]}))))
 
 ;; --- Swap Dimension Type Priorities ---
 
 (rf/reg-event-fx
- ::events/move-dimension-type
- (fn [{:keys [db]} [_ type-id direction]]
-   (let [types (:dimension-types db)
-         idx   (.indexOf (mapv :id types) type-id)]
-     (when (>= idx 0)
-       (let [swap-idx (case direction :up (dec idx) :down (inc idx))]
-         (when (and (>= swap-idx 0) (< swap-idx (count types)))
-           (let [other-id (:id (nth types swap-idx))]
-             {:db       (h/start-loading db :swap-dimension-type)
-              :dispatch [::re-graph/mutate
-                         {:query     gql/swap-dimension-type-priorities-mutation
-                          :variables {:idA type-id :idB other-id}
-                          :callback  [::events/on-dimension-type-swapped]}]})))))))
+  ::events/move-dimension-type
+  (fn [{:keys [db]} [_ type-id direction]]
+    (let [types (:dimension-types db)
+          idx   (.indexOf (mapv :id types) type-id)]
+      (when (>= idx 0)
+        (let [swap-idx (case direction :up (dec idx) :down (inc idx))]
+          (when (and (>= swap-idx 0) (< swap-idx (count types)))
+            (let [other-id (:id (nth types swap-idx))]
+              {:db       (h/start-loading db :swap-dimension-type)
+               :dispatch [::re-graph/mutate
+                          {:query     gql/swap-dimension-type-priorities-mutation
+                           :variables {:idA type-id :idB other-id}
+                           :callback  [::events/on-dimension-type-swapped]}]})))))))
 
 (rf/reg-event-fx
- ::events/on-dimension-type-swapped
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [response]}]
-   (let [{:keys [errors]} response]
-     (if errors
-       {:db (h/stop-loading db :swap-dimension-type errors)}
-       {:db       (h/stop-loading db :swap-dimension-type)
-        :dispatch [::events/fetch-dimension-types]}))))
+  ::events/on-dimension-type-swapped
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [response]}]
+    (let [{:keys [errors]} response]
+      (if errors
+        {:db (h/stop-loading db :swap-dimension-type errors)}
+        {:db       (h/stop-loading db :swap-dimension-type)
+         :dispatch [::events/fetch-dimension-types]}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Dimensions (parameterized by type-id)
@@ -173,213 +174,213 @@
 ;; --- Fetch dimensions for a type ---
 
 (rf/reg-event-fx
- ::events/fetch-dimensions
- (fn [{:keys [db]} [_ type-id]]
-   (let [db       (ensure-page db type-id)
-         page     (get-in db (dims-page-path type-id))
-         search   (:search page)
-         archived (:show-archived page)]
-     {:db       (h/start-loading db :dimensions)
-      :dispatch [::re-graph/query
-                 {:query     gql/dimensions-query
-                  :variables {:typeId          type-id
-                              :search          (when (seq search) search)
+  ::events/fetch-dimensions
+  (fn [{:keys [db]} [_ type-id]]
+    (let [db       (ensure-page db type-id)
+          page     (get-in db (dims-page-path type-id))
+          search   (:search page)
+          archived (:show-archived page)]
+      {:db       (h/start-loading db :dimensions)
+       :dispatch [::re-graph/query
+                  {:query     gql/dimensions-query
+                   :variables {:typeId          type-id
+                               :search          (when (seq search) search)
 
-                              :includeArchived (boolean archived)
-                              :first           config/page-size}
-                  :callback  [::events/on-dimensions-fresh {:type-id type-id}]}]})))
-
-(rf/reg-event-fx
- ::events/load-more-dimensions
- (fn [{:keys [db]} [_ type-id]]
-   (let [page     (get-in db (dims-page-path type-id))
-         search   (:search page)
-         archived (:show-archived page)
-         cursor   (get-in page [:page-info :endCursor])]
-     {:db       (h/start-loading db :dimensions)
-      :dispatch [::re-graph/query
-                 {:query     gql/dimensions-query
-                  :variables {:typeId          type-id
-                              :search          (when (seq search) search)
-
-                              :includeArchived (boolean archived)
-                              :first           config/page-size
-                              :after           cursor}
-                  :callback  [::events/on-dimensions-append {:type-id type-id}]}]})))
+                               :includeArchived (boolean archived)
+                               :first           config/page-size}
+                   :callback  [::events/on-dimensions-fresh {:type-id type-id}]}]})))
 
 (rf/reg-event-fx
- ::events/on-dimensions-fresh
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [type-id response]}]
-   (let [{:keys [data errors]} response
-         connection (:dimensions data)
-         path (dims-page-path type-id)]
-     {:db (-> db
-              (assoc-in (conj path :edges) (:edges connection))
-              (assoc-in (conj path :page-info) (:pageInfo connection))
-              (h/stop-loading :dimensions errors))})))
+  ::events/load-more-dimensions
+  (fn [{:keys [db]} [_ type-id]]
+    (let [page     (get-in db (dims-page-path type-id))
+          search   (:search page)
+          archived (:show-archived page)
+          cursor   (get-in page [:page-info :endCursor])]
+      {:db       (h/start-loading db :dimensions)
+       :dispatch [::re-graph/query
+                  {:query     gql/dimensions-query
+                   :variables {:typeId          type-id
+                               :search          (when (seq search) search)
+
+                               :includeArchived (boolean archived)
+                               :first           config/page-size
+                               :after           cursor}
+                   :callback  [::events/on-dimensions-append {:type-id type-id}]}]})))
 
 (rf/reg-event-fx
- ::events/on-dimensions-append
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [type-id response]}]
-   (let [{:keys [data errors]} response
-         connection (:dimensions data)
-         path (dims-page-path type-id)]
-     {:db (-> db
-              (update-in (conj path :edges) into (:edges connection))
-              (assoc-in (conj path :page-info) (:pageInfo connection))
-              (h/stop-loading :dimensions errors))})))
+  ::events/on-dimensions-fresh
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [type-id response]}]
+    (let [{:keys [data errors]} response
+          connection (:dimensions data)
+          path (dims-page-path type-id)]
+      {:db (-> db
+               (assoc-in (conj path :edges) (:edges connection))
+               (assoc-in (conj path :page-info) (:pageInfo connection))
+               (h/stop-loading :dimensions errors))})))
+
+(rf/reg-event-fx
+  ::events/on-dimensions-append
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [type-id response]}]
+    (let [{:keys [data errors]} response
+          connection (:dimensions data)
+          path (dims-page-path type-id)]
+      {:db (-> db
+               (update-in (conj path :edges) into (:edges connection))
+               (assoc-in (conj path :page-info) (:pageInfo connection))
+               (h/stop-loading :dimensions errors))})))
 
 ;; --- Search / Archive Toggle ---
 
 (rf/reg-event-fx
- ::events/set-dimensions-search
- (fn [{:keys [db]} [_ type-id text]]
-   (let [db   (ensure-page db type-id)
-         path (dims-page-path type-id)]
-     {:db       (-> db
-                    (assoc-in (conj path :search) text)
-                    (assoc-in (conj path :edges) [])
-                    (assoc-in (conj path :page-info) {:hasNextPage false :endCursor nil}))
-      :dispatch [::events/fetch-dimensions type-id]})))
+  ::events/set-dimensions-search
+  (fn [{:keys [db]} [_ type-id text]]
+    (let [db   (ensure-page db type-id)
+          path (dims-page-path type-id)]
+      {:db       (-> db
+                     (assoc-in (conj path :search) text)
+                     (assoc-in (conj path :edges) [])
+                     (assoc-in (conj path :page-info) {:hasNextPage false :endCursor nil}))
+       :dispatch [::events/fetch-dimensions type-id]})))
 
 (rf/reg-event-fx
- ::events/toggle-dimensions-archived
- (fn [{:keys [db]} [_ type-id]]
-   (let [db   (ensure-page db type-id)
-         path (dims-page-path type-id)]
-     {:db       (-> db
-                    (update-in (conj path :show-archived) not)
-                    (assoc-in (conj path :edges) [])
-                    (assoc-in (conj path :page-info) {:hasNextPage false :endCursor nil}))
-      :dispatch [::events/fetch-dimensions type-id]})))
+  ::events/toggle-dimensions-archived
+  (fn [{:keys [db]} [_ type-id]]
+    (let [db   (ensure-page db type-id)
+          path (dims-page-path type-id)]
+      {:db       (-> db
+                     (update-in (conj path :show-archived) not)
+                     (assoc-in (conj path :edges) [])
+                     (assoc-in (conj path :page-info) {:hasNextPage false :endCursor nil}))
+       :dispatch [::events/fetch-dimensions type-id]})))
 
 ;; --- Dimension Dialog ---
 
 (rf/reg-event-db
- ::events/open-dimension-dialog
- (fn [db [_ type-id dimension]]
-   (assoc db :dimension-dialog
-          {:open?     true
-           :type-id   type-id
-           :editing   (some? dimension)
-           :dimension (or dimension {:name "" :description ""})})))
+  ::events/open-dimension-dialog
+  (fn [db [_ type-id dimension]]
+    (assoc db :dimension-dialog
+           {:open?     true
+            :type-id   type-id
+            :editing   (some? dimension)
+            :dimension (or dimension {:name "" :description ""})})))
 
 (rf/reg-event-db
- ::events/close-dimension-dialog
- (fn [db _]
-   (assoc db :dimension-dialog {:open? false})))
+  ::events/close-dimension-dialog
+  (fn [db _]
+    (assoc db :dimension-dialog {:open? false})))
 
 (rf/reg-event-db
- ::events/set-dimension-field
- (fn [db [_ field value]]
-   (assoc-in db [:dimension-dialog :dimension field] value)))
+  ::events/set-dimension-field
+  (fn [db [_ field value]]
+    (assoc-in db [:dimension-dialog :dimension field] value)))
 
 (rf/reg-event-fx
- ::events/save-dimension
- (fn [{:keys [db]} _]
-   (let [{:keys [editing dimension type-id]} (:dimension-dialog db)
-         mutation (if editing gql/update-dimension-mutation gql/create-dimension-mutation)
-         input    (if editing
-                    (select-keys dimension [:id :name :description])
-                    (assoc (select-keys dimension [:name :description])
-                           :typeId type-id))]
-     {:db       (h/start-loading db :save-dimension)
-      :dispatch [::re-graph/mutate
-                 {:query     mutation
-                  :variables {:input input}
-                  :callback  [::events/on-dimension-saved {:type-id type-id}]}]})))
+  ::events/save-dimension
+  (fn [{:keys [db]} _]
+    (let [{:keys [editing dimension type-id]} (:dimension-dialog db)
+          mutation (if editing gql/update-dimension-mutation gql/create-dimension-mutation)
+          input    (if editing
+                     (select-keys dimension [:id :name :description])
+                     (assoc (select-keys dimension [:name :description])
+                            :typeId type-id))]
+      {:db       (h/start-loading db :save-dimension)
+       :dispatch [::re-graph/mutate
+                  {:query     mutation
+                   :variables {:input input}
+                   :callback  [::events/on-dimension-saved {:type-id type-id}]}]})))
 
 (rf/reg-event-fx
- ::events/on-dimension-saved
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [type-id response]}]
-   (let [{:keys [errors]} response]
-     (if errors
-       {:db (h/stop-loading db :save-dimension errors)}
-       {:db       (-> db
-                      (h/stop-loading :save-dimension)
-                      (assoc :dimension-dialog {:open? false}))
-        :dispatch-n [[::events/fetch-dimensions type-id]
-                     [::events/fetch-dimensions-list type-id]]}))))
+  ::events/on-dimension-saved
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [type-id response]}]
+    (let [{:keys [errors]} response]
+      (if errors
+        {:db (h/stop-loading db :save-dimension errors)}
+        {:db       (-> db
+                       (h/stop-loading :save-dimension)
+                       (assoc :dimension-dialog {:open? false}))
+         :dispatch-n [[::events/fetch-dimensions type-id]
+                      [::events/fetch-dimensions-list type-id]]}))))
 
 ;; --- Archive / Unarchive Dimension ---
 
 (rf/reg-event-fx
- ::events/archive-dimension
- (fn [{:keys [db]} [_ type-id id]]
-   {:db       (h/start-loading db :archive-dimension)
-    :dispatch [::re-graph/mutate
-               {:query     gql/archive-dimension-mutation
-                :variables {:id id}
-                :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
+  ::events/archive-dimension
+  (fn [{:keys [db]} [_ type-id id]]
+    {:db       (h/start-loading db :archive-dimension)
+     :dispatch [::re-graph/mutate
+                {:query     gql/archive-dimension-mutation
+                 :variables {:id id}
+                 :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
 
 (rf/reg-event-fx
- ::events/unarchive-dimension
- (fn [{:keys [db]} [_ type-id id]]
-   {:db       (h/start-loading db :archive-dimension)
-    :dispatch [::re-graph/mutate
-               {:query     gql/unarchive-dimension-mutation
-                :variables {:id id}
-                :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
+  ::events/unarchive-dimension
+  (fn [{:keys [db]} [_ type-id id]]
+    {:db       (h/start-loading db :archive-dimension)
+     :dispatch [::re-graph/mutate
+                {:query     gql/unarchive-dimension-mutation
+                 :variables {:id id}
+                 :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
 
 (rf/reg-event-fx
- ::events/on-dimension-archive-toggled
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [type-id response]}]
-   (let [{:keys [errors]} response]
-     (if errors
-       {:db (h/stop-loading db :archive-dimension errors)}
-       {:db       (-> db
-                      (h/stop-loading :archive-dimension)
-                      (assoc :dimension-dialog {:open? false}))
-        :dispatch-n [[::events/fetch-dimensions type-id]
-                     [::events/fetch-dimensions-list type-id]]}))))
+  ::events/on-dimension-archive-toggled
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [type-id response]}]
+    (let [{:keys [errors]} response]
+      (if errors
+        {:db (h/stop-loading db :archive-dimension errors)}
+        {:db       (-> db
+                       (h/stop-loading :archive-dimension)
+                       (assoc :dimension-dialog {:open? false}))
+         :dispatch-n [[::events/fetch-dimensions type-id]
+                      [::events/fetch-dimensions-list type-id]]}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Flat dimension lists for dropdowns (per type)
 ;; ---------------------------------------------------------------------------
 
 (rf/reg-event-fx
- ::events/fetch-dimensions-list
- (fn [_ [_ type-id]]
-   {:dispatch [::re-graph/query
-               {:query     gql/dimensions-query
-                :variables {:typeId type-id :first 10}
-                :callback  [::events/on-dimensions-list {:type-id type-id}]}]}))
+  ::events/fetch-dimensions-list
+  (fn [_ [_ type-id]]
+    {:dispatch [::re-graph/query
+                {:query     gql/dimensions-query
+                 :variables {:typeId type-id :first 10}
+                 :callback  [::events/on-dimensions-list {:type-id type-id}]}]}))
 
 (rf/reg-event-fx
- ::events/on-dimensions-list
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [type-id response]}]
-   (let [{:keys [data]} response
-         nodes (mapv :node (get-in data [:dimensions :edges]))]
-     {:db (assoc-in db [:all-dimensions type-id] nodes)})))
+  ::events/on-dimensions-list
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [type-id response]}]
+    (let [{:keys [data]} response
+          nodes (mapv :node (get-in data [:dimensions :edges]))]
+      {:db (assoc-in db [:all-dimensions type-id] nodes)})))
 
 ;; ---------------------------------------------------------------------------
 ;; Search dimensions for dropdowns (per type)
 ;; ---------------------------------------------------------------------------
 
 (rf/reg-event-fx
- ::events/search-dimensions-list
- (fn [_ [_ type-id query]]
-   (if (seq query)
-     {:dispatch [::re-graph/query
-                 {:query     gql/dimensions-query
-                  :variables {:typeId type-id :search query :first 10}
-                  :callback  [::events/on-dimensions-search-results {:type-id type-id}]}]}
-     {:dispatch [::events/clear-dimensions-search-results type-id]})))
+  ::events/search-dimensions-list
+  (fn [_ [_ type-id query]]
+    (if (seq query)
+      {:dispatch [::re-graph/query
+                  {:query     gql/dimensions-query
+                   :variables {:typeId type-id :search query :first 10}
+                   :callback  [::events/on-dimensions-search-results {:type-id type-id}]}]}
+      {:dispatch [::events/clear-dimensions-search-results type-id]})))
 
 (rf/reg-event-fx
- ::events/on-dimensions-search-results
- [rf/unwrap]
- (fn [{:keys [db]} {:keys [type-id response]}]
-   (let [{:keys [data]} response
-         nodes (mapv :node (get-in data [:dimensions :edges]))]
-     {:db (assoc-in db [:dimensions-search-results type-id] nodes)})))
+  ::events/on-dimensions-search-results
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [type-id response]}]
+    (let [{:keys [data]} response
+          nodes (mapv :node (get-in data [:dimensions :edges]))]
+      {:db (assoc-in db [:dimensions-search-results type-id] nodes)})))
 
 (rf/reg-event-db
- ::events/clear-dimensions-search-results
- (fn [db [_ type-id]]
-   (assoc-in db [:dimensions-search-results type-id] nil)))
+  ::events/clear-dimensions-search-results
+  (fn [db [_ type-id]]
+    (assoc-in db [:dimensions-search-results type-id] nil)))

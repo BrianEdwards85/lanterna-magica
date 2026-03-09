@@ -1,9 +1,10 @@
 (ns lanterna-magica.components.dimension-picker
   "Shared dimension picker — renders a per-type searchable select."
-  (:require [lanterna-magica.components.select :as sel]
-            [lanterna-magica.events :as events]
-            [lanterna-magica.subs :as subs]
-            [re-frame.core :as rf]))
+  (:require
+   [lanterna-magica.components.select :as sel]
+   [lanterna-magica.events :as events]
+   [lanterna-magica.subs :as subs]
+   [re-frame.core :as rf]))
 
 (defn dimension-picker
   "A per-type searchable select that toggles dimension IDs.

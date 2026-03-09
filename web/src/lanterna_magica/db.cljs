@@ -28,15 +28,15 @@
 
    ;; Shared values page
    :shared-values-page  {:edges [] :page-info {:hasNextPage false :endCursor nil}
-                          :search "" :show-archived false
-                          :selected-id nil
-                          :revisions {:edges []}
-                          :revisions-page-info nil}
+                         :search "" :show-archived false
+                         :selected-id nil
+                         :revisions {:edges []}
+                         :revisions-page-info nil}
 
    ;; Configurations page — filter by dimension ids
    :configurations-page {:edges [] :page-info {:hasNextPage false :endCursor nil}
-                          :filter-dimension-ids []
-                          :selected-id nil :selected nil}
+                         :filter-dimension-ids []
+                         :selected-id nil :selected nil}
 
    ;; Dialog state
    :shared-value-dialog {:open? false}

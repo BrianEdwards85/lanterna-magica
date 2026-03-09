@@ -1,6 +1,7 @@
 (ns lanterna-magica.views.home
-  (:require [lanterna-magica.bp :as bp]
-            [lanterna-magica.routes :as routes]))
+  (:require
+   [lanterna-magica.bp :as bp]
+   [lanterna-magica.routes :as routes]))
 
 (defn- nav-card [title description icon-name route-key]
   [:div {:class "bp6-card bp6-interactive p-4 cursor-pointer"

@@ -1,5 +1,6 @@
 (ns lanterna-magica.events
-  (:require [lanterna-magica.events.init]
-            [lanterna-magica.events.dimensions]
-            [lanterna-magica.events.shared-values]
-            [lanterna-magica.events.configurations]))
+  (:require
+   [lanterna-magica.events.configurations]
+   [lanterna-magica.events.dimensions]
+   [lanterna-magica.events.init]
+   [lanterna-magica.events.shared-values]))

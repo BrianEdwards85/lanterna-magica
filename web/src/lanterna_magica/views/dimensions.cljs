@@ -1,10 +1,18 @@
 (ns lanterna-magica.views.dimensions
-  (:require [lanterna-magica.bp :as bp]
-            [lanterna-magica.events :as events]
-            [lanterna-magica.subs :as subs]
-            [lanterna-magica.views.components :as comp]
-            [re-frame.core :as rf]
-            [reagent.core :as r]))
+  (:require
+   [lanterna-magica.bp :as bp]
+   [lanterna-magica.components.archived-banner :as archived-banner]
+   [lanterna-magica.components.entity-card :as entity-card]
+   [lanterna-magica.components.error-banner :as error-banner]
+   [lanterna-magica.components.inputs :as inputs]
+   [lanterna-magica.components.load-more :as load-more]
+   [lanterna-magica.components.page-header :as page-header]
+   [lanterna-magica.components.search-bar :as search-bar]
+   [lanterna-magica.components.states :as states]
+   [lanterna-magica.events :as events]
+   [lanterna-magica.subs :as subs]
+   [re-frame.core :as rf]
+   [reagent.core :as r]))
 
 ;; ---------------------------------------------------------------------------
 ;; Create / Edit Dimension Dialog
@@ -24,25 +32,23 @@
                     :class    "w-full max-w-md"}
          [bp/dialog-body
           (when (and editing archived?)
-            [:div {:class "mb-4 p-3 rounded bg-tn-orange/10 text-tn-orange text-sm flex items-center gap-2"}
-             [bp/icon {:icon "warning-sign" :size 14}]
-             "This dimension is archived."])
+            [archived-banner/archived-banner "This dimension is archived."])
 
           [:div.mb-4
            [:label.bp6-label "Name"]
-           [comp/local-input {:value       (or (:name dimension) "")
-                              :placeholder "e.g. production"
-                              :disabled    (and editing archived?)
-                              :on-change   #(rf/dispatch [::events/set-dimension-field :name %])}]]
+           [inputs/local-input {:value       (or (:name dimension) "")
+                                :placeholder "e.g. production"
+                                :disabled    (and editing archived?)
+                                :on-change   #(rf/dispatch [::events/set-dimension-field :name %])}]]
           [:div.mb-4
            [:label.bp6-label "Description " [:span.text-tn-fg-dim "(optional)"]]
-           [comp/local-input {:value       (or (:description dimension) "")
-                              :placeholder "What this dimension represents..."
-                              :disabled    (and editing archived?)
-                              :on-change   #(rf/dispatch [::events/set-dimension-field :description %])}]]
+           [inputs/local-input {:value       (or (:description dimension) "")
+                                :placeholder "What this dimension represents..."
+                                :disabled    (and editing archived?)
+                                :on-change   #(rf/dispatch [::events/set-dimension-field :description %])}]]
 
           (when save-error
-            [comp/error-banner "Failed to save dimension." save-error])
+            [error-banner/error-banner "Failed to save dimension." save-error])
 
           (when editing
             [:div {:class "mt-6 pt-4 border-t border-tn-border"}
@@ -57,12 +63,12 @@
          [bp/dialog-footer
           {:actions
            (r/as-element
-            [:<>
-             [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-dimension-dialog])}]
-             (when-not archived?
-               [bp/button {:text "Save" :intent "primary" :icon "tick"
-                           :loading saving?
-                           :on-click #(rf/dispatch [::events/save-dimension])}])])}]]))))
+             [:<>
+              [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-dimension-dialog])}]
+              (when-not archived?
+                [bp/button {:text "Save" :intent "primary" :icon "tick"
+                            :loading saving?
+                            :on-click #(rf/dispatch [::events/save-dimension])}])])}]]))))
 
 ;; ---------------------------------------------------------------------------
 ;; Create Dimension Type Dialog
@@ -82,17 +88,15 @@
                     :class    "w-full max-w-md"}
          [bp/dialog-body
           (when (and editing archived?)
-            [:div {:class "mb-4 p-3 rounded bg-tn-orange/10 text-tn-orange text-sm flex items-center gap-2"}
-             [bp/icon {:icon "warning-sign" :size 14}]
-             "This dimension type is archived."])
+            [archived-banner/archived-banner "This dimension type is archived."])
           [:div.mb-4
            [:label.bp6-label "Name"]
-           [comp/local-input {:value       (or (:name dimension-type) "")
-                              :placeholder "e.g. region"
-                              :disabled    (and editing archived?)
-                              :on-change   #(rf/dispatch [::events/set-dimension-type-field :name %])}]]
+           [inputs/local-input {:value       (or (:name dimension-type) "")
+                                :placeholder "e.g. region"
+                                :disabled    (and editing archived?)
+                                :on-change   #(rf/dispatch [::events/set-dimension-type-field :name %])}]]
           (when save-error
-            [comp/error-banner (str "Failed to " (if editing "update" "create") " dimension type.") save-error])
+            [error-banner/error-banner (str "Failed to " (if editing "update" "create") " dimension type.") save-error])
           (when editing
             [:div {:class "mt-6 pt-4 border-t border-tn-border"}
              (if archived?
@@ -105,12 +109,12 @@
          [bp/dialog-footer
           {:actions
            (r/as-element
-            [:<>
-             [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-dimension-type-dialog])}]
-             (when-not archived?
-               [bp/button {:text "Save" :intent "primary" :icon "tick"
-                           :loading saving?
-                           :on-click #(rf/dispatch [::events/save-dimension-type])}])])}]]))))
+             [:<>
+              [bp/button {:text "Cancel" :on-click #(rf/dispatch [::events/close-dimension-type-dialog])}]
+              (when-not archived?
+                [bp/button {:text "Save" :intent "primary" :icon "tick"
+                            :loading saving?
+                            :on-click #(rf/dispatch [::events/save-dimension-type])}])])}]]))))
 
 ;; ---------------------------------------------------------------------------
 ;; Left sidebar — dimension type list
@@ -171,11 +175,11 @@
                    :loading  loading?
                    :on-click #(rf/dispatch [::events/fetch-dimension-types])}]]]
      [:div.mb-3
-      [comp/archive-toggle {:checked   show-archived
-                            :on-change #(rf/dispatch [::events/toggle-dimension-types-archived])}]]
+      [search-bar/archive-toggle {:checked   show-archived
+                                  :on-change #(rf/dispatch [::events/toggle-dimension-types-archived])}]]
      (cond
        (and loading? (empty? dim-types))
-       [comp/loading-spinner]
+       [states/loading-spinner]
 
        (empty? dim-types)
        [:div.text-sm.text-tn-fg-dim.p-2 "No dimension types yet."]
@@ -196,9 +200,9 @@
         dim-types   @(rf/subscribe [::subs/dimension-types])
         sel-type    (some #(when (= (:id %) selected-id) %) dim-types)]
     (if-not sel-type
-      [comp/empty-state {:icon        "tag"
-                         :title       "Select a dimension type"
-                         :description "Choose a dimension type from the left to view its dimensions."}]
+      [states/empty-state {:icon        "tag"
+                           :title       "Select a dimension type"
+                           :description "Choose a dimension type from the left to view its dimensions."}]
       (let [type-id    (:id sel-type)
             type-name  (:name sel-type)
             page       @(rf/subscribe [::subs/dimensions-page type-id])
@@ -207,40 +211,40 @@
             page-error @(rf/subscribe [::subs/error :dimensions])]
         [:div.flex-1.pl-4
          (when page-error
-           [comp/error-banner (str "Failed to load " type-name " dimensions.") page-error])
+           [error-banner/error-banner (str "Failed to load " type-name " dimensions.") page-error])
 
-         [comp/page-header {:title      type-name
-                            :loading?   loading?
-                            :on-refresh #(rf/dispatch [::events/fetch-dimensions type-id])
-                            :on-create  #(rf/dispatch [::events/open-dimension-dialog type-id nil])}]
+         [page-header/page-header {:title      type-name
+                                   :loading?   loading?
+                                   :on-refresh #(rf/dispatch [::events/fetch-dimensions type-id])
+                                   :on-create  #(rf/dispatch [::events/open-dimension-dialog type-id nil])}]
 
-         [comp/search-bar {:search              (or search "")
-                           :on-search-change    #(rf/dispatch [::events/set-dimensions-search type-id %])
-                           :show-archived       show-archived
-                           :on-toggle-archived  #(rf/dispatch [::events/toggle-dimensions-archived type-id])
-                           :placeholder         (str "Search " type-name "...")}]
+         [search-bar/search-bar {:search              (or search "")
+                                 :on-search-change    #(rf/dispatch [::events/set-dimensions-search type-id %])
+                                 :show-archived       show-archived
+                                 :on-toggle-archived  #(rf/dispatch [::events/toggle-dimensions-archived type-id])
+                                 :placeholder         (str "Search " type-name "...")}]
 
          (cond
            (and loading? (empty? edges))
-           [comp/loading-spinner]
+           [states/loading-spinner]
 
            (empty? edges)
-           [comp/empty-state {:icon        "tag"
-                              :title       (str "No " type-name " found")
-                              :description (if (seq search)
-                                             "Try a different search term."
-                                             "Create your first dimension to get started.")}]
+           [states/empty-state {:icon        "tag"
+                                :title       (str "No " type-name " found")
+                                :description (if (seq search)
+                                               "Try a different search term."
+                                               "Create your first dimension to get started.")}]
 
            :else
            [:div
             (for [edge edges]
               ^{:key (get-in edge [:node :id])}
-              [comp/entity-card
+              [entity-card/entity-card
                {:name        (get-in edge [:node :name])
                 :description (get-in edge [:node :description])
                 :archived?   (some? (get-in edge [:node :archivedAt]))
                 :on-click    #(rf/dispatch [::events/open-dimension-dialog type-id (:node edge)])}])
-            [comp/load-more-button
+            [load-more/load-more-button
              {:has-next? (:hasNextPage page-info)
               :loading?  loading?
               :on-click  #(rf/dispatch [::events/load-more-dimensions type-id])}]])]))))

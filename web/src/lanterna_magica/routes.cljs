@@ -1,8 +1,9 @@
 (ns lanterna-magica.routes
-  (:require [lanterna-magica.events :as-alias events]
-            [re-frame.core :as rf]
-            [reitit.frontend :as rtf]
-            [reitit.frontend.easy :as rtfe]))
+  (:require
+   [lanterna-magica.events :as-alias events]
+   [re-frame.core :as rf]
+   [reitit.frontend :as rtf]
+   [reitit.frontend.easy :as rtfe]))
 
 (def routes
   [["/"                {:name :route/home}]
@@ -16,9 +17,9 @@
 
 (defn start! []
   (rtfe/start!
-   (rtf/router routes)
-   on-navigate
-   {:use-fragment false}))
+    (rtf/router routes)
+    on-navigate
+    {:use-fragment false}))
 
 (def ^:private route->fetch-event
   {:route/dimensions      [::events/fetch-dimension-types]
@@ -26,13 +27,13 @@
    :route/configurations  [::events/fetch-configurations]})
 
 (rf/reg-event-fx
- ::navigated
- (fn [{:keys [db]} [_ match]]
-   (let [route-name (get-in match [:data :name])
-         effects    {:db (assoc db :current-route match)}]
-     (if-let [event (route->fetch-event route-name)]
-       (assoc effects :dispatch event)
-       effects))))
+  ::navigated
+  (fn [{:keys [db]} [_ match]]
+    (let [route-name (get-in match [:data :name])
+          effects    {:db (assoc db :current-route match)}]
+      (if-let [event (route->fetch-event route-name)]
+        (assoc effects :dispatch event)
+        effects))))
 
 (defn navigate! [route-name]
   (rtfe/navigate route-name))

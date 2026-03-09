@@ -1,8 +1,9 @@
 (ns lanterna-magica.bp
   "Reagent wrappers for Blueprint.js React components."
-  (:require ["@blueprintjs/core" :as bp]
-            ["@blueprintjs/select" :as bp-select]
-            [reagent.core :as r]))
+  (:require
+   ["@blueprintjs/core" :as bp]
+   ["@blueprintjs/select" :as bp-select]
+   [reagent.core :as r]))
 
 (def button          (r/adapt-react-class bp/Button))
 (def callout         (r/adapt-react-class bp/Callout))

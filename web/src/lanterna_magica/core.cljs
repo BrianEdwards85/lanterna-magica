@@ -1,14 +1,15 @@
 (ns lanterna-magica.core
-  (:require [lanterna-magica.events :as events]
-            [lanterna-magica.routes :as routes]
-            [lanterna-magica.subs :as subs]
-            [lanterna-magica.views.header :as header]
-            [lanterna-magica.views.home :as home]
-            [lanterna-magica.views.dimensions :as dimensions]
-            [lanterna-magica.views.shared-values :as shared-values]
-            [lanterna-magica.views.configurations :as configurations]
-            [re-frame.core :as rf]
-            [reagent.dom.client :as rdc]))
+  (:require
+   [lanterna-magica.events :as events]
+   [lanterna-magica.routes :as routes]
+   [lanterna-magica.subs :as subs]
+   [lanterna-magica.views.configurations :as configurations]
+   [lanterna-magica.views.dimensions :as dimensions]
+   [lanterna-magica.views.header :as header]
+   [lanterna-magica.views.home :as home]
+   [lanterna-magica.views.shared-values :as shared-values]
+   [re-frame.core :as rf]
+   [reagent.dom.client :as rdc]))
 
 (defonce root (atom nil))
 

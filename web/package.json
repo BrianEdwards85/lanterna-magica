@@ -6,6 +6,8 @@
     "dev": "concurrently --names cljs,css -c blue,magenta \"npx shadow-cljs watch app\" \"npx postcss src/css/app.css -o resources/public/css/app.css --watch\"",
     "css:build": "npx postcss src/css/app.css -o resources/public/css/app.css --minify",
     "cljs:release": "npx shadow-cljs release app",
+    "cljs:format": "npx standard-clj fix src/",
+    "cljs:format:check": "npx standard-clj check src/",
     "postinstall": "mkdir -p resources/public/css/vendor && cp node_modules/@blueprintjs/core/lib/css/blueprint.css resources/public/css/vendor/ && cp node_modules/@blueprintjs/icons/lib/css/blueprint-icons.css resources/public/css/vendor/"
   },
   "dependencies": {
@@ -17,6 +19,7 @@
     "react-dom": "^18.3.0"
   },
   "devDependencies": {
+    "@chrisoakman/standard-clojure-style": "^0.26.0",
     "@tailwindcss/postcss": "^4.1.0",
     "concurrently": "^9.1.0",
     "postcss": "^8.5.0",

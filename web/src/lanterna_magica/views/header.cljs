@@ -1,8 +1,9 @@
 (ns lanterna-magica.views.header
-  (:require [lanterna-magica.bp :as bp]
-            [lanterna-magica.routes :as routes]
-            [lanterna-magica.subs :as subs]
-            [re-frame.core :as rf]))
+  (:require
+   [lanterna-magica.bp :as bp]
+   [lanterna-magica.routes :as routes]
+   [lanterna-magica.subs :as subs]
+   [re-frame.core :as rf]))
 
 (defn header []
   (let [route-name @(rf/subscribe [::subs/current-route-name])]

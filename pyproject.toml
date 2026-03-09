@@ -43,6 +43,8 @@ dev = "uvicorn lanterna_magica.app:app --reload --host 0.0.0.0 --port 8000"
 "build:web" = {shell = "cd web && npm run css:build && npm run cljs:release"}
 lint = "ruff check src/"
 format = "ruff format src/"
+"format:cljs" = {shell = "cd web && npm run cljs:format"}
+"lint:cljs" = {shell = "cd web && npm run cljs:format:check"}
 test = "pytest tests/ -v"
 test-unit = "pytest tests/unit -v"
 test-integration = "pytest tests/integration -v"
