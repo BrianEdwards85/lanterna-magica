@@ -47,6 +47,29 @@ class Configurations:
         ]
         return rows
 
+
+    async def get_configurations_by_shared_value(
+        self,
+        *,
+        shared_value_id: str,
+        include_archived: bool = False,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> dict:
+        limit = page_limit(first)
+        after_id = decode_cursor(after) if after else None
+        rows = [
+            dict(r)
+            async for r in queries.get_configurations_by_shared_value_id(
+                self.pool,
+                shared_value_id=shared_value_id,
+                include_archived=include_archived,
+                after_id=after_id,
+                page_limit=limit + 1,
+            )
+        ]
+        return build_connection(rows, "id", limit)
+
     async def create_configuration(
         self,
         *,

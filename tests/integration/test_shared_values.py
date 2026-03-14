@@ -1046,3 +1046,60 @@ async def test_resolve_for_scope_specificity_tiebreaker(client, pool):
     assert_that(str(result["id"])).described_as(
         "specific revision id returned"
     ).is_equal_to(rev_specific["id"])
+
+
+# -- resolveSharedValue query tests --
+
+RESOLVE_SHARED_VALUE = """
+query ResolveSharedValue($sharedValueId: ID!, $dimensionIds: [ID!]!) {
+    resolveSharedValue(sharedValueId: $sharedValueId, dimensionIds: $dimensionIds) {
+        id sharedValue { id } dimensions { id name } value isCurrent createdAt
+    }
+}
+"""
+
+
+async def test_resolve_shared_value_match(client):
+    """resolveSharedValue returns the best-matching current revision."""
+    sv = await create_shared_value(client, "gql_resolve_match")
+    svc = await create_service(client, "gql-svc")
+    env = await create_environment(client, "gql-env")
+
+    rev = await create_revision(client, sv["id"], [svc["id"], env["id"]], "gql-secret")
+
+    body = await gql(
+        client,
+        RESOLVE_SHARED_VALUE,
+        {"sharedValueId": sv["id"], "dimensionIds": [svc["id"], env["id"]]},
+    )
+    result = body["data"]["resolveSharedValue"]
+
+    assert_that(result).described_as("result should not be null").is_not_none()
+    assert_that(result["id"]).described_as("returned revision id").is_equal_to(rev["id"])
+    assert_that(result["value"]).described_as("returned revision value").is_equal_to("gql-secret")
+    assert_that(result["sharedValue"]["id"]).described_as(
+        "revision belongs to correct shared value"
+    ).is_equal_to(sv["id"])
+    assert_that(result["isCurrent"]).described_as("revision is current").is_true()
+
+
+async def test_resolve_shared_value_no_match(client):
+    """resolveSharedValue returns null when no revision covers the given scope."""
+    sv = await create_shared_value(client, "gql_resolve_no_match")
+    svc1 = await create_service(client, "gql-svc-nomatch-1")
+    svc2 = await create_service(client, "gql-svc-nomatch-2")
+    env = await create_environment(client, "gql-env-nomatch")
+
+    # Create a revision scoped to svc2 — should NOT match a query for svc1
+    await create_revision(client, sv["id"], [svc2["id"], env["id"]], "wrong-svc-val")
+
+    body = await gql(
+        client,
+        RESOLVE_SHARED_VALUE,
+        {"sharedValueId": sv["id"], "dimensionIds": [svc1["id"], env["id"]]},
+    )
+    result = body["data"]["resolveSharedValue"]
+
+    assert_that(result).described_as(
+        "no matching revision should return null"
+    ).is_none()

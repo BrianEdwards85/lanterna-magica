@@ -109,11 +109,32 @@
                      (assoc-in [:shared-values-page :selected-id] id)
                      (assoc-in [:shared-values-page :revisions] {:edges []})
                      (assoc-in [:shared-values-page :revisions-page-info] nil))
-       :dispatch [::events/fetch-revisions id]}
-      {:db (-> db
-               (assoc-in [:shared-values-page :selected-id] nil)
-               (assoc-in [:shared-values-page :revisions] {:edges []})
-               (assoc-in [:shared-values-page :revisions-page-info] nil))})))
+       :navigate [:route/shared-value {:id id}]}
+      {:db       (-> db
+                     (assoc-in [:shared-values-page :selected-id] nil)
+                     (assoc-in [:shared-values-page :selected] nil)
+                     (assoc-in [:shared-values-page :revisions] {:edges []})
+                     (assoc-in [:shared-values-page :revisions-page-info] nil))
+       :navigate :route/shared-values})))
+
+(rf/reg-event-fx
+  ::events/load-shared-value
+  (fn [{:keys [db]} [_ id]]
+    {:db       (-> db
+                   (assoc-in [:shared-values-page :selected-id] id)
+                   (assoc-in [:shared-values-page :revisions] {:edges []})
+                   (assoc-in [:shared-values-page :revisions-page-info] nil))
+     :dispatch [::events/fetch-revisions id]}))
+
+(rf/reg-event-db
+  ::events/deselect-shared-value
+  (fn [db _]
+    (-> db
+        (assoc-in [:shared-values-page :selected-id] nil)
+        (assoc-in [:shared-values-page :selected] nil)
+        (assoc-in [:shared-values-page :revisions] {:edges []})
+        (assoc-in [:shared-values-page :revisions-page-info] nil)
+        (assoc-in [:shared-values-page :used-by] nil))))
 
 (rf/reg-event-fx
   ::events/fetch-revisions
@@ -132,11 +153,20 @@
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
     (let [{:keys [data errors]} response
-          connection (get-in data [:sharedValue :revisions])]
-      {:db (-> db
-               (assoc-in [:shared-values-page :revisions] {:edges (:edges connection)})
-               (assoc-in [:shared-values-page :revisions-page-info] (:pageInfo connection))
-               (h/stop-loading :revisions errors))})))
+          shared-value (get data :sharedValue)
+          connection   (:revisions shared-value)]
+      (if (and (nil? shared-value) (nil? errors))
+        {:db       (-> db
+                       (assoc-in [:shared-values-page :selected-id] nil)
+                       (assoc-in [:shared-values-page :selected] nil)
+                       (h/stop-loading :revisions))
+         :navigate :route/shared-values}
+        {:db (-> db
+                 (assoc-in [:shared-values-page :selected] shared-value)
+                 (assoc-in [:shared-values-page :revisions] {:edges (:edges connection)})
+                 (assoc-in [:shared-values-page :revisions-page-info] (:pageInfo connection))
+                 (assoc-in [:shared-values-page :used-by] (:usedBy shared-value))
+                 (h/stop-loading :revisions errors))}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Load More Revisions
@@ -210,12 +240,14 @@
   ::events/on-shared-value-saved
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
-    (let [{:keys [errors]} response]
+    (let [{:keys [errors]} response
+          editing (get-in db [:shared-value-dialog :editing])]
       (if errors
         {:db (h/stop-loading db :save-shared-value errors)}
         {:db       (-> db
                        (h/stop-loading :save-shared-value)
                        (assoc :shared-value-dialog {:open? false}))
+         :toast    {:message (if editing "Shared value updated." "Shared value created.")}
          :dispatch [::events/fetch-shared-values]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -229,7 +261,7 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/archive-shared-value-mutation
                  :variables {:id id}
-                 :callback  [::events/on-shared-value-archive-toggled]}]}))
+                 :callback  [::events/on-shared-value-archive-toggled {:action :archive}]}]}))
 
 (rf/reg-event-fx
   ::events/unarchive-shared-value
@@ -238,18 +270,19 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/unarchive-shared-value-mutation
                  :variables {:id id}
-                 :callback  [::events/on-shared-value-archive-toggled]}]}))
+                 :callback  [::events/on-shared-value-archive-toggled {:action :unarchive}]}]}))
 
 (rf/reg-event-fx
   ::events/on-shared-value-archive-toggled
   [rf/unwrap]
-  (fn [{:keys [db]} {:keys [response]}]
+  (fn [{:keys [db]} {:keys [action response]}]
     (let [{:keys [errors]} response]
       (if errors
         {:db (h/stop-loading db :archive-shared-value errors)}
         {:db       (-> db
                        (h/stop-loading :archive-shared-value)
                        (assoc :shared-value-dialog {:open? false}))
+         :toast    {:message (if (= action :archive) "Shared value archived." "Shared value unarchived.")}
          :dispatch [::events/fetch-shared-values]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -263,17 +296,18 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/set-revision-current-mutation
                  :variables {:id id :isCurrent is-current}
-                 :callback  [::events/on-revision-current-set]}]}))
+                 :callback  [::events/on-revision-current-set {:is-current is-current}]}]}))
 
 (rf/reg-event-fx
   ::events/on-revision-current-set
   [rf/unwrap]
-  (fn [{:keys [db]} {:keys [response]}]
+  (fn [{:keys [db]} {:keys [is-current response]}]
     (let [{:keys [errors]} response
           sv-id (get-in db [:shared-values-page :selected-id])]
       (if errors
         {:db (h/stop-loading db :set-revision-current errors)}
         {:db       (h/stop-loading db :set-revision-current)
+         :toast    {:message (if is-current "Revision made current." "Revision deactivated.")}
          :dispatch [::events/fetch-revisions sv-id]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -282,12 +316,15 @@
 
 (rf/reg-event-db
   ::events/open-revision-dialog
-  (fn [db [_ shared-value-id]]
+  (fn [db [_ shared-value-id {:keys [dimension-ids value-text string-mode?]
+                               :or   {dimension-ids [] value-text "" string-mode? false}}]]
     (assoc db :revision-dialog
            {:open?    true
             :revision {:sharedValueId  shared-value-id
-                       :dimensionIds   []
-                       :value-text     ""}})))
+                       :dimensionIds   dimension-ids
+                       :value-text     value-text
+                       :string-mode?   string-mode?
+                       :value-valid?   true}})))
 
 (rf/reg-event-db
   ::events/close-revision-dialog
@@ -309,16 +346,29 @@
                     (conj current dimension-id))]
       (assoc-in db path updated))))
 
+(rf/reg-event-db
+  ::events/toggle-revision-string-mode
+  (fn [db _]
+    (update-in db [:revision-dialog :revision :string-mode?] not)))
+
+(rf/reg-event-db
+  ::events/set-revision-value-valid
+  (fn [db [_ valid?]]
+    (assoc-in db [:revision-dialog :revision :value-valid?] valid?)))
+
 (rf/reg-event-fx
   ::events/save-revision
   (fn [{:keys [db]} _]
     (let [{:keys [revision]} (:revision-dialog db)
-          value-text (:value-text revision)]
+          string-mode? (get revision :string-mode? false)
+          value-text   (get revision :value-text "")]
       (try
-        (let [parsed (.parse js/JSON value-text)
-              input  {:sharedValueId (:sharedValueId revision)
-                      :dimensionIds  (:dimensionIds revision)
-                      :value         parsed}]
+        (let [value (if string-mode?
+                      value-text
+                      (.parse js/JSON value-text))
+              input {:sharedValueId (:sharedValueId revision)
+                     :dimensionIds  (:dimensionIds revision)
+                     :value         value}]
           {:db       (h/start-loading db :save-revision)
            :dispatch [::re-graph/mutate
                       {:query     gql/create-shared-value-revision-mutation
@@ -339,4 +389,5 @@
         {:db       (-> db
                        (h/stop-loading :save-revision)
                        (assoc :revision-dialog {:open? false}))
+         :toast    {:message "Revision created."}
          :dispatch [::events/fetch-revisions sv-id]}))))

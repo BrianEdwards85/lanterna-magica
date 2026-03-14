@@ -1,5 +1,6 @@
 (ns lanterna-magica.events.init
   (:require
+   [lanterna-magica.components.toaster :as toaster]
    [lanterna-magica.config :as config]
    [lanterna-magica.db :as db]
    [lanterna-magica.events :as-alias events]
@@ -14,12 +15,25 @@
 
 (rf/reg-fx
   :navigate
-  (fn [route-name]
-    (routes/navigate! route-name)))
+  (fn [route]
+    (if (vector? route)
+      (apply routes/navigate! route)
+      (routes/navigate! route))))
+
+(rf/reg-fx
+  :toast
+  (fn [opts]
+    (toaster/show! opts)))
+
+(rf/reg-fx
+  :toaster/init
+  (fn [_]
+    (toaster/init!)))
 
 (rf/reg-event-fx
   ::events/boot
   (fn [_ _]
-    {:dispatch-n [[::re-graph/init {:ws   nil
-                                    :http {:url config/GRAPHQL_URL}}]
-                  [::events/fetch-dimension-types]]}))
+    {:toaster/init true
+     :dispatch-n   [[::re-graph/init {:ws   nil
+                                      :http {:url config/GRAPHQL_URL}}]
+                    [::events/fetch-dimension-types]]}))

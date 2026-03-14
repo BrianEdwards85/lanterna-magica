@@ -39,10 +39,18 @@
     (or (get-in db [:dimensions-search-results type-id])
         (get-in db [:all-dimensions type-id] []))))
 
+(rf/reg-sub ::dimensions-dropdown-items-no-base
+  (fn [db [_ type-id]]
+    (or (get-in db [:dimensions-search-results-no-base type-id])
+        (get-in db [:all-dimensions-no-base type-id] []))))
+
 ;; -- Entity page state ----------------------------------------------------
 
 (rf/reg-sub ::shared-values-page  (fn [db _] (:shared-values-page db)))
 (rf/reg-sub ::configurations-page (fn [db _] (:configurations-page db)))
+
+(rf/reg-sub ::shared-value-used-by
+  (fn [db _] (get-in db [:shared-values-page :used-by])))
 
 ;; -- Dialog state ---------------------------------------------------------
 
@@ -62,17 +70,17 @@
   :<- [::configuration-dialog]
   (fn [d _] (:substitutions d)))
 
-(rf/reg-sub ::config-dialog-step
+(rf/reg-sub ::config-extraction-pending?
   :<- [::configuration-dialog]
-  (fn [d _] (:active-step d)))
+  (fn [d _] (:extraction-pending? d)))
 
 (rf/reg-sub ::config-body-valid?
   :<- [::configuration-dialog]
   (fn [d _] (:body-valid? d)))
 
-(rf/reg-sub ::config-view-mode
-  :<- [::configurations-page]
-  (fn [p _] (:config-view-mode p)))
+(rf/reg-sub ::config-resolved-values
+  :<- [::configuration-dialog]
+  (fn [d _] (:resolved-values d)))
 
 ;; -- Loading / Errors -----------------------------------------------------
 

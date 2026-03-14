@@ -53,23 +53,18 @@
    render, so it is safe to pass a new function reference each render (e.g.
    an inline `#(rf/dispatch ...)` form). The debounced closure always calls
    the most-recently-rendered `on-change`, preventing stale-closure bugs."
-  [{:keys [value on-change]}]
-  (let [local           (r/atom (or value ""))
-        on-change-ref   (atom on-change)
-        debounced-fn    (deb/make-debounced-fn (fn [v] (when-let [f @on-change-ref] (f v))))]
-    (r/create-class
-      {:component-will-unmount
-       (fn [_]
-         (deb/cancel-debounced-fn! debounced-fn))
-
-       :reagent-render
-       (fn [{:keys [value on-change placeholder]}]
-         (reset! on-change-ref on-change)
-         (when (and (some? value) (not= value @local))
-           (reset! local value))
-         [bp/input-group {:left-icon   "search"
-                          :placeholder (or placeholder "Search...")
-                          :value       (or @local "")
-                          :on-change   #(let [v (.. % -target -value)]
-                                          (reset! local v)
-                                          (@debounced-fn v))}])})))
+  [{:keys [value on-change placeholder]}]
+  (r/with-let [local           (r/atom (or value ""))
+               on-change-ref   (atom on-change)
+               debounced-fn    (deb/make-debounced-fn (fn [v] (when-let [f @on-change-ref] (f v))))]
+    (reset! on-change-ref on-change)
+    (when (and (some? value) (not= value @local))
+      (reset! local value))
+    [bp/input-group {:left-icon   "search"
+                     :placeholder (or placeholder "Search...")
+                     :value       (or @local "")
+                     :on-change   #(let [v (.. % -target -value)]
+                                     (reset! local v)
+                                     (@debounced-fn v))}]
+    (finally
+      (deb/cancel-debounced-fn! debounced-fn))))

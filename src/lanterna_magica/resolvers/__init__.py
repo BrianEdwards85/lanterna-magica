@@ -55,7 +55,7 @@ def create_gql(pool) -> GraphQL:
         *get_dimension_resolvers(dimensions),
         *get_facade_resolvers(dimensions, dimension_types, "service"),
         *get_facade_resolvers(dimensions, dimension_types, "environment"),
-        *get_shared_value_resolvers(shared_values),
+        *get_shared_value_resolvers(shared_values, configurations),
         datetime_scalar,
         json_scalar,
         convert_names_case=True,

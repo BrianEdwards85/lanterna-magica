@@ -16,9 +16,14 @@
    ;; {type-id [dim1 dim2 ...]}
    :all-dimensions        {}
 
+   ;; Per-type dimension lists excluding base/sentinel dimensions, keyed by type id:
+   ;; {type-id [dim1 dim2 ...]}
+   :all-dimensions-no-base {}
+
    ;; Per-type search results for searchable dropdowns, keyed by type id:
    ;; {type-id [dim1 dim2 ...] | nil}
-   :dimensions-search-results {}
+   :dimensions-search-results        {}
+   :dimensions-search-results-no-base {}
 
    ;; Dialog state for dimension types
    :dimension-type-dialog {:open? false}
@@ -29,24 +34,24 @@
    ;; Shared values page
    :shared-values-page  {:edges [] :page-info {:hasNextPage false :endCursor nil}
                          :search "" :show-archived false
-                         :selected-id nil
+                         :selected-id nil :selected nil
                          :revisions {:edges []}
                          :revisions-page-info nil}
 
    ;; Configurations page — filter by dimension ids
    :configurations-page {:edges [] :page-info {:hasNextPage false :endCursor nil}
                          :filter-dimension-ids []
-                         :selected-id nil :selected nil
-                         :config-view-mode :body}
+                         :selected-id nil :selected nil}
 
    ;; Dialog state
    :shared-value-dialog {:open? false}
    :revision-dialog     {:open? false}
    :configuration-dialog {:open? false
-                          :sentinel-paths []
-                          :substitutions  {}
-                          :active-step    1
-                          :body-valid?    true}
+                          :sentinel-paths      []
+                          :substitutions       {}
+                          :resolved-values     {}
+                          :body-valid?         true
+                          :extraction-pending? false}
 
    ;; Loading keys (set of keywords) and per-key error map
    :loading          #{}

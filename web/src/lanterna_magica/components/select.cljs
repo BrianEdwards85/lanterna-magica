@@ -20,71 +20,66 @@
      :no-results-text - text shown when items is empty
      :fill            - whether to fill parent width (default true)
      :icon            - icon for the trigger button (default nil)"
-  [{:keys [items on-query-change]}]
-  (let [debounced-search (deb/make-debounced-fn
-                           (fn [query] (rf/dispatch (conj on-query-change query))))]
-    (r/create-class
-      {:component-will-unmount
-       (fn [_]
-         (deb/cancel-debounced-fn! debounced-search))
+  [{:keys [items selected-id on-select on-clear on-query-change on-clear-search
+           placeholder no-results-text fill icon]}]
+  (r/with-let [debounced-search (deb/make-debounced-fn
+                                  (fn [query] (rf/dispatch (conj on-query-change query))))]
+    (let [items    (or items [])
+          selected (some #(when (= (:id %) selected-id) %) items)
+          fill?    (if (some? fill) fill true)]
 
-       :reagent-render
-       (fn [{:keys [items selected-id on-select on-clear on-query-change on-clear-search
-                    placeholder no-results-text fill icon]}]
-         (let [items    (or items [])
-               selected (some #(when (= (:id %) selected-id) %) items)
-               fill?    (if (some? fill) fill true)]
+      [:> bp/select-component
+       {:items             (clj->js items)
+        :fill              fill?
+        :item-renderer     (fn [item props]
+                             (let [item (js->clj item :keywordize-keys true)]
+                               (r/as-element
+                                 [bp/menu-item
+                                  {:key      (:id item)
+                                   :text     (:name item)
+                                   :on-click (.-handleClick props)
+                                   :active   (.. props -modifiers -active)
+                                   :role-structure "listoption"}])))
+        :on-item-select    (fn [item]
+                             (let [item (js->clj item :keywordize-keys true)]
+                               (on-select (:id item))))
+        :on-query-change   (fn [query]
+                             (if (seq query)
+                               (@debounced-search query)
+                               (do
+                                 (deb/cancel-debounced-fn! debounced-search)
+                                 (rf/dispatch on-clear-search))))
+        :items-equal       "id"
+        :no-results        (r/as-element
+                             [bp/menu-item {:disabled true
+                                            :text     (or no-results-text "No results.")
+                                            :role-structure "listoption"}])
+        :popover-props     {:minimal   true
+                            :match-target-width fill?}
+        :reset-on-close    true
+        :filterable        true
+        :input-props       {:placeholder "Search..."}
+        ;; Disable client-side filtering — we filter server-side
+        :item-list-predicate (fn [_query items] items)}
 
-           [:> bp/select-component
-            {:items             (clj->js items)
-             :fill              fill?
-             :item-renderer     (fn [item props]
-                                  (let [item (js->clj item :keywordize-keys true)]
-                                    (r/as-element
-                                      [bp/menu-item
-                                       {:key      (:id item)
-                                        :text     (:name item)
-                                        :on-click (.-handleClick props)
-                                        :active   (.. props -modifiers -active)
-                                        :role-structure "listoption"}])))
-             :on-item-select    (fn [item]
-                                  (let [item (js->clj item :keywordize-keys true)]
-                                    (on-select (:id item))))
-             :on-query-change   (fn [query]
-                                  (if (seq query)
-                                    (@debounced-search query)
-                                    (do
-                                      (deb/cancel-debounced-fn! debounced-search)
-                                      (rf/dispatch on-clear-search))))
-             :items-equal       "id"
-             :no-results        (r/as-element
-                                  [bp/menu-item {:disabled true
-                                                 :text     (or no-results-text "No results.")
-                                                 :role-structure "listoption"}])
-             :popover-props     {:minimal   true
-                                 :match-target-width fill?}
-             :reset-on-close    true
-             :filterable        true
-             :input-props       {:placeholder "Search..."}
-             ;; Disable client-side filtering — we filter server-side
-             :item-list-predicate (fn [_query items] items)}
-
-            (if (and on-clear selected)
-              [:div.flex.items-center.gap-0 {:class (when fill? "w-full")}
-               [bp/button {:text       (:name selected)
-                           :right-icon "caret-down"
-                           :icon       icon
-                           :fill       fill?
-                           :align-text "left"
-                           :class      "flex-1"}]
-               [bp/button {:icon     "small-cross"
-                           :minimal  true
-                           :small    true
-                           :on-click (fn [e]
-                                       (.stopPropagation e)
-                                       (on-clear))}]]
-              [bp/button {:text       (or (:name selected) placeholder "Select...")
-                          :right-icon "caret-down"
-                          :icon       icon
-                          :fill       fill?
-                          :align-text "left"}])]))})))
+       (if (and on-clear selected)
+         [:div.flex.items-center.gap-0 {:class (when fill? "w-full")}
+          [bp/button {:text       (:name selected)
+                      :right-icon "caret-down"
+                      :icon       icon
+                      :fill       fill?
+                      :align-text "left"
+                      :class      "flex-1"}]
+          [bp/button {:icon     "small-cross"
+                      :minimal  true
+                      :small    true
+                      :on-click (fn [e]
+                                  (.stopPropagation e)
+                                  (on-clear))}]]
+         [bp/button {:text       (or (:name selected) placeholder "Select...")
+                     :right-icon "caret-down"
+                     :icon       icon
+                     :fill       fill?
+                     :align-text "left"}])])
+    (finally
+      (deb/cancel-debounced-fn! debounced-search))))

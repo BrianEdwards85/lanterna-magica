@@ -2,7 +2,6 @@
   (:require
    [lanterna-magica.bp :as bp]
    [lanterna-magica.components.archived-banner :as archived-banner]
-   [lanterna-magica.components.entity-card :as entity-card]
    [lanterna-magica.components.error-banner :as error-banner]
    [lanterna-magica.components.inputs :as inputs]
    [lanterna-magica.components.load-more :as load-more]
@@ -154,7 +153,24 @@
                 :class    "opacity-50 hover:opacity-100"
                 :on-click (fn [e]
                             (.stopPropagation e)
-                            (rf/dispatch [::events/open-dimension-type-dialog dt]))}]]])
+                            (rf/dispatch [::events/open-dimension-type-dialog dt]))}]
+    (if (some? (:archivedAt dt))
+      [bp/button {:icon     "undo"
+                  :minimal  true
+                  :small    true
+                  :intent   "success"
+                  :class    "opacity-50 hover:opacity-100"
+                  :on-click (fn [e]
+                              (.stopPropagation e)
+                              (rf/dispatch [::events/unarchive-dimension-type (:id dt)]))}]
+      [bp/button {:icon     "trash"
+                  :minimal  true
+                  :small    true
+                  :intent   "danger"
+                  :class    "opacity-50 hover:opacity-100"
+                  :on-click (fn [e]
+                              (.stopPropagation e)
+                              (rf/dispatch [::events/archive-dimension-type (:id dt)]))}])]])
 
 (defn- type-sidebar []
   (let [dim-types      @(rf/subscribe [::subs/dimension-types])
@@ -238,12 +254,35 @@
            :else
            [:div
             (for [edge edges]
-              ^{:key (get-in edge [:node :id])}
-              [entity-card/entity-card
-               {:name        (get-in edge [:node :name])
-                :description (get-in edge [:node :description])
-                :archived?   (some? (get-in edge [:node :archivedAt]))
-                :on-click    #(rf/dispatch [::events/open-dimension-dialog type-id (:node edge)])}])
+              (let [node      (:node edge)
+                    archived? (some? (:archivedAt node))]
+                ^{:key (:id node)}
+                [:div {:class    (str "mb-2 rounded p-3 cursor-pointer transition-all bg-tn-bg-card hover:brightness-110"
+                                      (when archived? " opacity-60"))
+                       :on-click #(rf/dispatch [::events/open-dimension-dialog type-id node])}
+                 [:div.flex.items-center.justify-between
+                  [:div.flex.items-center.gap-2
+                   [:span {:class (str "font-semibold" (when archived? " line-through"))} (:name node)]
+                   (when archived?
+                     [bp/tag {:minimal true :class "ml-2"} "archived"])]
+                  [:div.flex.items-center.gap-1
+                   (if archived?
+                     [bp/button {:icon     "undo"
+                                 :small    true
+                                 :intent   "success"
+                                 :minimal  true
+                                 :on-click (fn [e]
+                                             (.stopPropagation e)
+                                             (rf/dispatch [::events/unarchive-dimension type-id (:id node)]))}]
+                     [bp/button {:icon     "trash"
+                                 :small    true
+                                 :intent   "danger"
+                                 :minimal  true
+                                 :on-click (fn [e]
+                                             (.stopPropagation e)
+                                             (rf/dispatch [::events/archive-dimension type-id (:id node)]))}])]]
+                 (when (seq (:description node))
+                   [:p {:class "text-sm opacity-60 mt-1 mb-0"} (:description node)])]))
             [load-more/load-more-button
              {:has-next? (:hasNextPage page-info)
               :loading?  loading?
@@ -254,7 +293,7 @@
 ;; ---------------------------------------------------------------------------
 
 (defn dimensions-screen []
-  [:div {:class "max-w-4xl mx-auto px-4 py-4"}
+  [:div {:class "max-w-7xl mx-auto px-4 py-4"}
    [:div.flex
     [type-sidebar]
     [dimensions-main]]

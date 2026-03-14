@@ -1,11 +1,13 @@
 from ariadne import MutationType, ObjectType, QueryType
 
+from lanterna_magica.data.configurations import Configurations
 from lanterna_magica.data.shared_values import SharedValues
 
 
 class SharedValuesResolver:
-    def __init__(self, shared_values: SharedValues):
+    def __init__(self, shared_values: SharedValues, configurations: Configurations):
         self.shared_values = shared_values
+        self.configurations = configurations
 
     async def resolve_shared_values(
         self, _obj, info, *, include_archived=False, search=None, first=None, after=None
@@ -41,6 +43,20 @@ class SharedValuesResolver:
             value=input["value"],
         )
 
+    async def resolve_resolve_shared_value(self, _obj, info, *, shared_value_id, dimension_ids):
+        return await self.shared_values.resolve_for_scope(
+            shared_value_id=shared_value_id,
+            dimension_ids=dimension_ids,
+        )
+
+    async def resolve_used_by(self, obj, info, *, include_archived=False, first=None, after=None):
+        return await self.configurations.get_configurations_by_shared_value(
+            shared_value_id=str(obj["id"]),
+            include_archived=include_archived,
+            first=first,
+            after=after,
+        )
+
     async def resolve_set_revision_current(self, _obj, info, *, id, is_current):
         return await self.shared_values.set_revision_current(
             id=id, is_current=is_current,
@@ -65,8 +81,8 @@ class SharedValuesResolver:
         return await info.context["revision_scopes_loader"].load(str(obj["id"]))
 
 
-def get_shared_value_resolvers(shared_values: SharedValues) -> list:
-    resolver = SharedValuesResolver(shared_values)
+def get_shared_value_resolvers(shared_values: SharedValues, configurations: Configurations) -> list:
+    resolver = SharedValuesResolver(shared_values, configurations)
 
     query = QueryType()
     mutation = MutationType()
@@ -75,6 +91,7 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
 
     query.set_field("sharedValues", resolver.resolve_shared_values)
     query.set_field("sharedValue", resolver.resolve_shared_value)
+    query.set_field("resolveSharedValue", resolver.resolve_resolve_shared_value)
     mutation.set_field("createSharedValue", resolver.resolve_create_shared_value)
     mutation.set_field("updateSharedValue", resolver.resolve_update_shared_value)
     mutation.set_field("archiveSharedValue", resolver.resolve_archive_shared_value)
@@ -82,6 +99,7 @@ def get_shared_value_resolvers(shared_values: SharedValues) -> list:
     mutation.set_field("createSharedValueRevision", resolver.resolve_create_shared_value_revision)
     mutation.set_field("setRevisionCurrent", resolver.resolve_set_revision_current)
     shared_value_type.set_field("revisions", resolver.resolve_revisions)
+    shared_value_type.set_field("usedBy", resolver.resolve_used_by)
     revision_type.set_field("sharedValue", resolver.resolve_revision_shared_value)
     revision_type.set_field("dimensions", resolver.resolve_revision_dimensions)
 

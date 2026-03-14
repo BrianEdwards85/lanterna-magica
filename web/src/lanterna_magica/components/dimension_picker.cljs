@@ -15,7 +15,7 @@
   [{:keys [selected-ids on-toggle on-clear]}]
   (let [dim-types @(rf/subscribe [::subs/dimension-types])]
     [:div
-     (for [dt dim-types]
+     (doall (for [dt dim-types]
        (let [type-id (:id dt)
              items   @(rf/subscribe [::subs/dimensions-dropdown-items type-id])
              sel-id  (some (set selected-ids) (map :id items))]
@@ -33,4 +33,4 @@
              :on-query-change  [::events/search-dimensions-list type-id]
              :on-clear-search  [::events/clear-dimensions-search-results type-id]
              :icon             "tag"
-             :placeholder      (str "Select " (:name dt) "...")}]]]))]))
+             :placeholder      (str "Select " (:name dt) "...")}]]])))]))

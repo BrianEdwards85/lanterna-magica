@@ -103,3 +103,13 @@ from (
 ) sub
 where c.id = sub.configuration_id
   and c.scope_hash is distinct from sub.new_hash;
+
+-- name: get_configurations_by_shared_value_id(shared_value_id, include_archived, after_id, page_limit)
+select c.id, c.scope_hash, c.body, c.is_current, c.created_at, c.created_by
+from configurations c
+join config_substitutions cs on cs.configuration_id = c.id
+where cs.shared_value_id = :shared_value_id
+  and (:include_archived::boolean or c.archived_at is null)
+  and (:after_id::uuid is null or c.id < :after_id)
+order by c.id desc
+limit :page_limit;

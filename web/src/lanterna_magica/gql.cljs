@@ -100,6 +100,15 @@
          }
          pageInfo { hasNextPage endCursor }
        }
+       usedBy(first: 20) {
+         edges {
+           node {
+             id isCurrent createdAt
+             dimensions { id name type { id name } }
+           }
+         }
+         pageInfo { hasNextPage endCursor }
+       }
      }
    }")
 
@@ -201,5 +210,13 @@
        id jsonpath createdAt
        configuration { id }
        sharedValue { id name }
+     }
+   }")
+
+(def resolve-shared-value-query
+  "query ResolveSharedValue($sharedValueId: ID!, $dimensionIds: [ID!]!) {
+     resolveSharedValue(sharedValueId: $sharedValueId, dimensionIds: $dimensionIds) {
+       id
+       value
      }
    }")

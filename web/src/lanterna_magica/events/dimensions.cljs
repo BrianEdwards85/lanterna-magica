@@ -35,7 +35,8 @@
                        (assoc :selected-dimension-type-id selected)
                        (h/stop-loading :dimension-types errors))}
         (seq types)
-        (assoc :dispatch-n (into (mapv (fn [dt] [::events/fetch-dimensions-list (:id dt)]) types)
+        (assoc :dispatch-n (into (into (mapv (fn [dt] [::events/fetch-dimensions-list (:id dt) true]) types)
+                                   (mapv (fn [dt] [::events/fetch-dimensions-list (:id dt) false]) types))
                                  (when selected [[::events/fetch-dimensions selected]])))))))
 
 (rf/reg-event-fx
@@ -88,12 +89,14 @@
   ::events/on-dimension-type-saved
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
-    (let [{:keys [errors]} response]
+    (let [{:keys [errors]} response
+          editing (get-in db [:dimension-type-dialog :editing])]
       (if errors
         {:db (h/stop-loading db :save-dimension-type errors)}
         {:db       (-> db
                        (h/stop-loading :save-dimension-type)
                        (assoc :dimension-type-dialog {:open? false}))
+         :toast    {:message (if editing "Dimension type updated." "Dimension type created.")}
          :dispatch [::events/fetch-dimension-types]}))))
 
 ;; --- Archive / Unarchive Dimension Type ---
@@ -105,7 +108,7 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/archive-dimension-type-mutation
                  :variables {:id id}
-                 :callback  [::events/on-dimension-type-archive-toggled]}]}))
+                 :callback  [::events/on-dimension-type-archive-toggled {:action :archive}]}]}))
 
 (rf/reg-event-fx
   ::events/unarchive-dimension-type
@@ -114,16 +117,17 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/unarchive-dimension-type-mutation
                  :variables {:id id}
-                 :callback  [::events/on-dimension-type-archive-toggled]}]}))
+                 :callback  [::events/on-dimension-type-archive-toggled {:action :unarchive}]}]}))
 
 (rf/reg-event-fx
   ::events/on-dimension-type-archive-toggled
   [rf/unwrap]
-  (fn [{:keys [db]} {:keys [response]}]
+  (fn [{:keys [db]} {:keys [action response]}]
     (let [{:keys [errors]} response]
       (if errors
         {:db (h/stop-loading db :archive-dimension-type errors)}
         {:db       (h/stop-loading db :archive-dimension-type)
+         :toast    {:message (if (= action :archive) "Dimension type archived." "Dimension type unarchived.")}
          :dispatch [::events/fetch-dimension-types]}))))
 
 ;; --- Swap Dimension Type Priorities ---
@@ -151,6 +155,7 @@
       (if errors
         {:db (h/stop-loading db :swap-dimension-type errors)}
         {:db       (h/stop-loading db :swap-dimension-type)
+         :toast    {:message "Dimension type reordered."}
          :dispatch [::events/fetch-dimension-types]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -296,14 +301,17 @@
   ::events/on-dimension-saved
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [type-id response]}]
-    (let [{:keys [errors]} response]
+    (let [{:keys [errors]} response
+          editing (get-in db [:dimension-dialog :editing])]
       (if errors
         {:db (h/stop-loading db :save-dimension errors)}
-        {:db       (-> db
-                       (h/stop-loading :save-dimension)
-                       (assoc :dimension-dialog {:open? false}))
+        {:db         (-> db
+                         (h/stop-loading :save-dimension)
+                         (assoc :dimension-dialog {:open? false}))
+         :toast      {:message (if editing "Dimension updated." "Dimension created.")}
          :dispatch-n [[::events/fetch-dimensions type-id]
-                      [::events/fetch-dimensions-list type-id]]}))))
+                      [::events/fetch-dimensions-list type-id true]
+                      [::events/fetch-dimensions-list type-id false]]}))))
 
 ;; --- Archive / Unarchive Dimension ---
 
@@ -314,7 +322,7 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/archive-dimension-mutation
                  :variables {:id id}
-                 :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
+                 :callback  [::events/on-dimension-archive-toggled {:type-id type-id :action :archive}]}]}))
 
 (rf/reg-event-fx
   ::events/unarchive-dimension
@@ -323,20 +331,22 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/unarchive-dimension-mutation
                  :variables {:id id}
-                 :callback  [::events/on-dimension-archive-toggled {:type-id type-id}]}]}))
+                 :callback  [::events/on-dimension-archive-toggled {:type-id type-id :action :unarchive}]}]}))
 
 (rf/reg-event-fx
   ::events/on-dimension-archive-toggled
   [rf/unwrap]
-  (fn [{:keys [db]} {:keys [type-id response]}]
+  (fn [{:keys [db]} {:keys [type-id action response]}]
     (let [{:keys [errors]} response]
       (if errors
         {:db (h/stop-loading db :archive-dimension errors)}
-        {:db       (-> db
-                       (h/stop-loading :archive-dimension)
-                       (assoc :dimension-dialog {:open? false}))
+        {:db         (-> db
+                         (h/stop-loading :archive-dimension)
+                         (assoc :dimension-dialog {:open? false}))
+         :toast      {:message (if (= action :archive) "Dimension archived." "Dimension unarchived.")}
          :dispatch-n [[::events/fetch-dimensions type-id]
-                      [::events/fetch-dimensions-list type-id]]}))))
+                      [::events/fetch-dimensions-list type-id true]
+                      [::events/fetch-dimensions-list type-id false]]}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Flat dimension lists for dropdowns (per type)
@@ -344,19 +354,24 @@
 
 (rf/reg-event-fx
   ::events/fetch-dimensions-list
-  (fn [_ [_ type-id]]
-    {:dispatch [::re-graph/query
-                {:query     gql/dimensions-query
-                 :variables {:typeId type-id :first 10}
-                 :callback  [::events/on-dimensions-list {:type-id type-id}]}]}))
+  (fn [_ [_ type-id include-base?]]
+    (let [include-base? (if (false? include-base?) false true)]
+      {:dispatch [::re-graph/query
+                  {:query     gql/dimensions-query
+                   :variables {:typeId      type-id
+                               :includeBase include-base?
+                               :first       10}
+                   :callback  [::events/on-dimensions-list {:type-id      type-id
+                                                            :include-base? include-base?}]}]})))
 
 (rf/reg-event-fx
   ::events/on-dimensions-list
   [rf/unwrap]
-  (fn [{:keys [db]} {:keys [type-id response]}]
+  (fn [{:keys [db]} {:keys [type-id include-base? response]}]
     (let [{:keys [data]} response
-          nodes (mapv :node (get-in data [:dimensions :edges]))]
-      {:db (assoc-in db [:all-dimensions type-id] nodes)})))
+          nodes (mapv :node (get-in data [:dimensions :edges]))
+          db-key (if include-base? :all-dimensions :all-dimensions-no-base)]
+      {:db (assoc-in db [db-key type-id] nodes)})))
 
 ;; ---------------------------------------------------------------------------
 ;; Search dimensions for dropdowns (per type)
@@ -364,23 +379,36 @@
 
 (rf/reg-event-fx
   ::events/search-dimensions-list
-  (fn [_ [_ type-id query]]
-    (if (seq query)
-      {:dispatch [::re-graph/query
-                  {:query     gql/dimensions-query
-                   :variables {:typeId type-id :search query :first 10}
-                   :callback  [::events/on-dimensions-search-results {:type-id type-id}]}]}
-      {:dispatch [::events/clear-dimensions-search-results type-id]})))
+  ;; Supports two arities:
+  ;;   [_ type-id query]             — include-base? defaults to true (used by dimension picker)
+  ;;   [_ type-id include-base? query] — explicit include-base? (false for config sidebar filters)
+  (fn [_ [_ type-id maybe-include-base query-or-nil]]
+    (let [[include-base? query] (if (boolean? maybe-include-base)
+                                  [maybe-include-base query-or-nil]
+                                  [true maybe-include-base])]
+      (if (seq query)
+        {:dispatch [::re-graph/query
+                    {:query     gql/dimensions-query
+                     :variables {:typeId      type-id
+                                 :includeBase include-base?
+                                 :search      query
+                                 :first       10}
+                     :callback  [::events/on-dimensions-search-results {:type-id       type-id
+                                                                        :include-base? include-base?}]}]}
+        {:dispatch [::events/clear-dimensions-search-results type-id]}))))
 
 (rf/reg-event-fx
   ::events/on-dimensions-search-results
   [rf/unwrap]
-  (fn [{:keys [db]} {:keys [type-id response]}]
+  (fn [{:keys [db]} {:keys [type-id include-base? response]}]
     (let [{:keys [data]} response
-          nodes (mapv :node (get-in data [:dimensions :edges]))]
-      {:db (assoc-in db [:dimensions-search-results type-id] nodes)})))
+          nodes  (mapv :node (get-in data [:dimensions :edges]))
+          db-key (if include-base? :dimensions-search-results :dimensions-search-results-no-base)]
+      {:db (assoc-in db [db-key type-id] nodes)})))
 
 (rf/reg-event-db
   ::events/clear-dimensions-search-results
   (fn [db [_ type-id]]
-    (assoc-in db [:dimensions-search-results type-id] nil)))
+    (-> db
+        (assoc-in [:dimensions-search-results type-id] nil)
+        (assoc-in [:dimensions-search-results-no-base type-id] nil))))

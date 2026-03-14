@@ -21,6 +21,7 @@
 (def switch-control  (r/adapt-react-class bp/Switch))
 (def tag             (r/adapt-react-class bp/Tag))
 (def text-area       (r/adapt-react-class bp/TextArea))
+(def tooltip         (r/adapt-react-class bp/Tooltip))
 
 ;; @blueprintjs/select
 (def select-component bp-select/Select)

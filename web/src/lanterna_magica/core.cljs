@@ -19,7 +19,9 @@
       :route/home             [home/home-screen]
       :route/dimensions       [dimensions/dimensions-screen]
       :route/shared-values    [shared-values/shared-values-screen]
+      :route/shared-value     [shared-values/shared-values-screen]
       :route/configurations   [configurations/configurations-screen]
+      :route/configuration    [configurations/configurations-screen]
       [home/home-screen])))
 
 (defn app []

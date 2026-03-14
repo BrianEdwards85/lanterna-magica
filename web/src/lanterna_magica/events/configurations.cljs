@@ -111,47 +111,67 @@
      :dispatch [::re-graph/mutate
                 {:query     gql/set-configuration-current-mutation
                  :variables {:id id :isCurrent is-current}
-                 :callback  [::events/on-configuration-current-set]}]}))
+                 :callback  [::events/on-configuration-current-set {:is-current is-current}]}]}))
 
 (rf/reg-event-fx
   ::events/on-configuration-current-set
   [rf/unwrap]
-  (fn [{:keys [db]} {:keys [response]}]
+  (fn [{:keys [db]} {:keys [is-current response]}]
     (let [{:keys [errors]} response]
       (if errors
         {:db (h/stop-loading db :set-configuration-current errors)}
         {:db       (h/stop-loading db :set-configuration-current)
+         :toast    {:message (if is-current "Configuration made current." "Configuration deactivated.")}
          :dispatch [::events/fetch-configurations]}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Create Configuration Dialog
 ;; ---------------------------------------------------------------------------
 
-(rf/reg-event-db
+(rf/reg-event-fx
   ::events/open-configuration-dialog
-  (fn [db _]
-    (assoc db :configuration-dialog
-           {:open?         true
-            :configuration {:dimensionIds [] :body-text "{}"}
-            :sentinel-paths []
-            :substitutions  {}
-            :active-step    1
-            :body-valid?    true})))
+  (fn [{:keys [db]} [_ {:keys [dimension-ids body-text substitutions]
+                        :or   {dimension-ids [] body-text "{}" substitutions {}}}]]
+    (let [pre-populated?     (seq substitutions)
+          resolve-dispatches (when pre-populated?
+                               (mapv (fn [[path sv-id]]
+                                       [::events/resolve-substitution-value path sv-id dimension-ids])
+                                     substitutions))
+          extra-dispatches   (when pre-populated?
+                               [[::events/extract-sentinel-paths]])]
+      {:db         (assoc db :configuration-dialog
+                          {:open?               true
+                           :configuration       {:dimensionIds dimension-ids :body-text body-text}
+                           :sentinel-paths      []
+                           :substitutions       substitutions
+                           :resolved-values     {}
+                           :body-valid?         true
+                           :extraction-pending? (boolean pre-populated?)})
+       :dispatch-n (-> [[::events/ensure-shared-values-loaded]]
+                       (into extra-dispatches)
+                       (into resolve-dispatches))})))
 
 (rf/reg-event-db
   ::events/close-configuration-dialog
   (fn [db _]
     (assoc db :configuration-dialog {:open? false})))
 
-(rf/reg-event-db
+(rf/reg-event-fx
   ::events/toggle-configuration-dimension
-  (fn [db [_ dimension-id]]
-    (let [path    [:configuration-dialog :configuration :dimensionIds]
-          current (get-in db path [])
-          updated (if (some #{dimension-id} current)
-                    (vec (remove #{dimension-id} current))
-                    (conj current dimension-id))]
-      (assoc-in db path updated))))
+  (fn [{:keys [db]} [_ dimension-id]]
+    (let [path         [:configuration-dialog :configuration :dimensionIds]
+          current      (get-in db path [])
+          updated      (if (some #{dimension-id} current)
+                         (vec (remove #{dimension-id} current))
+                         (conj current dimension-id))
+          substitutions (get-in db [:configuration-dialog :substitutions] {})
+          re-resolves  (mapv (fn [[jsonpath sv-id]]
+                               [::events/resolve-substitution-value jsonpath sv-id updated])
+                             (remove (fn [[_ sv-id]] (nil? sv-id)) substitutions))]
+      {:db         (-> db
+                       (assoc-in path updated)
+                       (assoc-in [:configuration-dialog :resolved-values] {}))
+       :dispatch-n re-resolves})))
 
 (rf/reg-event-db
   ::events/set-configuration-body
@@ -183,21 +203,49 @@
   (fn [{:keys [db]} {:keys [response]}]
     (let [{:keys [data errors]} response]
       (if errors
-        {:db (h/stop-loading db :extract-sentinel-paths errors)}
+        {:db (-> db
+                 (assoc-in [:configuration-dialog :extraction-pending?] false)
+                 (h/stop-loading :extract-sentinel-paths errors))}
         (let [paths (get data :extractSentinelPaths)]
           {:db (-> db
                    (assoc-in [:configuration-dialog :sentinel-paths] paths)
+                   (assoc-in [:configuration-dialog :extraction-pending?] false)
                    (h/stop-loading :extract-sentinel-paths))})))))
 
-(rf/reg-event-db
+(rf/reg-event-fx
   ::events/set-substitution
-  (fn [db [_ jsonpath shared-value-id]]
-    (assoc-in db [:configuration-dialog :substitutions jsonpath] shared-value-id)))
+  (fn [{:keys [db]} [_ jsonpath shared-value-id]]
+    (let [dim-ids (get-in db [:configuration-dialog :configuration :dimensionIds])]
+      (if shared-value-id
+        {:db       (assoc-in db [:configuration-dialog :substitutions jsonpath] shared-value-id)
+         :dispatch [::events/resolve-substitution-value jsonpath shared-value-id dim-ids]}
+        {:db (-> db
+                 (assoc-in [:configuration-dialog :substitutions jsonpath] nil)
+                 (update-in [:configuration-dialog :resolved-values] dissoc jsonpath))}))))
+
+(rf/reg-event-fx
+  ::events/resolve-substitution-value
+  (fn [_ [_ jsonpath shared-value-id dimension-ids]]
+    {:dispatch [::re-graph/query
+                {:query     gql/resolve-shared-value-query
+                 :variables {:sharedValueId shared-value-id
+                             :dimensionIds  dimension-ids}
+                 :callback  [::events/on-substitution-value-resolved {:jsonpath jsonpath}]}]}))
+
+(rf/reg-event-fx
+  ::events/on-substitution-value-resolved
+  [rf/unwrap]
+  (fn [{:keys [db]} {:keys [jsonpath response]}]
+    (let [{:keys [data errors]} response]
+      (if errors
+        {:db db}
+        {:db (assoc-in db [:configuration-dialog :resolved-values jsonpath]
+                       (get data :resolveSharedValue))}))))
 
 (rf/reg-event-db
-  ::events/set-config-dialog-step
-  (fn [db [_ step]]
-    (assoc-in db [:configuration-dialog :active-step] step)))
+  ::events/set-extraction-pending
+  (fn [db [_ pending?]]
+    (assoc-in db [:configuration-dialog :extraction-pending?] pending?)))
 
 (rf/reg-event-fx
   ::events/ensure-shared-values-loaded
@@ -212,9 +260,8 @@
           body-text (:body-text configuration)]
       (try
         (let [parsed        (.parse js/JSON body-text)
-              subs-vec      (mapv (fn [[path sv-id]]
-                                    {:jsonpath path :sharedValueId sv-id})
-                                  substitutions)
+              subs-vec      (mapv (fn [[jsonpath sv-id]] {:jsonpath jsonpath :sharedValueId sv-id})
+                                  (remove (fn [[_ sv-id]] (nil? sv-id)) substitutions))
               input         {:dimensionIds  (:dimensionIds configuration)
                              :body          parsed
                              :substitutions subs-vec}]
@@ -237,6 +284,7 @@
         {:db       (-> db
                        (h/stop-loading :save-configuration)
                        (assoc :configuration-dialog {:open? false}))
+         :toast    {:message "Configuration created."}
          :dispatch [::events/fetch-configurations]}))))
 
 ;; ---------------------------------------------------------------------------
@@ -244,31 +292,47 @@
 ;; ---------------------------------------------------------------------------
 
 (rf/reg-event-fx
+  ::events/load-configuration
+  (fn [{:keys [db]} [_ id]]
+    {:db       (-> db
+                   (assoc-in [:configurations-page :selected-id] id)
+                   (h/start-loading :configuration-detail))
+     :dispatch [::re-graph/query
+                {:query     gql/configuration-query
+                 :variables {:id id}
+                 :callback  [::events/on-configuration-detail]}]}))
+
+(rf/reg-event-db
+  ::events/deselect-configuration
+  (fn [db _]
+    (-> db
+        (assoc-in [:configurations-page :selected-id] nil)
+        (assoc-in [:configurations-page :selected] nil))))
+
+(rf/reg-event-fx
   ::events/select-configuration
   (fn [{:keys [db]} [_ id]]
     (if id
       {:db       (-> db
-                     (assoc-in [:configurations-page :selected-id] id)
-                     (assoc-in [:configurations-page :config-view-mode] :body)
-                     (h/start-loading :configuration-detail))
-       :dispatch [::re-graph/query
-                  {:query     gql/configuration-query
-                   :variables {:id id}
-                   :callback  [::events/on-configuration-detail]}]}
-      {:db (-> db
-               (assoc-in [:configurations-page :selected-id] nil)
-               (assoc-in [:configurations-page :selected] nil))})))
-
-(rf/reg-event-db
-  ::events/set-config-view-mode
-  (fn [db [_ mode]]
-    (assoc-in db [:configurations-page :config-view-mode] mode)))
+                     (assoc-in [:configurations-page :selected-id] id))
+       :navigate [:route/configuration {:id id}]}
+      {:db       (-> db
+                     (assoc-in [:configurations-page :selected-id] nil)
+                     (assoc-in [:configurations-page :selected] nil))
+       :navigate :route/configurations})))
 
 (rf/reg-event-fx
   ::events/on-configuration-detail
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
-    (let [{:keys [data errors]} response]
-      {:db (-> db
-               (assoc-in [:configurations-page :selected] (:configuration data))
-               (h/stop-loading :configuration-detail errors))})))
+    (let [{:keys [data errors]} response
+          configuration (:configuration data)]
+      (if (and (nil? configuration) (nil? errors))
+        {:db       (-> db
+                       (assoc-in [:configurations-page :selected-id] nil)
+                       (assoc-in [:configurations-page :selected] nil)
+                       (h/stop-loading :configuration-detail))
+         :navigate :route/configurations}
+        {:db (-> db
+                 (assoc-in [:configurations-page :selected] configuration)
+                 (h/stop-loading :configuration-detail errors))}))))

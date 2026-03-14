@@ -11,6 +11,11 @@ type SharedValue {
     first: Int
     after: String
   ): SharedValueRevisionConnection!
+  usedBy(
+    includeArchived: Boolean
+    first: Int
+    after: String
+  ): ConfigurationConnection!
 }
 
 type SharedValueEdge {
@@ -65,6 +70,7 @@ extend type Query {
     after: String
   ): SharedValueConnection!
   sharedValue(id: ID!): SharedValue
+  resolveSharedValue(sharedValueId: ID!, dimensionIds: [ID!]!): SharedValueRevision
 }
 
 extend type Mutation {
