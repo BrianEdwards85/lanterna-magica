@@ -70,6 +70,18 @@ class ConfigurationsResolver:
             dimension_ids=dimension_ids,
         )
 
+    async def resolve_configurations_by_scope(
+        self, _obj, info, *, scope_hash, first=None, after=None
+    ):
+        return await self.configurations.get_configurations_by_scope(
+            scope_hash=scope_hash,
+            first=first,
+            after=after,
+        )
+
+    async def resolve_config_scope_hash(self, obj, info):
+        return str(obj["scope_hash"])
+
     async def resolve_extract_sentinel_paths(self, _obj, info, *, body):
         return self.orchestrator.find_sentinel_paths(body)
 
@@ -87,6 +99,7 @@ def get_configuration_resolvers(
 
     query.set_field("configurations", resolver.resolve_configurations)
     query.set_field("configuration", resolver.resolve_configuration)
+    query.set_field("configurationsByScope", resolver.resolve_configurations_by_scope)
     query.set_field("extractSentinelPaths", resolver.resolve_extract_sentinel_paths)
     mutation.set_field("createConfiguration", resolver.resolve_create_configuration)
     mutation.set_field("updateConfigSubstitution", resolver.resolve_update_config_substitution)
@@ -94,6 +107,7 @@ def get_configuration_resolvers(
     configuration_type.set_field("dimensions", resolver.resolve_config_dimensions)
     configuration_type.set_field("substitutions", resolver.resolve_config_substitutions)
     configuration_type.set_field("projection", resolver.resolve_config_projection)
+    configuration_type.set_field("scopeHash", resolver.resolve_config_scope_hash)
     substitution_type.set_field("configuration", resolver.resolve_substitution_configuration)
     substitution_type.set_field("sharedValue", resolver.resolve_substitution_shared_value)
 

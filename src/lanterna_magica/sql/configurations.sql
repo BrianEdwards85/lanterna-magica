@@ -92,6 +92,14 @@ where not exists (
     where cs.configuration_id = c.id and cs.dimension_id = :dimension_id::uuid
 );
 
+-- name: get_configurations_by_scope_hash(scope_hash, after_id, page_limit)
+select id, scope_hash, body, is_current, created_at
+from configurations
+where scope_hash = :scope_hash
+  and (:after_id::uuid IS NULL OR id < :after_id)
+order by id desc
+limit :page_limit;
+
 -- name: recompute_configuration_scope_hashes()!
 update configurations c
 set scope_hash = sub.new_hash

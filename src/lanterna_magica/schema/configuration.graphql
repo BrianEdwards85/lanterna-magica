@@ -6,6 +6,7 @@ type Configuration {
   createdAt: DateTime!
   substitutions: [ConfigSubstitution!]!
   projection: JSON
+  scopeHash: String!
 }
 
 type ConfigurationEdge {
@@ -52,6 +53,11 @@ extend type Query {
     after: String
   ): ConfigurationConnection!
   configuration(id: ID!): Configuration
+  configurationsByScope(
+    scopeHash: String!
+    first: Int
+    after: String
+  ): ConfigurationConnection!
   extractSentinelPaths(body: JSON!): [String!]!
 }
 

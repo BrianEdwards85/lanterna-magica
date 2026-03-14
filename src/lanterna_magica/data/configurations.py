@@ -159,6 +159,26 @@ class Configurations:
             raise NotFoundError("Config substitution not found")
         return dict(row)
 
+    async def get_configurations_by_scope(
+        self,
+        *,
+        scope_hash: str,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> dict:
+        limit = page_limit(first)
+        after_id = decode_cursor(after) if after else None
+        rows = [
+            dict(r)
+            async for r in queries.get_configurations_by_scope_hash(
+                self.pool,
+                scope_hash=scope_hash,
+                after_id=after_id,
+                page_limit=limit + 1,
+            )
+        ]
+        return build_connection(rows, "id", limit)
+
     async def get_substitutions(self, *, configuration_id: str) -> list[dict]:
         rows = [
             dict(r)
