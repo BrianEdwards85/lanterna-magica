@@ -28,8 +28,9 @@ values (:scope_hash, :body::jsonb, true)
 returning id, scope_hash, body, is_current, created_at;
 
 -- name: insert_configuration_scope(configuration_id, dimension_id)!
-insert into configuration_scopes (configuration_id, dimension_id)
-values (:configuration_id, :dimension_id);
+insert into configuration_scopes (configuration_id, dimension_id, type_id)
+select :configuration_id, :dimension_id, d.type_id
+from dimensions d where d.id = :dimension_id;
 
 -- name: get_scopes_for_config(configuration_id)
 select cs.dimension_id, d.id, d.type_id, d.name, d.description, d.base
@@ -84,13 +85,15 @@ where id = :id
 returning id, scope_hash, body, is_current, created_at;
 
 -- name: backfill_configuration_scopes(dimension_id)!
-insert into configuration_scopes (configuration_id, dimension_id)
-select c.id, :dimension_id::uuid
+insert into configuration_scopes (configuration_id, dimension_id, type_id)
+select c.id, :dimension_id::uuid, d.type_id
 from configurations c
-where not exists (
-    select 1 from configuration_scopes cs
-    where cs.configuration_id = c.id and cs.dimension_id = :dimension_id::uuid
-);
+cross join dimensions d
+where d.id = :dimension_id::uuid
+  and not exists (
+      select 1 from configuration_scopes cs
+      where cs.configuration_id = c.id and cs.dimension_id = :dimension_id::uuid
+  );
 
 -- name: get_configurations_by_scope_hash(scope_hash, after_id, page_limit)
 select id, scope_hash, body, is_current, created_at

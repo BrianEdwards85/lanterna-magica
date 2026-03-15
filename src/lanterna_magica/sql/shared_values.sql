@@ -68,8 +68,9 @@ values (:shared_value_id, :scope_hash, :value::jsonb, true)
 returning id, shared_value_id, scope_hash, value, is_current, created_at;
 
 -- name: insert_revision_scope(revision_id, dimension_id)!
-insert into revision_scopes (revision_id, dimension_id)
-values (:revision_id, :dimension_id);
+insert into revision_scopes (revision_id, dimension_id, type_id)
+select :revision_id, :dimension_id, d.type_id
+from dimensions d where d.id = :dimension_id;
 
 -- name: get_scopes_for_revision(revision_id)
 select rs.revision_id, d.id, d.type_id, d.name, d.description, d.base
@@ -105,13 +106,15 @@ where id = :id
 returning id, shared_value_id, scope_hash, value, is_current, created_at;
 
 -- name: backfill_revision_scopes(dimension_id)!
-insert into revision_scopes (revision_id, dimension_id)
-select r.id, :dimension_id::uuid
+insert into revision_scopes (revision_id, dimension_id, type_id)
+select r.id, :dimension_id::uuid, d.type_id
 from shared_value_revisions r
-where not exists (
-    select 1 from revision_scopes rs
-    where rs.revision_id = r.id and rs.dimension_id = :dimension_id::uuid
-);
+cross join dimensions d
+where d.id = :dimension_id::uuid
+  and not exists (
+      select 1 from revision_scopes rs
+      where rs.revision_id = r.id and rs.dimension_id = :dimension_id::uuid
+  );
 
 -- name: recompute_revision_scope_hashes()!
 update shared_value_revisions r

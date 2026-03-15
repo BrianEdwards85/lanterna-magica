@@ -1103,3 +1103,40 @@ async def test_resolve_shared_value_no_match(client):
     assert_that(result).described_as(
         "no matching revision should return null"
     ).is_none()
+
+
+# -- Type uniqueness validation tests --
+
+CREATE_SHARED_VALUE_REVISION = """
+mutation CreateSharedValueRevision($input: CreateSharedValueRevisionInput!) {
+    createSharedValueRevision(input: $input) {
+        id value isCurrent
+        dimensions { id name }
+    }
+}
+"""
+
+
+async def test_create_revision_duplicate_dimension_type_raises_error(client):
+    """Creating a revision with two dimensions of the same type should fail."""
+    sv = await create_shared_value(client, "dup_type_sv")
+    svc1 = await create_service(client, "rev-svc-alpha")
+    svc2 = await create_service(client, "rev-svc-beta")
+
+    body = await gql(
+        client,
+        CREATE_SHARED_VALUE_REVISION,
+        {
+            "input": {
+                "sharedValueId": sv["id"],
+                "dimensionIds": [svc1["id"], svc2["id"]],
+                "value": "test",
+            }
+        },
+        expect_errors=True,
+    )
+    assert_that(body).described_as("duplicate type error response").contains_key("errors")
+    error_message = body["errors"][0]["message"]
+    assert_that(error_message).described_as(
+        "error mentions duplicate type"
+    ).contains("multiple dimensions of the same type")

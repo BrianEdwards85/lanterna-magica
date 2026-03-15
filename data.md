@@ -111,8 +111,12 @@ its scope.
 |------------------|------|-----------------------------------------------|
 | configuration_id | uuid | FK -> configurations.id ON DELETE CASCADE, NOT NULL |
 | dimension_id     | uuid | FK -> dimensions.id, NOT NULL                 |
+| type_id          | uuid | FK -> dimension_types.id, NOT NULL            |
 
 **Primary key:** `(configuration_id, dimension_id)`
+
+**Unique constraint:** `UNIQUE (configuration_id, type_id)`
+-- at most one dimension of each type per configuration scope.
 
 ### config_substitutions
 
@@ -175,5 +179,9 @@ define its scope.
 |--------------|------|--------------------------------------------------------|
 | revision_id  | uuid | FK -> shared_value_revisions.id ON DELETE CASCADE, NOT NULL |
 | dimension_id | uuid | FK -> dimensions.id, NOT NULL                          |
+| type_id      | uuid | FK -> dimension_types.id, NOT NULL                     |
 
 **Primary key:** `(revision_id, dimension_id)`
+
+**Unique constraint:** `UNIQUE (revision_id, type_id)`
+-- at most one dimension of each type per revision scope.

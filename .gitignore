@@ -11,3 +11,5 @@ dist/
 web/resources/public/js/
 web/resources/public/css/
 AGENTS.md
+.beads
+.claude

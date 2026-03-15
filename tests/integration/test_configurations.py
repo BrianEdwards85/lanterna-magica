@@ -905,3 +905,29 @@ async def test_projection_with_unresolvable_substitution_leaves_sentinel(client)
     assert_that(config["projection"]).described_as(
         "unresolvable substitution keeps sentinel in projection"
     ).is_equal_to({"api_key": "_"})
+
+
+# -- Type uniqueness validation tests --
+
+
+async def test_create_configuration_duplicate_dimension_type_raises_error(client):
+    """Creating a configuration with two dimensions of the same type should fail."""
+    svc1 = await create_service(client, "svc-alpha")
+    svc2 = await create_service(client, "svc-beta")
+
+    body = await gql(
+        client,
+        CREATE_CONFIGURATION,
+        {
+            "input": {
+                "dimensionIds": [svc1["id"], svc2["id"]],
+                "body": {"key": "value"},
+            }
+        },
+        expect_errors=True,
+    )
+    assert_that(body).described_as("duplicate type error response").contains_key("errors")
+    error_message = body["errors"][0]["message"]
+    assert_that(error_message).described_as(
+        "error mentions duplicate type"
+    ).contains("multiple dimensions of the same type")
