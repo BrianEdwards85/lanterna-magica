@@ -10,9 +10,8 @@
   "A per-type searchable select that toggles dimension IDs.
    Props:
      :selected-ids - vec of selected dimension IDs
-     :on-toggle    - (fn [id]) called when user picks a dimension
-     :on-clear     - (fn [id]) called when user clears a dimension (optional)"
-  [{:keys [selected-ids on-toggle on-clear]}]
+     :on-toggle    - (fn [id]) called when user picks a dimension"
+  [{:keys [selected-ids on-toggle]}]
   (let [dim-types @(rf/subscribe [::subs/dimension-types])]
     [:div
      (doall (for [dt dim-types]
@@ -28,8 +27,6 @@
             {:items            items
              :selected-id      sel-id
              :on-select        on-toggle
-             :on-clear         (when (and on-clear sel-id)
-                                 #(on-clear sel-id))
              :on-query-change  [::events/search-dimensions-list type-id]
              :on-clear-search  [::events/clear-dimensions-search-results type-id]
              :icon             "tag"

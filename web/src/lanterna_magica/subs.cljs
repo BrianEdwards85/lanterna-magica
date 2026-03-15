@@ -44,6 +44,13 @@
     (or (get-in db [:dimensions-search-results-no-base type-id])
         (get-in db [:all-dimensions-no-base type-id] []))))
 
+(rf/reg-sub ::base-dimension-ids
+  (fn [db _]
+    (->> (vals (:all-dimensions db))
+         (apply concat)
+         (filter #(true? (:base %)))
+         (mapv :id))))
+
 ;; -- Entity page state ----------------------------------------------------
 
 (rf/reg-sub ::shared-values-page  (fn [db _] (:shared-values-page db)))

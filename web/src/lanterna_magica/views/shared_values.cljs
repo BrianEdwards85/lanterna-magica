@@ -93,8 +93,7 @@
            [bp/dialog-body
             [dim-picker/dimension-picker
              {:selected-ids (or (:dimensionIds revision) [])
-              :on-toggle    #(rf/dispatch [::events/toggle-revision-dimension %])
-              :on-clear     #(rf/dispatch [::events/toggle-revision-dimension %])}]
+              :on-toggle    #(rf/dispatch [::events/toggle-revision-dimension %])}]
             [:div.mb-4
              [:div.flex.items-center.justify-between.mb-1
               [:label.bp6-label.mb-0 "Value"]

@@ -314,17 +314,18 @@
 ;; Create Revision Dialog
 ;; ---------------------------------------------------------------------------
 
-(rf/reg-event-db
+(rf/reg-event-fx
   ::events/open-revision-dialog
-  (fn [db [_ shared-value-id {:keys [dimension-ids value-text string-mode?]
-                               :or   {dimension-ids [] value-text "" string-mode? false}}]]
-    (assoc db :revision-dialog
-           {:open?    true
-            :revision {:sharedValueId  shared-value-id
-                       :dimensionIds   dimension-ids
-                       :value-text     value-text
-                       :string-mode?   string-mode?
-                       :value-valid?   true}})))
+  (fn [{:keys [db]} [_ shared-value-id {:keys [dimension-ids value-text string-mode?]
+                                         :or   {value-text "" string-mode? false}}]]
+    (let [dim-ids (if (seq dimension-ids) dimension-ids (h/base-dimension-ids db))]
+      {:db (assoc db :revision-dialog
+                  {:open?    true
+                   :revision {:sharedValueId  shared-value-id
+                               :dimensionIds   dim-ids
+                               :value-text     value-text
+                               :string-mode?   string-mode?
+                               :value-valid?   true}})})))
 
 (rf/reg-event-db
   ::events/close-revision-dialog
@@ -336,15 +337,17 @@
   (fn [db [_ field value]]
     (assoc-in db [:revision-dialog :revision field] value)))
 
-(rf/reg-event-db
+(rf/reg-event-fx
   ::events/toggle-revision-dimension
-  (fn [db [_ dimension-id]]
+  (fn [{:keys [db]} [_ dimension-id]]
     (let [path    [:revision-dialog :revision :dimensionIds]
           current (get-in db path [])
-          updated (if (some #{dimension-id} current)
-                    (vec (remove #{dimension-id} current))
-                    (conj current dimension-id))]
-      (assoc-in db path updated))))
+          type-id (h/find-type-id db dimension-id)
+          updated (if (nil? type-id)
+                    (conj current dimension-id)
+                    (-> (vec (remove #(= (h/find-type-id db %) type-id) current))
+                        (conj dimension-id)))]
+      {:db (assoc-in db path updated)})))
 
 (rf/reg-event-db
   ::events/toggle-revision-string-mode

@@ -56,8 +56,7 @@
            [:div {:style {:flex "0 0 55%"}}
             [dim-picker/dimension-picker
              {:selected-ids (:dimensionIds configuration)
-              :on-toggle    #(rf/dispatch [::events/toggle-configuration-dimension %])
-              :on-clear     #(rf/dispatch [::events/toggle-configuration-dimension %])}]
+              :on-toggle    #(rf/dispatch [::events/toggle-configuration-dimension %])}]
             [:div.mb-4
              [:label.bp6-label "Configuration Body (JSON)"]
              [monaco/monaco-editor

@@ -131,17 +131,18 @@
 (rf/reg-event-fx
   ::events/open-configuration-dialog
   (fn [{:keys [db]} [_ {:keys [dimension-ids body-text substitutions]
-                        :or   {dimension-ids [] body-text "{}" substitutions {}}}]]
-    (let [pre-populated?     (seq substitutions)
+                        :or   {body-text "{}" substitutions {}}}]]
+    (let [dim-ids            (if (seq dimension-ids) dimension-ids (h/base-dimension-ids db))
+          pre-populated?     (seq substitutions)
           resolve-dispatches (when pre-populated?
                                (mapv (fn [[path sv-id]]
-                                       [::events/resolve-substitution-value path sv-id dimension-ids])
+                                       [::events/resolve-substitution-value path sv-id dim-ids])
                                      substitutions))
           extra-dispatches   (when pre-populated?
                                [[::events/extract-sentinel-paths]])]
       {:db         (assoc db :configuration-dialog
                           {:open?               true
-                           :configuration       {:dimensionIds dimension-ids :body-text body-text}
+                           :configuration       {:dimensionIds dim-ids :body-text body-text}
                            :sentinel-paths      []
                            :substitutions       substitutions
                            :resolved-values     {}
@@ -159,15 +160,17 @@
 (rf/reg-event-fx
   ::events/toggle-configuration-dimension
   (fn [{:keys [db]} [_ dimension-id]]
-    (let [path         [:configuration-dialog :configuration :dimensionIds]
-          current      (get-in db path [])
-          updated      (if (some #{dimension-id} current)
-                         (vec (remove #{dimension-id} current))
-                         (conj current dimension-id))
+    (let [path          [:configuration-dialog :configuration :dimensionIds]
+          current       (get-in db path [])
+          type-id       (h/find-type-id db dimension-id)
+          updated       (if (nil? type-id)
+                          (conj current dimension-id)
+                          (-> (vec (remove #(= (h/find-type-id db %) type-id) current))
+                              (conj dimension-id)))
           substitutions (get-in db [:configuration-dialog :substitutions] {})
-          re-resolves  (mapv (fn [[jsonpath sv-id]]
-                               [::events/resolve-substitution-value jsonpath sv-id updated])
-                             (remove (fn [[_ sv-id]] (nil? sv-id)) substitutions))]
+          re-resolves   (mapv (fn [[jsonpath sv-id]]
+                                [::events/resolve-substitution-value jsonpath sv-id updated])
+                              (remove (fn [[_ sv-id]] (nil? sv-id)) substitutions))]
       {:db         (-> db
                        (assoc-in path updated)
                        (assoc-in [:configuration-dialog :resolved-values] {}))
