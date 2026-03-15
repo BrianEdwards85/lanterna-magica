@@ -7,6 +7,7 @@
                 :output-dir "resources/public/js"
                 :asset-path "/js"
                 :modules    {:main {:init-fn lanterna-magica.core/init}}
+                :compiler-options {:warnings {:redef false}}
                 :js-options {:resolve {"change-case" {:target :file
                                                       :file   "src/js/change-case-shim.js"}}}
                 :devtools   {:http-root    "resources/public"

@@ -249,13 +249,11 @@
            (for [edge rev-edges]
              (let [{:keys [id dimensions value isCurrent createdAt]} (:node edge)]
                ^{:key id}
-               [:div {:class (str "mb-2 rounded p-3 transition-all bg-tn-bg-card"
-                                  (when isCurrent " ring-1 ring-tn-blue/50"))}
+               [:div {:class (str "mb-2 rounded p-3 transition-all "
+                                  (if isCurrent "bg-tn-green/10" "bg-tn-bg-card"))}
                 [:div.flex.items-center.justify-between.mb-1
                  [:div.flex.items-center.gap-2
-                  [dimensions-label/dimensions-label dimensions]
-                  (when isCurrent
-                    [bp/tag {:intent "success" :minimal true} "current"])]
+                  [dimensions-label/dimensions-label dimensions]]
                  [:div.flex.items-center.gap-2
                   (if isCurrent
                     [bp/button {:icon     "trash"
@@ -302,13 +300,12 @@
             (for [edge ub-edges]
               (let [{:keys [id dimensions isCurrent createdAt]} (:node edge)]
                 ^{:key id}
-                [:div {:class    "px-3 py-2 rounded cursor-pointer transition-all bg-tn-bg-card hover:brightness-110"
+                [:div {:class    (str "px-3 py-2 rounded cursor-pointer transition-all hover:brightness-110 "
+                                       (if isCurrent "bg-tn-green/10" "bg-tn-bg-card"))
                        :on-click #(rf/dispatch [::events/select-configuration id])}
                  [:div.flex.items-center.justify-between.gap-2
                   [:div.flex.items-center.gap-2.flex-wrap
-                   [dimensions-label/dimensions-label dimensions]
-                   (when isCurrent
-                     [bp/tag {:intent "success" :minimal true} "current"])]
+                   [dimensions-label/dimensions-label dimensions]]
                   [timestamp/timestamp createdAt]]]))])]])]))
 
 ;; ---------------------------------------------------------------------------
