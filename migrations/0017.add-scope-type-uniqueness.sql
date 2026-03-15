@@ -4,6 +4,16 @@
 -- Step 1: Delete configurations where any two scoped dimensions share a type_id.
 -- config_substitutions cascade via FK on configurations.id.
 -- configuration_scopes cascade via FK on configurations.id.
+
+DELETE FROM config_substitutions
+WHERE configuration_id IN (
+    SELECT cs.configuration_id
+    FROM configuration_scopes cs
+    JOIN dimensions d ON d.id = cs.dimension_id
+    GROUP BY cs.configuration_id, d.type_id
+    HAVING COUNT(*) > 1
+);
+
 DELETE FROM configurations
 WHERE id IN (
     SELECT cs.configuration_id
