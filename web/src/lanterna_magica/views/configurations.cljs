@@ -208,15 +208,14 @@
                 selected? (= (:id node) selected-id)]
             ^{:key (:id node)}
             [:div {:class    (str "px-3 py-2 rounded cursor-pointer transition-all "
+                                  (if (:isCurrent node) "bg-tn-green/10 " "bg-tn-bg-card ")
                                   (if selected?
-                                    "bg-tn-selection ring-1 ring-tn-blue/50"
-                                    "hover:brightness-110 bg-tn-bg-card"))
+                                    "ring-2 ring-tn-blue"
+                                    "hover:brightness-110"))
                    :on-click #(rf/dispatch [::events/select-configuration (:id node)])}
              [:div.flex.items-center.justify-between.gap-2
               [:div.flex.items-center.gap-2.flex-wrap
-               [dimensions-label/dimensions-label (:dimensions node)]
-               (when (:isCurrent node)
-                 [bp/tag {:intent "success" :minimal true} "current"])]
+               [dimensions-label/dimensions-label (:dimensions node)]]
               (if (:isCurrent node)
                 [bp/button {:icon     "trash"
                             :small    true
