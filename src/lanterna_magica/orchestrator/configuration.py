@@ -13,7 +13,7 @@ from lanterna_magica.errors import NotFoundError, ValidationError
 logger = logging.getLogger(__name__)
 
 # Matches a single path segment:  .key  or  [index]  or  [index].key ...
-_SEGMENT_RE = re.compile(r'\.([^.\[]+)|\[(\d+)\]')
+_SEGMENT_RE = re.compile(r"\.([^.\[]+)|\[(\d+)\]")
 
 
 def _sanitize_for_toml(obj):
@@ -24,9 +24,7 @@ def _sanitize_for_toml(obj):
     - all other values: return as-is.
     """
     if isinstance(obj, dict):
-        return {
-            k: _sanitize_for_toml(v) for k, v in obj.items() if v is not None
-        }
+        return {k: _sanitize_for_toml(v) for k, v in obj.items() if v is not None}
     if isinstance(obj, list):
         # Drop None elements, then recurse into each remaining element
         return [_sanitize_for_toml(item) for item in obj if item is not None]
@@ -231,9 +229,7 @@ class ConfigurationOrchestrator:
 
         # Build name->type mapping for non-slug types
         name_to_type = {
-            dt["name"]: dt
-            for dt in dim_types_sorted
-            if dt["id"] != slug_type["id"]
+            dt["name"]: dt for dt in dim_types_sorted if dt["id"] != slug_type["id"]
         }
 
         # Resolve extra dimensions matching known dimension type names

@@ -49,7 +49,6 @@ class Configurations:
         ]
         return rows
 
-
     async def get_configurations_by_shared_value(
         self,
         *,
@@ -83,7 +82,8 @@ class Configurations:
         missing = [
             dict(r)
             async for r in queries.get_missing_base_dimensions(
-                self.pool, dimension_ids=effective_ids,
+                self.pool,
+                dimension_ids=effective_ids,
             )
         ]
         effective_ids.extend(str(d["id"]) for d in missing)
@@ -138,7 +138,8 @@ class Configurations:
             config = rows[0]
             async with self.pool.acquire() as conn, conn.transaction():
                 await queries.unset_current_configuration(
-                    conn, scope_hash=str(config["scope_hash"]),
+                    conn,
+                    scope_hash=str(config["scope_hash"]),
                 )
                 row = await queries.set_configuration_current(conn, id=id)
                 if not row:

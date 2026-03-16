@@ -2,58 +2,15 @@
 
 from assertpy import assert_that
 from conftest import gql
-from utils import (
+from gql import (
+    SHARED_VALUE_USED_BY,
+    create_configuration,
     create_environment,
     create_service,
     create_shared_value,
-    nodes,
 )
 
-# -- Queries --
-
-SHARED_VALUE_USED_BY = """
-query SharedValueUsedBy($ids: [ID!]!, $includeArchived: Boolean, $first: Int, $after: String) {
-    sharedValuesByIds(ids: $ids) {
-        id name
-        usedBy(includeArchived: $includeArchived, first: $first, after: $after) {
-            edges {
-                node {
-                    id body isCurrent
-                    substitutions { id jsonpath sharedValue { id } }
-                }
-                cursor
-            }
-            pageInfo { hasNextPage endCursor }
-        }
-    }
-}
-"""
-
-CREATE_CONFIGURATION = """
-mutation CreateConfiguration($input: CreateConfigurationInput!) {
-    createConfiguration(input: $input) {
-        id body isCurrent
-        dimensions { id name }
-        substitutions { id jsonpath sharedValue { id } }
-    }
-}
-"""
-
-
 # -- Helpers --
-
-
-async def _create_configuration(client, dimension_ids, body, substitutions=None):
-    variables = {
-        "input": {
-            "dimensionIds": dimension_ids,
-            "body": body,
-        }
-    }
-    if substitutions:
-        variables["input"]["substitutions"] = substitutions
-    result = await gql(client, CREATE_CONFIGURATION, variables)
-    return result["data"]["createConfiguration"]
 
 
 async def _archive_configuration(pool, config_id):
@@ -74,7 +31,7 @@ async def test_used_by_config_with_substitution_appears(client):
     env = await create_environment(client)
     sv = await create_shared_value(client, "db_password")
 
-    cfg = await _create_configuration(
+    cfg = await create_configuration(
         client,
         [svc["id"], env["id"]],
         {"database": {"password": "_"}},
@@ -98,7 +55,7 @@ async def test_used_by_config_without_substitution_excluded(client):
     sv_other = await create_shared_value(client, "api_key")
 
     # Create a configuration that substitutes sv_other, not sv
-    cfg = await _create_configuration(
+    cfg = await create_configuration(
         client,
         [svc["id"], env["id"]],
         {"api": {"key": "_"}},
@@ -122,7 +79,7 @@ async def test_used_by_cross_value_isolation(client):
     sv_z = await create_shared_value(client, "value_z")
 
     # Config references Y only
-    cfg_y = await _create_configuration(
+    cfg_y = await create_configuration(
         client,
         [svc["id"], env["id"]],
         {"secret": "_"},
@@ -132,8 +89,14 @@ async def test_used_by_cross_value_isolation(client):
     body_y = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv_y["id"]]})
     body_z = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv_z["id"]]})
 
-    ids_for_y = [e["node"]["id"] for e in body_y["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
-    ids_for_z = [e["node"]["id"] for e in body_z["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
+    ids_for_y = [
+        e["node"]["id"]
+        for e in body_y["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
+    ]
+    ids_for_z = [
+        e["node"]["id"]
+        for e in body_z["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
+    ]
 
     assert_that(ids_for_y).described_as(
         "config referencing Y should appear in Y.usedBy"
@@ -149,7 +112,7 @@ async def test_used_by_include_archived_false_excludes_archived(client, pool):
     env = await create_environment(client)
     sv = await create_shared_value(client, "db_password")
 
-    cfg = await _create_configuration(
+    cfg = await create_configuration(
         client,
         [svc["id"], env["id"]],
         {"db": {"pass": "_"}},
@@ -160,15 +123,21 @@ async def test_used_by_include_archived_false_excludes_archived(client, pool):
 
     # Default (includeArchived not set — defaults to false)
     body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]]})
-    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
+    config_ids = [
+        e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
+    ]
 
     assert_that(config_ids).described_as(
         "archived config should not appear in usedBy with default includeArchived"
     ).does_not_contain(cfg["id"])
 
     # Explicit includeArchived=false
-    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": False})
-    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
+    body = await gql(
+        client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": False}
+    )
+    config_ids = [
+        e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
+    ]
 
     assert_that(config_ids).described_as(
         "archived config should not appear in usedBy with includeArchived=false"
@@ -181,7 +150,7 @@ async def test_used_by_include_archived_true_includes_archived(client, pool):
     env = await create_environment(client)
     sv = await create_shared_value(client, "db_password")
 
-    cfg = await _create_configuration(
+    cfg = await create_configuration(
         client,
         [svc["id"], env["id"]],
         {"db": {"pass": "_"}},
@@ -190,8 +159,12 @@ async def test_used_by_include_archived_true_includes_archived(client, pool):
 
     await _archive_configuration(pool, cfg["id"])
 
-    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True})
-    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
+    body = await gql(
+        client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True}
+    )
+    config_ids = [
+        e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
+    ]
 
     assert_that(config_ids).described_as(
         "archived config should appear in usedBy with includeArchived=true"
@@ -206,7 +179,7 @@ async def test_used_by_pagination_has_next_page(client):
 
     # Create 3 configurations each referencing sv — one per environment (different scopes)
     for env in env_list:
-        await _create_configuration(
+        await create_configuration(
             client,
             [svc["id"], env["id"]],
             {"key": "_"},
@@ -216,15 +189,15 @@ async def test_used_by_pagination_has_next_page(client):
     body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "first": 2})
     page1 = body["data"]["sharedValuesByIds"][0]["usedBy"]
 
-    assert_that(page1["edges"]).described_as(
-        "page 1 should have 2 edges"
-    ).is_length(2)
+    assert_that(page1["edges"]).described_as("page 1 should have 2 edges").is_length(2)
     assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
         "hasNextPage should be true when more results exist"
     ).is_true()
 
 
-async def test_used_by_no_duplicate_when_multiple_substitutions_point_to_same_value(client):
+async def test_used_by_no_duplicate_when_multiple_substitutions_point_to_same_value(
+    client,
+):
     """A configuration with two substitutions pointing to the same shared value should
     appear exactly once in usedBy — regression test for the DISTINCT ON fix."""
     svc = await create_service(client)
@@ -233,7 +206,7 @@ async def test_used_by_no_duplicate_when_multiple_substitutions_point_to_same_va
 
     # Create a configuration with two substitutions both pointing to the same shared value
     # at different JSONPaths. This exercises the bug where the JOIN returned two rows.
-    cfg = await _create_configuration(
+    cfg = await create_configuration(
         client,
         [svc["id"], env["id"]],
         {"db": {"host": "_", "port": "_"}},
@@ -244,7 +217,9 @@ async def test_used_by_no_duplicate_when_multiple_substitutions_point_to_same_va
     )
 
     # Force the SQL code path (not DataLoader) by passing includeArchived=True
-    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True})
+    body = await gql(
+        client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True}
+    )
     used_by = body["data"]["sharedValuesByIds"][0]["usedBy"]
     config_ids = [e["node"]["id"] for e in used_by["edges"]]
 
@@ -263,7 +238,7 @@ async def test_used_by_pagination_after_cursor(client):
     sv = await create_shared_value(client, "paginated_secret")
 
     for env in env_list:
-        await _create_configuration(
+        await create_configuration(
             client,
             [svc["id"], env["id"]],
             {"k": "_"},
@@ -288,9 +263,7 @@ async def test_used_by_pagination_after_cursor(client):
     page2 = body["data"]["sharedValuesByIds"][0]["usedBy"]
     page2_ids = [e["node"]["id"] for e in page2["edges"]]
 
-    assert_that(page2["edges"]).described_as(
-        "page 2 should have 1 edge"
-    ).is_length(1)
+    assert_that(page2["edges"]).described_as("page 2 should have 1 edge").is_length(1)
     assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
         "page 2 has no next page"
     ).is_false()

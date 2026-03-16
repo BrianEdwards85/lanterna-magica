@@ -4,41 +4,16 @@ Covers JSON/YAML/TOML serialization, scope merging, query-param dimensions,
 shared value substitution, and 404/400 error cases.
 """
 
-import json
-
 import tomllib
 import yaml
 from assertpy import assert_that
-from conftest import gql
-from utils import (
+from gql import (
+    create_configuration,
     create_environment,
     create_revision,
     create_service,
     create_shared_value,
 )
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-_CREATE_CONFIGURATION = """
-mutation CreateConfiguration($input: CreateConfigurationInput!) {
-    createConfiguration(input: $input) {
-        id
-        dimensions { id name }
-        body
-    }
-}
-"""
-
-
-async def _create_configuration(client, dimension_ids, body, substitutions=None):
-    variables = {"input": {"dimensionIds": dimension_ids, "body": body}}
-    if substitutions:
-        variables["input"]["substitutions"] = substitutions
-    result = await gql(client, _CREATE_CONFIGURATION, variables)
-    return result["data"]["createConfiguration"]
-
 
 # ---------------------------------------------------------------------------
 # Test cases
@@ -50,14 +25,14 @@ async def test_json_format_200(client):
     svc = await create_service(client, "json-svc")
     env = await create_environment(client, "json-env")
     config_body = {"host": "localhost", "port": 8080}
-    await _create_configuration(client, [svc["id"], env["id"]], config_body)
+    await create_configuration(client, [svc["id"], env["id"]], config_body)
 
     resp = await client.get("/config/json-svc.json?environment=json-env")
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
-    assert_that(resp.headers["content-type"]).described_as(
-        "content-type"
-    ).contains("application/json")
+    assert_that(resp.headers["content-type"]).described_as("content-type").contains(
+        "application/json"
+    )
     assert_that(resp.json()).described_as("response body").is_equal_to(config_body)
 
 
@@ -66,14 +41,14 @@ async def test_yaml_format_200(client):
     svc = await create_service(client, "yaml-svc")
     env = await create_environment(client, "yaml-env")
     config_body = {"host": "yaml-host", "port": 9090}
-    await _create_configuration(client, [svc["id"], env["id"]], config_body)
+    await create_configuration(client, [svc["id"], env["id"]], config_body)
 
     resp = await client.get("/config/yaml-svc.yml?environment=yaml-env")
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
-    assert_that(resp.headers["content-type"]).described_as(
-        "content-type"
-    ).contains("text/yaml")
+    assert_that(resp.headers["content-type"]).described_as("content-type").contains(
+        "text/yaml"
+    )
     parsed = yaml.safe_load(resp.text)
     assert_that(parsed).described_as("parsed YAML body").is_equal_to(config_body)
 
@@ -83,14 +58,14 @@ async def test_toml_format_200(client):
     svc = await create_service(client, "toml-svc")
     env = await create_environment(client, "toml-env")
     config_body = {"host": "toml-host", "port": 7070}
-    await _create_configuration(client, [svc["id"], env["id"]], config_body)
+    await create_configuration(client, [svc["id"], env["id"]], config_body)
 
     resp = await client.get("/config/toml-svc.toml?environment=toml-env")
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
-    assert_that(resp.headers["content-type"]).described_as(
-        "content-type"
-    ).contains("application/toml")
+    assert_that(resp.headers["content-type"]).described_as("content-type").contains(
+        "application/toml"
+    )
     parsed = tomllib.loads(resp.text)
     assert_that(parsed).described_as("parsed TOML body").is_equal_to(config_body)
 
@@ -100,9 +75,9 @@ async def test_scope_merge(client):
     svc = await create_service(client, "merge-svc")
 
     # Global config (no specific dims — assigned to base dims only)
-    await _create_configuration(client, [], {"a": 1, "b": 2})
+    await create_configuration(client, [], {"a": 1, "b": 2})
     # Service-specific config overrides 'b' and adds 'c'
-    await _create_configuration(client, [svc["id"]], {"b": 99, "c": 3})
+    await create_configuration(client, [svc["id"]], {"b": 99, "c": 3})
 
     resp = await client.get("/config/merge-svc.json")
 
@@ -118,7 +93,7 @@ async def test_query_param_dimension(client):
     svc = await create_service(client, "qp-svc")
     prod = await create_environment(client, "prod")
     config_body = {"env": "prod-only"}
-    await _create_configuration(client, [svc["id"], prod["id"]], config_body)
+    await create_configuration(client, [svc["id"], prod["id"]], config_body)
 
     resp = await client.get("/config/qp-svc.json?environment=prod")
 
@@ -136,7 +111,7 @@ async def test_shared_value_substitution(client):
     await create_revision(client, sv["id"], [svc["id"], env["id"]], "s3cr3t")
 
     config_body = {"database": {"password": "_"}}
-    await _create_configuration(
+    await create_configuration(
         client,
         [svc["id"], env["id"]],
         config_body,
@@ -162,7 +137,7 @@ async def test_404_unknown_slug(client):
 async def test_404_unknown_query_param_value(client):
     """GET /config/traefik.json?environment=nonexistent returns 404."""
     svc = await create_service(client, "traefik-qp")
-    await _create_configuration(client, [svc["id"]], {"key": "value"})
+    await create_configuration(client, [svc["id"]], {"key": "value"})
 
     resp = await client.get("/config/traefik-qp.json?environment=nonexistent-env-xyz")
 
@@ -182,7 +157,7 @@ async def test_404_no_configs_for_scope(client):
 async def test_400_unknown_format(client):
     """GET /config/{name}.xyz returns 400 for unrecognised format extension."""
     svc = await create_service(client, "fmt-svc")
-    await _create_configuration(client, [svc["id"]], {"key": "value"})
+    await create_configuration(client, [svc["id"]], {"key": "value"})
 
     resp = await client.get("/config/fmt-svc.xyz")
 
@@ -215,9 +190,9 @@ async def test_scope_merge_with_query_param_dimension(client):
     env = await create_environment(client, "prod")
 
     # Global base config (no dimensions — applies to all scopes)
-    await _create_configuration(client, [], {"log_level": "info", "timeout": 30})
+    await create_configuration(client, [], {"log_level": "info", "timeout": 30})
     # Service+environment-scoped config overrides only log_level
-    await _create_configuration(client, [svc["id"], env["id"]], {"log_level": "debug"})
+    await create_configuration(client, [svc["id"], env["id"]], {"log_level": "debug"})
 
     resp = await client.get("/config/myapp.json?environment=prod")
 

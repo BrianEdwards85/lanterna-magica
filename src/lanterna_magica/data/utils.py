@@ -29,7 +29,8 @@ def page_limit(first: int | None) -> int:
         raise ValidationError(f"first must not exceed {MAX_PAGE_SIZE}")
     return first if first is not None else DEFAULT_PAGE_SIZE
 
-INVALID_NAME_CHARS = re.compile(r'[%\\]')
+
+INVALID_NAME_CHARS = re.compile(r"[%\\]")
 
 
 def validate_name(name: str) -> None:
@@ -39,9 +40,9 @@ def validate_name(name: str) -> None:
 
 def sanitize_search(search: str) -> str:
     # 1. Strip chars that are dangerous in ILIKE patterns (% and \)
-    cleaned = re.sub(r'[%\\]', '', search)
+    cleaned = re.sub(r"[%\\]", "", search)
     # 2. Escape _ so it matches literally instead of acting as single-char wildcard
-    return cleaned.replace('_', r'\_')
+    return cleaned.replace("_", r"\_")
 
 
 async def require_row(query_fn, error_msg: str, *args, **kwargs) -> dict:

@@ -2,7 +2,15 @@ from asyncpg import Pool
 
 from lanterna_magica.errors import ValidationError
 
-from .utils import build_connection, decode_cursor, page_limit, queries, require_row, sanitize_search, validate_name
+from .utils import (
+    build_connection,
+    decode_cursor,
+    page_limit,
+    queries,
+    require_row,
+    sanitize_search,
+    validate_name,
+)
 
 
 class Dimensions:
@@ -39,15 +47,16 @@ class Dimensions:
 
     async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
         rows = [
-            dict(r)
-            async for r in queries.get_dimensions_by_ids(self.pool, ids=ids)
+            dict(r) async for r in queries.get_dimensions_by_ids(self.pool, ids=ids)
         ]
         return rows
 
     async def get_base_dimension(self, type_id: str) -> dict:
         return await require_row(
-            queries.get_base_dimension, "Base dimension not found for this type",
-            self.pool, type_id=type_id,
+            queries.get_base_dimension,
+            "Base dimension not found for this type",
+            self.pool,
+            type_id=type_id,
         )
 
     async def create_dimension(
@@ -67,20 +76,28 @@ class Dimensions:
         if name is not None:
             validate_name(name)
         return await require_row(
-            queries.update_dimension, "Dimension not found",
-            self.pool, id=id, name=name, description=description,
+            queries.update_dimension,
+            "Dimension not found",
+            self.pool,
+            id=id,
+            name=name,
+            description=description,
         )
 
     async def archive_dimension(self, id: str) -> dict:
         return await require_row(
-            queries.archive_dimension, "Dimension not found or already archived",
-            self.pool, id=id,
+            queries.archive_dimension,
+            "Dimension not found or already archived",
+            self.pool,
+            id=id,
         )
 
     async def unarchive_dimension(self, id: str) -> dict:
         return await require_row(
-            queries.unarchive_dimension, "Dimension not found or not archived",
-            self.pool, id=id,
+            queries.unarchive_dimension,
+            "Dimension not found or not archived",
+            self.pool,
+            id=id,
         )
 
     async def get_by_type_and_name(self, *, type_id: str, name: str) -> dict | None:

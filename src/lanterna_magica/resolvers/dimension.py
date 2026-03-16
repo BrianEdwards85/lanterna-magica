@@ -8,7 +8,16 @@ class DimensionsResolver:
         self.dimensions = dimensions
 
     async def resolve_dimensions(
-        self, _obj, info, *, type_id, search=None, include_base=True, include_archived=False, first=None, after=None
+        self,
+        _obj,
+        info,
+        *,
+        type_id,
+        search=None,
+        include_base=True,
+        include_archived=False,
+        first=None,
+        after=None,
     ):
         return await self.dimensions.get_dimensions(
             type_id=type_id,

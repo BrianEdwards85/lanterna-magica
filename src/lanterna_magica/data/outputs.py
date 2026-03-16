@@ -42,17 +42,11 @@ class Outputs:
         return output
 
     async def get(self, *, id: str) -> dict | None:
-        rows = [
-            dict(r)
-            async for r in queries.get_outputs_by_ids(self.pool, ids=[id])
-        ]
+        rows = [dict(r) async for r in queries.get_outputs_by_ids(self.pool, ids=[id])]
         return rows[0] if rows else None
 
     async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
-        rows = [
-            dict(r)
-            async for r in queries.get_outputs_by_ids(self.pool, ids=ids)
-        ]
+        rows = [dict(r) async for r in queries.get_outputs_by_ids(self.pool, ids=ids)]
         return rows
 
     async def list(

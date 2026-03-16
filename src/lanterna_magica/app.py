@@ -36,6 +36,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             )
         return response
 
+
 WEB_PUBLIC = Path(__file__).parent.parent.parent / "web" / "resources" / "public"
 
 

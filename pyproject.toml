@@ -32,6 +32,7 @@ dev = [
     "assertpy>=1.1",
     "pytest>=8",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=6",
     "httpx>=0.28",
     "ruff>=0.8",
 ]
@@ -50,9 +51,20 @@ format = "ruff format src/"
 test = "pytest tests/ -v"
 test-unit = "pytest tests/unit -v"
 test-integration = "pytest tests/integration -v"
+test-coverage = "pytest tests/ --cov=lanterna_magica --cov-report=term-missing"
+test-coverage-html = "pytest tests/ --cov=lanterna_magica --cov-report=html"
 migrate = "python -c \"from lanterna_magica.db import apply_migrations; apply_migrations()\""
 "docker:build" = {shell = "docker build -t lanterna-magica:latest ."}
 "docker:up" = {shell = "docker compose up -d"}
+
+[tool.coverage.run]
+source = ["lanterna_magica"]
+omit = [
+    "*/migrations/*",
+]
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.ruff]
 target-version = "py312"

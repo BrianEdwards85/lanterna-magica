@@ -2,7 +2,14 @@ import re
 
 import pytest
 
-from lanterna_magica.data.utils import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, compute_scope_hash, page_limit, sanitize_search, validate_name
+from lanterna_magica.data.utils import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    compute_scope_hash,
+    page_limit,
+    sanitize_search,
+    validate_name,
+)
 from lanterna_magica.errors import ValidationError
 
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -113,7 +120,10 @@ def test_scope_hash_valid_uuid_format():
 
 
 def test_scope_hash_deterministic():
-    ids = ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]
+    ids = [
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    ]
     assert compute_scope_hash(ids) == compute_scope_hash(ids)
 
 

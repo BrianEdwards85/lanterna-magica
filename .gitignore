@@ -13,3 +13,5 @@ web/resources/public/css/
 AGENTS.md
 .beads
 .claude
+htmlcov/
+.coverage

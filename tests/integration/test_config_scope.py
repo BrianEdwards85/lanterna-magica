@@ -1,12 +1,12 @@
 """Integration tests for data-layer methods added in turbo-umbrella-1qr.2:
-  - Dimensions.get_by_type_and_name
-  - Configurations.get_for_rest_scope
+- Dimensions.get_by_type_and_name
+- Configurations.get_for_rest_scope
 """
 
 from assertpy import assert_that
-from conftest import gql
-from utils import (
+from gql import (
     _get_type_id,
+    create_configuration,
     create_environment,
     create_service,
     create_shared_value,
@@ -14,26 +14,6 @@ from utils import (
 
 from lanterna_magica.data.configurations import Configurations
 from lanterna_magica.data.dimensions import Dimensions
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-async def _create_configuration(client, dimension_ids, body, substitutions=None):
-    CREATE_CONFIGURATION = """
-    mutation CreateConfiguration($input: CreateConfigurationInput!) {
-        createConfiguration(input: $input) {
-            id
-        }
-    }
-    """
-    variables = {"input": {"dimensionIds": dimension_ids, "body": body}}
-    if substitutions:
-        variables["input"]["substitutions"] = substitutions
-    result = await gql(client, CREATE_CONFIGURATION, variables)
-    return result["data"]["createConfiguration"]
-
 
 # ---------------------------------------------------------------------------
 # Dimensions.get_by_type_and_name tests
@@ -87,7 +67,7 @@ async def test_get_for_rest_scope_single_matching_config(client, pool):
     env = await create_environment(client, "scope-env")
     sv = await create_shared_value(client, "scope-secret")
 
-    await _create_configuration(
+    await create_configuration(
         client,
         [svc["id"], env["id"]],
         {"host": "_"},
@@ -116,7 +96,7 @@ async def test_get_for_rest_scope_no_matching_configs(client, pool):
 
     # Create a config scoped to a *different* service so it won't match
     other_svc = await create_service(client, "other-svc")
-    await _create_configuration(client, [other_svc["id"], env["id"]], {"other": True})
+    await create_configuration(client, [other_svc["id"], env["id"]], {"other": True})
 
     configs = Configurations(pool)
     results = await configs.get_for_rest_scope(dimension_ids=[svc["id"], env["id"]])
@@ -130,9 +110,9 @@ async def test_get_for_rest_scope_ordered_least_specific_first(client, pool):
     env = await create_environment(client, "order-env")
 
     # Global config (no non-base dims — assigned to base dims only)
-    await _create_configuration(client, [], {"specificity": "global"})
+    await create_configuration(client, [], {"specificity": "global"})
     # Specific config (two non-base dims)
-    await _create_configuration(
+    await create_configuration(
         client, [svc["id"], env["id"]], {"specificity": "specific"}
     )
 
@@ -144,9 +124,9 @@ async def test_get_for_rest_scope_ordered_least_specific_first(client, pool):
     assert_that(specificities[0]).described_as(
         "least specific (global) comes first"
     ).is_equal_to("global")
-    assert_that(specificities[1]).described_as(
-        "most specific comes last"
-    ).is_equal_to("specific")
+    assert_that(specificities[1]).described_as("most specific comes last").is_equal_to(
+        "specific"
+    )
 
 
 async def test_get_for_rest_scope_substitutions_empty_when_none(client, pool):
@@ -154,7 +134,7 @@ async def test_get_for_rest_scope_substitutions_empty_when_none(client, pool):
     svc = await create_service(client, "nosub-svc")
     env = await create_environment(client, "nosub-env")
 
-    await _create_configuration(client, [svc["id"], env["id"]], {"plain": True})
+    await create_configuration(client, [svc["id"], env["id"]], {"plain": True})
 
     configs = Configurations(pool)
     results = await configs.get_for_rest_scope(dimension_ids=[svc["id"], env["id"]])

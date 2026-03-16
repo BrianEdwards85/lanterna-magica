@@ -116,7 +116,8 @@ class SharedValues:
         missing = [
             dict(r)
             async for r in queries.get_missing_base_dimensions(
-                self.pool, dimension_ids=effective_ids,
+                self.pool,
+                dimension_ids=effective_ids,
             )
         ]
         effective_ids.extend(str(d["id"]) for d in missing)
@@ -172,8 +173,7 @@ class SharedValues:
     async def set_revision_current(self, *, id: str, is_current: bool) -> dict:
         if is_current:
             rows = [
-                dict(r)
-                async for r in queries.get_revision_by_ids(self.pool, ids=[id])
+                dict(r) async for r in queries.get_revision_by_ids(self.pool, ids=[id])
             ]
             if not rows:
                 raise NotFoundError("Revision not found")
