@@ -3,10 +3,10 @@ insert into outputs (path_template, format)
 values (:path_template, :format)
 returning id, path_template, format, created_at, updated_at, archived_at;
 
--- name: get_output(id)^
+-- name: get_outputs_by_ids(ids)
 select id, path_template, format, created_at, updated_at, archived_at
 from outputs
-where id = :id;
+where id = any(:ids::uuid[]);
 
 -- name: get_outputs(include_archived, after_id, page_limit)
 select id, path_template, format, created_at, updated_at, archived_at

@@ -17,7 +17,6 @@ from lanterna_magica.errors import AppError
 from lanterna_magica.orchestrator import ConfigurationOrchestrator
 from lanterna_magica.resolvers.configuration import get_configuration_resolvers
 from lanterna_magica.resolvers.dimension import get_dimension_resolvers
-from lanterna_magica.resolvers.dimension_facade import get_facade_resolvers
 from lanterna_magica.resolvers.dimension_type import get_dimension_type_resolvers
 from lanterna_magica.resolvers.output import get_output_resolvers
 from lanterna_magica.resolvers.scalars import datetime_scalar, json_scalar
@@ -60,8 +59,6 @@ def create_gql(pool) -> GraphQL:
         *get_configuration_resolvers(configurations, configuration_orchestrator),
         *get_dimension_type_resolvers(dimension_types, dimensions),
         *get_dimension_resolvers(dimensions),
-        *get_facade_resolvers(dimensions, dimension_types, "service"),
-        *get_facade_resolvers(dimensions, dimension_types, "environment"),
         *get_shared_value_resolvers(shared_values, configurations),
         *get_output_resolvers(outputs, writer),
         datetime_scalar,
