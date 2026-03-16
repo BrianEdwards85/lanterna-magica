@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from lanterna_magica.api.config import router as config_router
 from lanterna_magica.config import settings
 from lanterna_magica.db import apply_migrations, create_pool
 from lanterna_magica.resolvers import create_gql
@@ -89,6 +90,8 @@ async def health(request: Request):
 async def graphql_endpoint(request: Request) -> Response:
     return await app.state.graphql.handle_request(request)
 
+
+app.include_router(config_router, prefix="/config")
 
 if (WEB_PUBLIC / "js").is_dir():
     app.mount("/js", StaticFiles(directory=WEB_PUBLIC / "js"), name="js")

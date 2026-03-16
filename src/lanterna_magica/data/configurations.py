@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from asyncpg import Pool
 
 from lanterna_magica.errors import NotFoundError, ValidationError
@@ -195,3 +197,19 @@ class Configurations:
             )
         ]
         return rows
+
+    async def get_for_rest_scope(self, *, dimension_ids: list[str]) -> list[dict]:
+        configs = [
+            dict(r)
+            async for r in queries.get_configs_for_rest_scope(
+                self.pool, dimension_ids=dimension_ids
+            )
+        ]
+        ids = [str(c["id"]) for c in configs]
+        by_config: defaultdict[str, list] = defaultdict(list)
+        async for r in queries.get_substitutions_by_config_ids(self.pool, ids=ids):
+            d = dict(r)
+            by_config[str(d["configuration_id"])].append(d)
+        for config in configs:
+            config["substitutions"] = by_config[str(config["id"])]
+        return configs

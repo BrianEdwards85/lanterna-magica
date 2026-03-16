@@ -1,3 +1,26 @@
+-- name: get_configs_for_rest_scope(dimension_ids)
+select c.id, c.scope_hash, c.body, c.is_current, c.created_at
+from configurations c
+where c.is_current = true
+  and c.archived_at is null
+  and not exists (
+      select 1
+      from configuration_scopes cs
+      join dimensions d on d.id = cs.dimension_id
+      where cs.configuration_id = c.id
+        and d.base = false
+        and d.id != all(:dimension_ids::uuid[])
+        and d.archived_at is null
+  )
+order by (
+    select count(*)
+    from configuration_scopes cs2
+    join dimensions d2 on d2.id = cs2.dimension_id
+    where cs2.configuration_id = c.id
+      and d2.base = false
+      and d2.archived_at is null
+) asc, c.id asc;
+
 -- name: get_configurations(dimension_ids, include_base, current_only, after_id, page_limit)
 select distinct c.id, c.scope_hash, c.body, c.is_current, c.created_at
 from configurations c

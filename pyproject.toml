@@ -23,6 +23,8 @@ dependencies = [
     "opentelemetry-instrumentation-starlette",
     "opentelemetry-instrumentation-asyncpg",
     "opentelemetry-exporter-otlp-proto-http",
+    "pyyaml>=6.0.3",
+    "tomli-w>=1.2.0",
 ]
 
 [project.optional-dependencies]

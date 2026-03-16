@@ -82,3 +82,11 @@ class Dimensions:
             queries.unarchive_dimension, "Dimension not found or not archived",
             self.pool, id=id,
         )
+
+    async def get_by_type_and_name(self, *, type_id: str, name: str) -> dict | None:
+        row = await queries.get_dimension_by_type_and_name(
+            self.pool, type_id=type_id, name=name
+        )
+        if row is None:
+            return None
+        return dict(row)

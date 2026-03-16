@@ -1,3 +1,10 @@
+-- name: get_dimension_by_type_and_name(type_id, name)^
+select id, type_id, name, description, base, created_at, updated_at, archived_at
+from dimensions
+where type_id = :type_id
+  and name = :name
+  and archived_at is null;
+
 -- name: get_dimensions(type_id, include_base, include_archived, search, after_id, page_limit)
 select id, type_id, name, description, base, created_at, updated_at, archived_at
 from dimensions

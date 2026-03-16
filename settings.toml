@@ -20,6 +20,9 @@ allow_credentials = true
 endpoint = ""
 service_name = "lanterna-magica"
 
+[default.rest]
+slug_dimension_type_name = "service"
+
 [development]
 dynaconf_merge = true
 
