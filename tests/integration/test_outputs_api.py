@@ -83,8 +83,8 @@ query Outputs($includeArchived: Boolean, $first: Int, $after: String) {
 """
 
 OUTPUT_QUERY = """
-query Output($id: ID!) {
-    output(id: $id) {
+query OutputsByIds($ids: [ID!]!) {
+    outputsByIds(ids: $ids) {
         id
         pathTemplate
         format
@@ -387,8 +387,8 @@ async def test_trigger_output_results_stored_in_db(client):
         written_path = trigger_result["results"][0]["path"]
 
         # Query output from DB
-        body = await gql(client, OUTPUT_QUERY, {"id": output["id"]})
-        fetched = body["data"]["output"]
+        body = await gql(client, OUTPUT_QUERY, {"ids": [output["id"]]})
+        fetched = body["data"]["outputsByIds"][0]
 
         assert_that(fetched["results"]).described_as("results present").is_length(1)
         res = fetched["results"][0]

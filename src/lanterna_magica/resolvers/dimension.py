@@ -19,8 +19,8 @@ class DimensionsResolver:
             after=after,
         )
 
-    async def resolve_dimension(self, _obj, info, *, id):
-        return await info.context["dimension_loader"].load(id)
+    async def resolve_dimensions_by_ids(self, _obj, info, *, ids):
+        return await self.dimensions.get_by_ids(ids=ids)
 
     async def resolve_create_dimension(self, _obj, info, *, input):
         return await self.dimensions.create_dimension(
@@ -54,7 +54,7 @@ def get_dimension_resolvers(dimensions: Dimensions) -> list:
     dimension_type = ObjectType("Dimension")
 
     query.set_field("dimensions", resolver.resolve_dimensions)
-    query.set_field("dimension", resolver.resolve_dimension)
+    query.set_field("dimensionsByIds", resolver.resolve_dimensions_by_ids)
     mutation.set_field("createDimension", resolver.resolve_create_dimension)
     mutation.set_field("updateDimension", resolver.resolve_update_dimension)
     mutation.set_field("archiveDimension", resolver.resolve_archive_dimension)

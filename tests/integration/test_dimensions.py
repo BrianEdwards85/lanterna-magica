@@ -51,9 +51,9 @@ query Dimensions($typeId: ID!, $includeBase: Boolean, $includeArchived: Boolean,
 }
 """
 
-DIMENSION = """
-query Dimension($id: ID!) {
-    dimension(id: $id) {
+DIMENSIONS_BY_IDS = """
+query DimensionsByIds($ids: [ID!]!) {
+    dimensionsByIds(ids: $ids) {
         id type { id name } name description base createdAt updatedAt archivedAt
     }
 }
@@ -114,19 +114,28 @@ async def test_create_dimension_same_name_different_type(client):
     assert_that(dim2["name"]).described_as("same name different type").is_equal_to("shared-name")
 
 
-async def test_dimension_by_id(client):
+async def test_dimensions_by_ids(client):
     type_id = await _get_service_type_id(client)
-    dim = await create_dimension(client, type_id, "traefik")
+    dim1 = await create_dimension(client, type_id, "traefik")
+    dim2 = await create_dimension(client, type_id, "nginx")
 
-    body = await gql(client, DIMENSION, {"id": dim["id"]})
-    found = body["data"]["dimension"]
-    assert_that(found["id"]).described_as("fetched dimension id").is_equal_to(dim["id"])
-    assert_that(found["name"]).described_as("fetched dimension name").is_equal_to("traefik")
+    body = await gql(client, DIMENSIONS_BY_IDS, {"ids": [dim1["id"], dim2["id"]]})
+    found = body["data"]["dimensionsByIds"]
+    assert_that(found).described_as("fetched dimensions count").is_length(2)
+    ids = [d["id"] for d in found]
+    assert_that(ids).described_as("fetched dimension ids").contains(dim1["id"], dim2["id"])
 
 
-async def test_dimension_by_id_not_found(client):
-    body = await gql(client, DIMENSION, {"id": "00000000-0000-0000-0000-ffffffffffff"})
-    assert_that(body["data"]["dimension"]).described_as("non-existent id").is_none()
+async def test_dimensions_by_ids_empty(client):
+    body = await gql(client, DIMENSIONS_BY_IDS, {"ids": []})
+    found = body["data"]["dimensionsByIds"]
+    assert_that(found).described_as("empty ids returns empty list").is_empty()
+
+
+async def test_dimensions_by_ids_unknown(client):
+    body = await gql(client, DIMENSIONS_BY_IDS, {"ids": ["00000000-0000-0000-0000-ffffffffffff"]})
+    found = body["data"]["dimensionsByIds"]
+    assert_that(found).described_as("unknown id returns empty list").is_empty()
 
 
 async def test_dimensions_list(client):
@@ -180,8 +189,10 @@ async def test_base_dimension_by_id(client):
     items = nodes(body["data"]["dimensions"]["edges"])
     base = next(d for d in items if d["base"])
 
-    body = await gql(client, DIMENSION, {"id": base["id"]})
-    found = body["data"]["dimension"]
+    body = await gql(client, DIMENSIONS_BY_IDS, {"ids": [base["id"]]})
+    results = body["data"]["dimensionsByIds"]
+    assert_that(results).described_as("result list").is_length(1)
+    found = results[0]
     assert_that(found["id"]).described_as("fetched base id").is_equal_to(base["id"])
     assert_that(found["name"]).described_as("fetched base name").is_equal_to("global")
     assert_that(found["base"]).described_as("fetched base flag").is_true()
@@ -407,3 +418,151 @@ async def test_get_base_dimension_not_found(pool):
     dims = Dimensions(pool)
     with pytest.raises(NotFoundError):
         await dims.get_base_dimension("00000000-0000-0000-0000-ffffffffffff")
+
+
+async def test_get_by_ids_multi(client, pool):
+    """Dimensions.get_by_ids returns multiple dimensions by ID."""
+    type_id = await _get_service_type_id(client)
+    dim1 = await create_dimension(client, type_id, "traefik")
+    dim2 = await create_dimension(client, type_id, "nginx")
+    dims = Dimensions(pool)
+    results = await dims.get_by_ids(ids=[dim1["id"], dim2["id"]])
+    assert_that(results).described_as("multi-ID fetch count").is_length(2)
+    result_ids = [str(r["id"]) for r in results]
+    assert_that(result_ids).described_as("multi-ID fetch ids").contains(dim1["id"], dim2["id"])
+
+
+async def test_get_by_ids_empty(pool):
+    """Dimensions.get_by_ids returns empty list for empty ids."""
+    dims = Dimensions(pool)
+    results = await dims.get_by_ids(ids=[])
+    assert_that(results).described_as("empty ids returns empty list").is_empty()
+
+
+async def test_get_by_ids_unknown(pool):
+    """Dimensions.get_by_ids returns empty list for unknown IDs."""
+    dims = Dimensions(pool)
+    results = await dims.get_by_ids(ids=["00000000-0000-0000-0000-ffffffffffff"])
+    assert_that(results).described_as("unknown id returns empty list").is_empty()
+
+
+# -- DataLoader tests --
+
+DIMENSION_TYPES_WITH_DIMENSIONS = """
+query DimensionTypesWithDimensions {
+    dimensionTypes {
+        id
+        name
+        dimensions {
+            edges {
+                node { id name base }
+            }
+        }
+    }
+}
+"""
+
+DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED = """
+query DimensionTypesWithDimensionsFiltered($includeBase: Boolean, $includeArchived: Boolean, $search: String, $first: Int, $after: String) {
+    dimensionTypes {
+        id
+        name
+        dimensions(includeBase: $includeBase, includeArchived: $includeArchived, search: $search, first: $first, after: $after) {
+            edges {
+                node { id name base archivedAt }
+            }
+            pageInfo { hasNextPage endCursor }
+        }
+    }
+}
+"""
+
+
+async def test_dimension_types_with_dimensions_via_loader(client):
+    """Querying dimensionTypes with nested dimensions uses the DataLoader (default params)."""
+    type_id = await _get_service_type_id(client)
+    await create_dimension(client, type_id, "traefik")
+    await create_dimension(client, type_id, "nginx")
+
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS)
+    types = body["data"]["dimensionTypes"]
+    assert_that(types).described_as("dimension types returned").is_not_empty()
+
+    service_type = next(t for t in types if t["name"] == "service")
+    dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
+    assert_that(dim_names).described_as("service dimensions include traefik").contains("traefik")
+    assert_that(dim_names).described_as("service dimensions include nginx").contains("nginx")
+    assert_that(dim_names).described_as("service dimensions include base").contains("global")
+
+
+async def test_dimension_types_loader_returns_correct_dimensions_per_type(client):
+    """Each dimension type only sees its own dimensions via the DataLoader."""
+    type_id = await _get_service_type_id(client)
+    region_type = await create_dimension_type(client, "region")
+
+    await create_dimension(client, type_id, "traefik")
+    await create_dimension(client, region_type["id"], "us-east-1")
+
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS)
+    types = body["data"]["dimensionTypes"]
+
+    service_type = next(t for t in types if t["name"] == "service")
+    region_type_data = next(t for t in types if t["name"] == "region")
+
+    service_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
+    region_names = [e["node"]["name"] for e in region_type_data["dimensions"]["edges"]]
+
+    assert_that(service_names).described_as("service dims").contains("traefik").does_not_contain("us-east-1")
+    assert_that(region_names).described_as("region dims").contains("us-east-1").does_not_contain("traefik")
+
+
+async def test_dimension_types_loader_excludes_archived(client):
+    """DataLoader path excludes archived dimensions (default: include_archived=False)."""
+    type_id = await _get_service_type_id(client)
+    dim = await create_dimension(client, type_id, "traefik")
+    await gql(client, ARCHIVE_DIMENSION, {"id": dim["id"]})
+
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS)
+    types = body["data"]["dimensionTypes"]
+    service_type = next(t for t in types if t["name"] == "service")
+    dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
+    assert_that(dim_names).described_as("archived dim not visible via loader").does_not_contain("traefik")
+
+
+async def test_dimension_types_loader_fallback_with_include_archived(client):
+    """Passing includeArchived=True falls back to direct call, includes archived dims."""
+    type_id = await _get_service_type_id(client)
+    dim = await create_dimension(client, type_id, "traefik")
+    await gql(client, ARCHIVE_DIMENSION, {"id": dim["id"]})
+
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"includeArchived": True})
+    types = body["data"]["dimensionTypes"]
+    service_type = next(t for t in types if t["name"] == "service")
+    dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
+    assert_that(dim_names).described_as("archived dim visible with includeArchived=True").contains("traefik")
+
+
+async def test_dimension_types_loader_fallback_with_search(client):
+    """Passing search= falls back to direct call, filters dimensions by name."""
+    type_id = await _get_service_type_id(client)
+    await create_dimension(client, type_id, "traefik")
+    await create_dimension(client, type_id, "nginx")
+
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"search": "traefik"})
+    types = body["data"]["dimensionTypes"]
+    service_type = next(t for t in types if t["name"] == "service")
+    dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
+    assert_that(dim_names).described_as("search filters to traefik only").contains("traefik").does_not_contain("nginx")
+
+
+async def test_dimension_types_loader_fallback_with_pagination(client):
+    """Passing first= falls back to direct call and respects pagination."""
+    type_id = await _get_service_type_id(client)
+    for i in range(3):
+        await create_dimension(client, type_id, f"svc-{i:02d}")
+
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"first": 2})
+    types = body["data"]["dimensionTypes"]
+    service_type = next(t for t in types if t["name"] == "service")
+    assert_that(service_type["dimensions"]["edges"]).described_as("paginated result").is_length(2)
+    assert_that(service_type["dimensions"]["pageInfo"]["hasNextPage"]).described_as("has next page").is_true()

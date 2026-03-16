@@ -4,6 +4,7 @@ import itertools
 import logging
 import os
 from collections import defaultdict
+from collections.abc import Callable
 
 from lanterna_magica.data.configurations import Configurations
 from lanterna_magica.data.dimension_types import DimensionTypes
@@ -32,11 +33,17 @@ class OutputWriter:
         self,
         *,
         output_id: str,
+        on_complete: Callable[[], None] | None = None,
     ) -> list[dict]:
         """Compute all dimension combinations for an output, resolve and write files.
 
         Args:
             output_id: The UUID of the output to write.
+            on_complete: Optional synchronous callback invoked after all results
+                are collected.  Callers within a GraphQL request should pass a
+                lambda that clears the relevant DataLoader cache entry so
+                subsequent loads return fresh data instead of a stale cached
+                value.
 
         Returns:
             List of result dicts — one per combination, from upsert_result.
@@ -156,6 +163,8 @@ class OutputWriter:
             )
             results.append(result)
 
+        if on_complete is not None:
+            on_complete()
         return results
 
 

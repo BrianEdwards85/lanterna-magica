@@ -37,7 +37,8 @@ limit :page_limit;
 -- name: get_configurations_by_ids(ids)
 select id, scope_hash, body, is_current, created_at
 from configurations
-where id = any(:ids::uuid[]);
+where id = any(:ids::uuid[])
+order by id;
 
 -- name: unset_current_configuration(scope_hash)!
 update configurations
@@ -139,7 +140,7 @@ where c.id = sub.configuration_id
   and c.scope_hash is distinct from sub.new_hash;
 
 -- name: get_configurations_by_shared_value_id(shared_value_id, include_archived, after_id, page_limit)
-select c.id, c.scope_hash, c.body, c.is_current, c.created_at, c.created_by
+select distinct on (c.id) c.id, c.scope_hash, c.body, c.is_current, c.created_at, c.created_by
 from configurations c
 join config_substitutions cs on cs.configuration_id = c.id
 where cs.shared_value_id = :shared_value_id
@@ -147,3 +148,11 @@ where cs.shared_value_id = :shared_value_id
   and (:after_id::uuid is null or c.id < :after_id)
 order by c.id desc
 limit :page_limit;
+
+-- name: get_configurations_by_shared_value_ids(ids)
+select distinct on (cs.shared_value_id, c.id) cs.shared_value_id, c.id, c.scope_hash, c.body, c.is_current, c.created_at, c.created_by
+from configurations c
+join config_substitutions cs on cs.configuration_id = c.id
+where cs.shared_value_id = any(:ids::uuid[])
+  and c.archived_at is null
+order by cs.shared_value_id, c.id desc;

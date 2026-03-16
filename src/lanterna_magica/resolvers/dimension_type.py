@@ -2,6 +2,7 @@ from ariadne import MutationType, ObjectType, QueryType
 
 from lanterna_magica.data.dimension_types import DimensionTypes
 from lanterna_magica.data.dimensions import Dimensions
+from lanterna_magica.data.utils import build_connection
 
 
 class DimensionTypesResolver:
@@ -38,6 +39,11 @@ class DimensionTypesResolver:
     async def resolve_dimensions_for_type(
         self, obj, info, *, include_base=True, include_archived=False, first=None, after=None, search=None
     ):
+        # Use DataLoader for the default case (no filtering, no pagination, no search)
+        # to avoid N+1 queries when listing dimension types with their dimensions.
+        if include_base and not include_archived and first is None and after is None and search is None:
+            rows = await info.context["dimensions_by_type_loader"].load(str(obj["id"]))
+            return build_connection(rows, "id", len(rows))
         return await self.dimensions.get_dimensions(
             type_id=str(obj["id"]),
             search=search,

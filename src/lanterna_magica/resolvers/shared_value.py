@@ -2,6 +2,7 @@ from ariadne import MutationType, ObjectType, QueryType
 
 from lanterna_magica.data.configurations import Configurations
 from lanterna_magica.data.shared_values import SharedValues
+from lanterna_magica.data.utils import build_connection
 
 
 class SharedValuesResolver:
@@ -19,8 +20,12 @@ class SharedValuesResolver:
             after=after,
         )
 
-    async def resolve_shared_value(self, _obj, info, *, id):
-        return await info.context["shared_value_loader"].load(id)
+    async def resolve_shared_values_by_ids(self, _obj, info, *, ids):
+        rows = await self.shared_values.get_by_ids(ids=ids)
+        loader = info.context["shared_value_loader"]
+        for r in rows:
+            loader.prime(str(r["id"]), r)
+        return rows
 
     async def resolve_create_shared_value(self, _obj, info, *, input):
         return await self.shared_values.create_shared_value(name=input["name"])
@@ -50,6 +55,10 @@ class SharedValuesResolver:
         )
 
     async def resolve_used_by(self, obj, info, *, include_archived=False, first=None, after=None):
+        # Use DataLoader for default case (no filtering, no pagination)
+        if not include_archived and first is None and after is None:
+            rows = await info.context["configs_by_shared_value_loader"].load(str(obj["id"]))
+            return build_connection(rows, "id", len(rows))
         return await self.configurations.get_configurations_by_shared_value(
             shared_value_id=str(obj["id"]),
             include_archived=include_archived,
@@ -90,7 +99,7 @@ def get_shared_value_resolvers(shared_values: SharedValues, configurations: Conf
     revision_type = ObjectType("SharedValueRevision")
 
     query.set_field("sharedValues", resolver.resolve_shared_values)
-    query.set_field("sharedValue", resolver.resolve_shared_value)
+    query.set_field("sharedValuesByIds", resolver.resolve_shared_values_by_ids)
     query.set_field("resolveSharedValue", resolver.resolve_resolve_shared_value)
     mutation.set_field("createSharedValue", resolver.resolve_create_shared_value)
     mutation.set_field("updateSharedValue", resolver.resolve_update_shared_value)

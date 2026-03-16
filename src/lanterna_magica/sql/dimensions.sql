@@ -19,7 +19,15 @@ limit :page_limit;
 -- name: get_dimensions_by_ids(ids)
 select id, type_id, name, description, base, created_at, updated_at, archived_at
 from dimensions
-where id = any(:ids::uuid[]);
+where id = any(:ids::uuid[])
+order by id;
+
+-- name: get_dimensions_for_type_ids(ids)
+select id, type_id, name, description, base, created_at, updated_at, archived_at
+from dimensions
+where type_id = any(:ids::uuid[])
+  and archived_at is null
+order by id desc;
 
 -- name: get_base_dimension(type_id)^
 select id, type_id, name, description, base, created_at, updated_at, archived_at

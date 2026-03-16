@@ -23,16 +23,16 @@ class DimensionTypeLoader(_ByIdLoader):
     query_fn = queries.get_dimension_types_by_ids
 
 
-class DimensionLoader(_ByIdLoader):
-    query_fn = queries.get_dimensions_by_ids
-
-
 class SharedValueLoader(_ByIdLoader):
     query_fn = queries.get_shared_values_by_ids
 
 
 class ConfigurationLoader(_ByIdLoader):
     query_fn = queries.get_configurations_by_ids
+
+
+class OutputLoader(_ByIdLoader):
+    query_fn = queries.get_outputs_by_ids
 
 
 class _ScopesByParentLoader(DataLoader):
@@ -63,6 +63,26 @@ class ScopesByRevisionLoader(_ScopesByParentLoader):
     parent_key = "revision_id"
 
 
+class DimensionsByTypeLoader(_ScopesByParentLoader):
+    query_fn = queries.get_dimensions_for_type_ids
+    parent_key = "type_id"
+
+
+class OutputDimensionsLoader(_ScopesByParentLoader):
+    query_fn = queries.get_dimensions_for_outputs
+    parent_key = "output_id"
+
+
+class OutputResultsLoader(_ScopesByParentLoader):
+    query_fn = queries.get_results_for_outputs
+    parent_key = "output_id"
+
+
+class ConfigsBySharedValueLoader(_ScopesByParentLoader):
+    query_fn = queries.get_configurations_by_shared_value_ids
+    parent_key = "shared_value_id"
+
+
 class SubstitutionsByConfigLoader(DataLoader):
     """One-to-many loader: configuration_id -> list of substitution rows."""
 
@@ -84,9 +104,13 @@ def create_loaders(pool: Pool) -> dict:
     return {
         "configuration_loader": ConfigurationLoader(pool),
         "dimension_type_loader": DimensionTypeLoader(pool),
-        "dimension_loader": DimensionLoader(pool),
+        "dimensions_by_type_loader": DimensionsByTypeLoader(pool),
+        "output_loader": OutputLoader(pool),
+        "output_dimensions_loader": OutputDimensionsLoader(pool),
+        "output_results_loader": OutputResultsLoader(pool),
         "shared_value_loader": SharedValueLoader(pool),
         "substitution_loader": SubstitutionsByConfigLoader(pool),
         "config_scopes_loader": ScopesByConfigLoader(pool),
+        "configs_by_shared_value_loader": ConfigsBySharedValueLoader(pool),
         "revision_scopes_loader": ScopesByRevisionLoader(pool),
     }

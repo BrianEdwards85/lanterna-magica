@@ -42,8 +42,8 @@ mutation UpdateConfigSubstitution($input: SetConfigSubstitutionInput!) {
 
 # Substitution query helper for verifying updates
 CONFIGURATION_WITH_SUBS = """
-query Configuration($id: ID!) {
-    configuration(id: $id) {
+query ConfigurationWithSubs($ids: [ID!]!) {
+    configurationsByIds(ids: $ids) {
         id
         substitutions {
             id jsonpath sharedValue { id }
@@ -75,9 +75,9 @@ query Configurations($dimensionIds: [ID!], $includeBase: Boolean, $first: Int, $
 }
 """
 
-CONFIGURATION = """
-query Configuration($id: ID!) {
-    configuration(id: $id) {
+CONFIGURATIONS_BY_IDS = """
+query ConfigurationsByIds($ids: [ID!]!) {
+    configurationsByIds(ids: $ids) {
         id
         dimensions { id name }
         body
@@ -155,8 +155,8 @@ async def test_new_configuration_replaces_current(client):
     assert_that(cfg2["isCurrent"]).described_as("new config is current").is_true()
 
     # Check cfg1 is no longer current
-    body = await gql(client, CONFIGURATION, {"id": cfg1["id"]})
-    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg1["id"]]})
+    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as(
         "old config no longer current"
     ).is_false()
 
@@ -166,8 +166,8 @@ async def test_configuration_by_id(client):
     env = await create_environment(client)
 
     cfg = await _create_configuration(client, [svc["id"], env["id"]], {"key": "value"})
-    body = await gql(client, CONFIGURATION, {"id": cfg["id"]})
-    found = body["data"]["configuration"]
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg["id"]]})
+    found = body["data"]["configurationsByIds"][0]
     assert_that(found["id"]).described_as("fetched configuration id").is_equal_to(
         cfg["id"]
     )
@@ -178,9 +178,25 @@ async def test_configuration_by_id(client):
 
 async def test_configuration_by_id_not_found(client):
     body = await gql(
-        client, CONFIGURATION, {"id": "00000000-0000-0000-0000-ffffffffffff"}
+        client, CONFIGURATIONS_BY_IDS, {"ids": ["00000000-0000-0000-0000-ffffffffffff"]}
     )
-    assert_that(body["data"]["configuration"]).described_as("non-existent id").is_none()
+    assert_that(body["data"]["configurationsByIds"]).described_as("non-existent id returns empty list").is_empty()
+
+
+async def test_configurations_by_ids_fetches_multiple(client):
+    svc = await create_service(client)
+    env = await create_environment(client)
+
+    cfg1 = await _create_configuration(client, [svc["id"], env["id"]], {"version": 1})
+    cfg2 = await _create_configuration(client, [svc["id"], env["id"]], {"version": 2})
+
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg1["id"], cfg2["id"]]})
+    results = body["data"]["configurationsByIds"]
+    result_ids = [r["id"] for r in results]
+    assert_that(results).described_as("fetches both configurations").is_length(2)
+    assert_that(result_ids).described_as("returned ids match requested").contains(
+        cfg1["id"], cfg2["id"]
+    )
 
 
 async def test_configurations_list(client):
@@ -484,7 +500,7 @@ async def test_create_configuration_with_array_body(client):
 
 
 async def test_configuration_by_invalid_uuid(client):
-    body = await gql(client, CONFIGURATION, {"id": "not-a-uuid"}, expect_errors=True)
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": ["not-a-uuid"]}, expect_errors=True)
     assert_that(body).described_as("invalid uuid rejected").contains_key("errors")
 
 
@@ -492,8 +508,8 @@ async def test_configuration_by_invalid_uuid(client):
 
 
 CONFIGURATION_WITH_TYPED_DIMENSIONS = """
-query Configuration($id: ID!) {
-    configuration(id: $id) {
+query ConfigurationWithTypedDimensions($ids: [ID!]!) {
+    configurationsByIds(ids: $ids) {
         id
         dimensions { id name type { id name } }
         substitutions {
@@ -512,8 +528,8 @@ async def test_configuration_dimensions_include_type(client):
     env = await create_environment(client)
     cfg = await _create_configuration(client, [svc["id"], env["id"]], {"k": "v"})
 
-    body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg["id"]})
-    config = body["data"]["configuration"]
+    body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"ids": [cfg["id"]]})
+    config = body["data"]["configurationsByIds"][0]
     for dim in config["dimensions"]:
         assert_that(dim["type"]).described_as("dimension has type").contains_key(
             "id", "name"
@@ -536,8 +552,8 @@ async def test_configuration_substitutions_resolve_nested(client):
         [{"jsonpath": "$.host", "sharedValueId": sv["id"]}],
     )
 
-    body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg["id"]})
-    subs = body["data"]["configuration"]["substitutions"]
+    body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"ids": [cfg["id"]]})
+    subs = body["data"]["configurationsByIds"][0]["substitutions"]
     assert_that(subs).described_as("substitutions count").is_length(1)
     assert_that(subs[0]["configuration"]["id"]).described_as(
         "sub -> config id"
@@ -607,8 +623,8 @@ async def test_new_base_configuration_replaces_current_base(client):
 
     assert_that(cfg2["isCurrent"]).described_as("new base config is current").is_true()
 
-    body = await gql(client, CONFIGURATION, {"id": cfg1["id"]})
-    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg1["id"]]})
+    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as(
         "old base config no longer current"
     ).is_false()
 
@@ -620,9 +636,9 @@ async def test_new_dimension_type_backfills_base_into_configurations(client):
     await create_dimension_type(client, "region")
 
     body = await gql(
-        client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"id": cfg_before["id"]}
+        client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"ids": [cfg_before["id"]]}
     )
-    config = body["data"]["configuration"]
+    config = body["data"]["configurationsByIds"][0]
     type_names = sorted(d["type"]["name"] for d in config["dimensions"])
     assert_that(type_names).described_as(
         "old configuration now includes all base dimensions"
@@ -632,8 +648,8 @@ async def test_new_dimension_type_backfills_base_into_configurations(client):
     cfg_after = await _create_configuration(client, [], {"after": True})
     assert_that(cfg_after["isCurrent"]).described_as("new config is current").is_true()
 
-    body = await gql(client, CONFIGURATION, {"id": cfg_before["id"]})
-    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg_before["id"]]})
+    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as(
         "old base config replaced as current"
     ).is_false()
 
@@ -663,9 +679,9 @@ async def test_partial_dimensions_env_only(client):
     body = await gql(
         client,
         CONFIGURATION_WITH_TYPED_DIMENSIONS,
-        {"id": cfg["id"]},
+        {"ids": [cfg["id"]]},
     )
-    config = body["data"]["configuration"]
+    config = body["data"]["configurationsByIds"][0]
     by_type = {
         d["type"]["name"]: d["name"] for d in config["dimensions"]
     }
@@ -706,8 +722,8 @@ async def test_set_noncurrent_configuration_to_current(client):
     assert_that(result["isCurrent"]).described_as("cfg1 now current").is_true()
 
     # Verify cfg2 is no longer current
-    body = await gql(client, CONFIGURATION, {"id": cfg2["id"]})
-    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg2["id"]]})
+    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as(
         "cfg2 no longer current"
     ).is_false()
 
@@ -742,8 +758,8 @@ async def test_set_current_only_affects_same_scope_configurations(client):
     await gql(client, SET_CONFIGURATION_CURRENT, {"id": cfg_prod["id"], "isCurrent": True})
 
     # Staging should still be current
-    body = await gql(client, CONFIGURATION, {"id": cfg_staging["id"]})
-    assert_that(body["data"]["configuration"]["isCurrent"]).described_as(
+    body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg_staging["id"]]})
+    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as(
         "staging unaffected"
     ).is_true()
 
@@ -832,8 +848,8 @@ async def test_create_configuration_extra_substitution_path_raises_error(client)
 # -- projection field tests --
 
 CONFIGURATION_WITH_PROJECTION = """
-query Configuration($id: ID!) {
-    configuration(id: $id) {
+query ConfigurationWithProjection($ids: [ID!]!) {
+    configurationsByIds(ids: $ids) {
         id
         body
         projection
@@ -858,8 +874,8 @@ async def test_projection_with_resolved_substitution(client):
         [{"jsonpath": "$.database.password", "sharedValueId": sv["id"]}],
     )
 
-    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"id": cfg["id"]})
-    config = body["data"]["configuration"]
+    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"ids": [cfg["id"]]})
+    config = body["data"]["configurationsByIds"][0]
     assert_that(config["projection"]).described_as(
         "projection replaces sentinel with resolved value"
     ).is_equal_to({"database": {"password": "s3cr3t"}})
@@ -879,8 +895,8 @@ async def test_projection_with_no_substitutions(client):
         {"host": "localhost", "port": 5432},
     )
 
-    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"id": cfg["id"]})
-    config = body["data"]["configuration"]
+    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"ids": [cfg["id"]]})
+    config = body["data"]["configurationsByIds"][0]
     assert_that(config["projection"]).described_as(
         "projection equals body when no substitutions"
     ).is_equal_to({"host": "localhost", "port": 5432})
@@ -900,8 +916,8 @@ async def test_projection_with_unresolvable_substitution_leaves_sentinel(client)
         [{"jsonpath": "$.api_key", "sharedValueId": sv["id"]}],
     )
 
-    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"id": cfg["id"]})
-    config = body["data"]["configuration"]
+    body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"ids": [cfg["id"]]})
+    config = body["data"]["configurationsByIds"][0]
     assert_that(config["projection"]).described_as(
         "unresolvable substitution keeps sentinel in projection"
     ).is_equal_to({"api_key": "_"})
@@ -931,3 +947,41 @@ async def test_create_configuration_duplicate_dimension_type_raises_error(client
     assert_that(error_message).described_as(
         "error mentions duplicate type"
     ).contains("multiple dimensions of the same type")
+
+
+# -- Data-layer tests for Configurations.get_by_ids --
+
+
+async def test_get_by_ids_multiple(client, pool):
+    """get_by_ids returns multiple configurations by their IDs."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    configs = Configurations(pool)
+
+    cfg_a = await _create_configuration(client, [svc["id"], env["id"]], {"tag": "a"})
+    cfg_b = await _create_configuration(client, [svc["id"], env["id"]], {"tag": "b"})
+    cfg_c = await _create_configuration(client, [svc["id"], env["id"]], {"tag": "c"})
+
+    result = await configs.get_by_ids(ids=[cfg_a["id"], cfg_c["id"]])
+
+    assert_that(result).described_as("returns two configurations").is_length(2)
+    returned_ids = {str(r["id"]) for r in result}
+    assert_that(returned_ids).described_as("correct ids returned").is_equal_to(
+        {cfg_a["id"], cfg_c["id"]}
+    )
+    # b was not requested and should not be present
+    assert_that(cfg_b["id"]).described_as("unrequested config absent").is_not_in(returned_ids)
+
+
+async def test_get_by_ids_empty_list(pool):
+    """get_by_ids returns an empty list when given no IDs."""
+    configs = Configurations(pool)
+    result = await configs.get_by_ids(ids=[])
+    assert_that(result).described_as("empty list for empty ids").is_equal_to([])
+
+
+async def test_get_by_ids_unknown_ids(pool):
+    """get_by_ids returns an empty list when no IDs match."""
+    configs = Configurations(pool)
+    result = await configs.get_by_ids(ids=["00000000-0000-0000-0000-ffffffffffff"])
+    assert_that(result).described_as("empty list for unknown ids").is_equal_to([])

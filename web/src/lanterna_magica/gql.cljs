@@ -49,11 +49,6 @@
      }
    }")
 
-(def dimension-query
-  "query Dimension($id: ID!) {
-     dimension(id: $id) { id name description base createdAt updatedAt archivedAt type { id name } }
-   }")
-
 (def create-dimension-mutation
   "mutation CreateDimension($input: CreateDimensionInput!) {
      createDimension(input: $input) { id name description base createdAt updatedAt archivedAt type { id name } }
@@ -87,8 +82,8 @@
    }")
 
 (def shared-value-query
-  "query SharedValue($id: ID!, $dimensionIds: [ID!], $includeBase: Boolean, $currentOnly: Boolean, $first: Int, $after: String) {
-     sharedValue(id: $id) {
+  "query SharedValuesByIds($ids: [ID!]!, $dimensionIds: [ID!], $includeBase: Boolean, $currentOnly: Boolean, $first: Int, $after: String) {
+     sharedValuesByIds(ids: $ids) {
        id name createdAt updatedAt archivedAt
        revisions(dimensionIds: $dimensionIds, includeBase: $includeBase, currentOnly: $currentOnly, first: $first, after: $after) {
          edges {
@@ -173,8 +168,8 @@
    }")
 
 (def configuration-query
-  "query Configuration($id: ID!) {
-     configuration(id: $id) {
+  "query ConfigurationsByIds($ids: [ID!]!) {
+     configurationsByIds(ids: $ids) {
        id body isCurrent createdAt projection
        dimensions { id name type { id name } }
        substitutions {
@@ -201,15 +196,6 @@
      setConfigurationCurrent(id: $id, isCurrent: $isCurrent) {
        id body isCurrent createdAt projection
        dimensions { id name type { id name } }
-     }
-   }")
-
-(def update-config-substitution-mutation
-  "mutation UpdateConfigSubstitution($input: SetConfigSubstitutionInput!) {
-     updateConfigSubstitution(input: $input) {
-       id jsonpath createdAt
-       configuration { id }
-       sharedValue { id name }
      }
    }")
 
@@ -241,8 +227,8 @@
    }")
 
 (def output-query
-  "query Output($id: ID!) {
-     output(id: $id) {
+  "query OutputsByIds($ids: [ID!]!) {
+     outputsByIds(ids: $ids) {
        id pathTemplate format createdAt updatedAt archivedAt
        dimensions { id name type { id name } }
        results {

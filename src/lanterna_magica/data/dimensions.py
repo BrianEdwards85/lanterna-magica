@@ -37,7 +37,7 @@ class Dimensions:
         ]
         return build_connection(rows, "id", limit, search=search)
 
-    async def get_dimensions_by_ids(self, ids: list[str]) -> list[dict]:
+    async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
         rows = [
             dict(r)
             async for r in queries.get_dimensions_by_ids(self.pool, ids=ids)

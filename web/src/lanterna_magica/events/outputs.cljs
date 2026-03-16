@@ -184,7 +184,7 @@
                    (h/start-loading :output-detail))
      :dispatch [::re-graph/query
                 {:query     gql/output-query
-                 :variables {:id id}
+                 :variables {:ids [id]}
                  :callback  [::events/on-output-detail]}]}))
 
 (rf/reg-event-fx
@@ -192,7 +192,13 @@
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
     (let [{:keys [data errors]} response
-          output (:output data)]
-      {:db (-> db
-               (assoc-in [:outputs-page :selected] output)
-               (h/stop-loading :output-detail errors))})))
+          output (first (:outputsByIds data))]
+      (if (and (nil? output) (nil? errors))
+        {:db       (-> db
+                       (assoc-in [:outputs-page :selected-id] nil)
+                       (assoc-in [:outputs-page :selected] nil)
+                       (h/stop-loading :output-detail))
+         :navigate :route/outputs}
+        {:db (-> db
+                 (assoc-in [:outputs-page :selected] output)
+                 (h/stop-loading :output-detail errors))}))))

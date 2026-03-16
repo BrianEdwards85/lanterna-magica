@@ -12,8 +12,8 @@ from utils import (
 # -- Queries --
 
 SHARED_VALUE_USED_BY = """
-query SharedValueUsedBy($id: ID!, $includeArchived: Boolean, $first: Int, $after: String) {
-    sharedValue(id: $id) {
+query SharedValueUsedBy($ids: [ID!]!, $includeArchived: Boolean, $first: Int, $after: String) {
+    sharedValuesByIds(ids: $ids) {
         id name
         usedBy(includeArchived: $includeArchived, first: $first, after: $after) {
             edges {
@@ -81,8 +81,8 @@ async def test_used_by_config_with_substitution_appears(client):
         [{"jsonpath": "$.database.password", "sharedValueId": sv["id"]}],
     )
 
-    body = await gql(client, SHARED_VALUE_USED_BY, {"id": sv["id"]})
-    used_by = body["data"]["sharedValue"]["usedBy"]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]]})
+    used_by = body["data"]["sharedValuesByIds"][0]["usedBy"]
     config_ids = [e["node"]["id"] for e in used_by["edges"]]
 
     assert_that(config_ids).described_as(
@@ -105,8 +105,8 @@ async def test_used_by_config_without_substitution_excluded(client):
         [{"jsonpath": "$.api.key", "sharedValueId": sv_other["id"]}],
     )
 
-    body = await gql(client, SHARED_VALUE_USED_BY, {"id": sv["id"]})
-    used_by = body["data"]["sharedValue"]["usedBy"]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]]})
+    used_by = body["data"]["sharedValuesByIds"][0]["usedBy"]
     config_ids = [e["node"]["id"] for e in used_by["edges"]]
 
     assert_that(config_ids).described_as(
@@ -129,11 +129,11 @@ async def test_used_by_cross_value_isolation(client):
         [{"jsonpath": "$.secret", "sharedValueId": sv_y["id"]}],
     )
 
-    body_y = await gql(client, SHARED_VALUE_USED_BY, {"id": sv_y["id"]})
-    body_z = await gql(client, SHARED_VALUE_USED_BY, {"id": sv_z["id"]})
+    body_y = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv_y["id"]]})
+    body_z = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv_z["id"]]})
 
-    ids_for_y = [e["node"]["id"] for e in body_y["data"]["sharedValue"]["usedBy"]["edges"]]
-    ids_for_z = [e["node"]["id"] for e in body_z["data"]["sharedValue"]["usedBy"]["edges"]]
+    ids_for_y = [e["node"]["id"] for e in body_y["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
+    ids_for_z = [e["node"]["id"] for e in body_z["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
     assert_that(ids_for_y).described_as(
         "config referencing Y should appear in Y.usedBy"
@@ -159,16 +159,16 @@ async def test_used_by_include_archived_false_excludes_archived(client, pool):
     await _archive_configuration(pool, cfg["id"])
 
     # Default (includeArchived not set — defaults to false)
-    body = await gql(client, SHARED_VALUE_USED_BY, {"id": sv["id"]})
-    config_ids = [e["node"]["id"] for e in body["data"]["sharedValue"]["usedBy"]["edges"]]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]]})
+    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
     assert_that(config_ids).described_as(
         "archived config should not appear in usedBy with default includeArchived"
     ).does_not_contain(cfg["id"])
 
     # Explicit includeArchived=false
-    body = await gql(client, SHARED_VALUE_USED_BY, {"id": sv["id"], "includeArchived": False})
-    config_ids = [e["node"]["id"] for e in body["data"]["sharedValue"]["usedBy"]["edges"]]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": False})
+    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
     assert_that(config_ids).described_as(
         "archived config should not appear in usedBy with includeArchived=false"
@@ -190,8 +190,8 @@ async def test_used_by_include_archived_true_includes_archived(client, pool):
 
     await _archive_configuration(pool, cfg["id"])
 
-    body = await gql(client, SHARED_VALUE_USED_BY, {"id": sv["id"], "includeArchived": True})
-    config_ids = [e["node"]["id"] for e in body["data"]["sharedValue"]["usedBy"]["edges"]]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True})
+    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
     assert_that(config_ids).described_as(
         "archived config should appear in usedBy with includeArchived=true"
@@ -213,8 +213,8 @@ async def test_used_by_pagination_has_next_page(client):
             [{"jsonpath": "$.key", "sharedValueId": sv["id"]}],
         )
 
-    body = await gql(client, SHARED_VALUE_USED_BY, {"id": sv["id"], "first": 2})
-    page1 = body["data"]["sharedValue"]["usedBy"]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "first": 2})
+    page1 = body["data"]["sharedValuesByIds"][0]["usedBy"]
 
     assert_that(page1["edges"]).described_as(
         "page 1 should have 2 edges"
@@ -222,6 +222,38 @@ async def test_used_by_pagination_has_next_page(client):
     assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
         "hasNextPage should be true when more results exist"
     ).is_true()
+
+
+async def test_used_by_no_duplicate_when_multiple_substitutions_point_to_same_value(client):
+    """A configuration with two substitutions pointing to the same shared value should
+    appear exactly once in usedBy — regression test for the DISTINCT ON fix."""
+    svc = await create_service(client)
+    env = await create_environment(client)
+    sv = await create_shared_value(client, "multi_sub_value")
+
+    # Create a configuration with two substitutions both pointing to the same shared value
+    # at different JSONPaths. This exercises the bug where the JOIN returned two rows.
+    cfg = await _create_configuration(
+        client,
+        [svc["id"], env["id"]],
+        {"db": {"host": "_", "port": "_"}},
+        [
+            {"jsonpath": "$.db.host", "sharedValueId": sv["id"]},
+            {"jsonpath": "$.db.port", "sharedValueId": sv["id"]},
+        ],
+    )
+
+    # Force the SQL code path (not DataLoader) by passing includeArchived=True
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True})
+    used_by = body["data"]["sharedValuesByIds"][0]["usedBy"]
+    config_ids = [e["node"]["id"] for e in used_by["edges"]]
+
+    assert_that(config_ids).described_as(
+        "config with two substitutions to same sv should appear exactly once in usedBy"
+    ).contains(cfg["id"])
+    assert_that(config_ids.count(cfg["id"])).described_as(
+        "config id must not be duplicated in usedBy results"
+    ).is_equal_to(1)
 
 
 async def test_used_by_pagination_after_cursor(client):
@@ -239,8 +271,8 @@ async def test_used_by_pagination_after_cursor(client):
         )
 
     # Get page 1
-    body = await gql(client, SHARED_VALUE_USED_BY, {"id": sv["id"], "first": 2})
-    page1 = body["data"]["sharedValue"]["usedBy"]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "first": 2})
+    page1 = body["data"]["sharedValuesByIds"][0]["usedBy"]
     page1_ids = [e["node"]["id"] for e in page1["edges"]]
 
     assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
@@ -251,9 +283,9 @@ async def test_used_by_pagination_after_cursor(client):
     body = await gql(
         client,
         SHARED_VALUE_USED_BY,
-        {"id": sv["id"], "first": 2, "after": page1["pageInfo"]["endCursor"]},
+        {"ids": [sv["id"]], "first": 2, "after": page1["pageInfo"]["endCursor"]},
     )
-    page2 = body["data"]["sharedValue"]["usedBy"]
+    page2 = body["data"]["sharedValuesByIds"][0]["usedBy"]
     page2_ids = [e["node"]["id"] for e in page2["edges"]]
 
     assert_that(page2["edges"]).described_as(

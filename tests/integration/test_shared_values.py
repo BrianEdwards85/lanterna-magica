@@ -70,9 +70,9 @@ query SharedValuesWithSearch($search: String, $includeArchived: Boolean, $first:
 }
 """
 
-SHARED_VALUE = """
-query SharedValue($id: ID!) {
-    sharedValue(id: $id) {
+SHARED_VALUES_BY_IDS = """
+query SharedValuesByIds($ids: [ID!]!) {
+    sharedValuesByIds(ids: $ids) {
         id name createdAt updatedAt archivedAt
     }
 }
@@ -80,13 +80,13 @@ query SharedValue($id: ID!) {
 
 SHARED_VALUE_WITH_REVISIONS = """
 query SharedValueWithRevisions(
-    $id: ID!,
+    $ids: [ID!]!,
     $dimensionIds: [ID!],
     $currentOnly: Boolean,
     $first: Int,
     $after: String
 ) {
-    sharedValue(id: $id) {
+    sharedValuesByIds(ids: $ids) {
         id name
         revisions(
             dimensionIds: $dimensionIds,
@@ -106,14 +106,14 @@ query SharedValueWithRevisions(
 
 SHARED_VALUE_WITH_REVISIONS_INCLUDE_BASE = """
 query SharedValueWithRevisionsIncludeBase(
-    $id: ID!,
+    $ids: [ID!]!,
     $dimensionIds: [ID!],
     $includeBase: Boolean,
     $currentOnly: Boolean,
     $first: Int,
     $after: String
 ) {
-    sharedValue(id: $id) {
+    sharedValuesByIds(ids: $ids) {
         id name
         revisions(
             dimensionIds: $dimensionIds,
@@ -159,10 +159,12 @@ async def test_create_shared_value_duplicate_name(client):
     )
 
 
-async def test_shared_value_by_id(client):
+async def test_shared_values_by_ids(client):
     sv = await create_shared_value(client)
-    body = await gql(client, SHARED_VALUE, {"id": sv["id"]})
-    found = body["data"]["sharedValue"]
+    body = await gql(client, SHARED_VALUES_BY_IDS, {"ids": [sv["id"]]})
+    results = body["data"]["sharedValuesByIds"]
+    assert_that(results).described_as("returns one result").is_length(1)
+    found = results[0]
     assert_that(found["id"]).described_as("fetched shared value id").is_equal_to(
         sv["id"]
     )
@@ -171,11 +173,26 @@ async def test_shared_value_by_id(client):
     )
 
 
-async def test_shared_value_by_id_not_found(client):
-    body = await gql(
-        client, SHARED_VALUE, {"id": "00000000-0000-0000-0000-ffffffffffff"}
+async def test_shared_values_by_ids_multiple(client):
+    sv1 = await create_shared_value(client, "db_password")
+    sv2 = await create_shared_value(client, "api_key")
+
+    body = await gql(client, SHARED_VALUES_BY_IDS, {"ids": [sv1["id"], sv2["id"]]})
+    found = body["data"]["sharedValuesByIds"]
+    assert_that(found).described_as("fetched shared values count").is_length(2)
+    ids = [sv["id"] for sv in found]
+    assert_that(ids).described_as("fetched shared value ids").contains(
+        sv1["id"], sv2["id"]
     )
-    assert_that(body["data"]["sharedValue"]).described_as("non-existent id").is_none()
+
+
+async def test_shared_values_by_ids_unknown_returns_empty(client):
+    body = await gql(
+        client, SHARED_VALUES_BY_IDS, {"ids": ["00000000-0000-0000-0000-ffffffffffff"]}
+    )
+    assert_that(body["data"]["sharedValuesByIds"]).described_as(
+        "non-existent id returns empty list"
+    ).is_empty()
 
 
 async def test_shared_values_list(client):
@@ -367,8 +384,8 @@ async def test_new_revision_replaces_current(client):
     ).is_true()
 
     # Check all revisions — rev1 should no longer be current
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
-    revisions = body["data"]["sharedValue"]["revisions"]["edges"]
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]]})
+    revisions = body["data"]["sharedValuesByIds"][0]["revisions"]["edges"]
     by_id = {e["node"]["id"]: e["node"] for e in revisions}
     assert_that(by_id[rev1["id"]]["isCurrent"]).described_as(
         "old revision no longer current"
@@ -391,9 +408,9 @@ async def test_revisions_scoped_by_dimension(client):
     body = await gql(
         client,
         SHARED_VALUE_WITH_REVISIONS,
-        {"id": sv["id"], "dimensionIds": [svc1["id"]]},
+        {"ids": [sv["id"]], "dimensionIds": [svc1["id"]]},
     )
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc1").is_length(1)
     assert_that(revisions).extracting("value").described_as(
         "svc1 revision value"
@@ -403,9 +420,9 @@ async def test_revisions_scoped_by_dimension(client):
     body = await gql(
         client,
         SHARED_VALUE_WITH_REVISIONS,
-        {"id": sv["id"], "dimensionIds": [svc2["id"]]},
+        {"ids": [sv["id"]], "dimensionIds": [svc2["id"]]},
     )
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions).described_as("revisions filtered by svc2").is_length(1)
     assert_that(revisions).extracting("value").described_as(
         "svc2 revision value"
@@ -421,15 +438,15 @@ async def test_revisions_current_only_filter(client):
     await create_revision(client, sv["id"], [svc["id"], env["id"]], "v2")
 
     # All revisions
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
-    all_revs = body["data"]["sharedValue"]["revisions"]["edges"]
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]]})
+    all_revs = body["data"]["sharedValuesByIds"][0]["revisions"]["edges"]
     assert_that(all_revs).described_as("all revisions count").is_length(2)
 
     # Current only
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "currentOnly": True}
+        client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]], "currentOnly": True}
     )
-    current_revs = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    current_revs = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(current_revs).described_as("current-only revisions count").is_length(1)
     assert_that(current_revs).extracting("value").described_as(
         "current revision value"
@@ -447,8 +464,8 @@ async def test_revisions_pagination(client):
     for i in range(5):
         await create_revision(client, sv["id"], [svc["id"], env["id"]], f"v{i}")
 
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "first": 2})
-    page1 = body["data"]["sharedValue"]["revisions"]
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]], "first": 2})
+    page1 = body["data"]["sharedValuesByIds"][0]["revisions"]
     assert_that(page1["edges"]).described_as("revision page 1 edge count").is_length(2)
     assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
         "revision page 1 has next page"
@@ -457,9 +474,9 @@ async def test_revisions_pagination(client):
     body = await gql(
         client,
         SHARED_VALUE_WITH_REVISIONS,
-        {"id": sv["id"], "first": 2, "after": page1["pageInfo"]["endCursor"]},
+        {"ids": [sv["id"]], "first": 2, "after": page1["pageInfo"]["endCursor"]},
     )
-    page2 = body["data"]["sharedValue"]["revisions"]
+    page2 = body["data"]["sharedValuesByIds"][0]["revisions"]
     assert_that(page2["edges"]).described_as("revision page 2 edge count").is_length(2)
     assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
         "revision page 2 has next page"
@@ -468,9 +485,9 @@ async def test_revisions_pagination(client):
     body = await gql(
         client,
         SHARED_VALUE_WITH_REVISIONS,
-        {"id": sv["id"], "first": 2, "after": page2["pageInfo"]["endCursor"]},
+        {"ids": [sv["id"]], "first": 2, "after": page2["pageInfo"]["endCursor"]},
     )
-    page3 = body["data"]["sharedValue"]["revisions"]
+    page3 = body["data"]["sharedValuesByIds"][0]["revisions"]
     assert_that(page3["edges"]).described_as("revision page 3 edge count").is_length(1)
     assert_that(page3["pageInfo"]["hasNextPage"]).described_as(
         "revision page 3 has no next page"
@@ -489,9 +506,9 @@ async def test_revisions_filter_by_environment(client):
     body = await gql(
         client,
         SHARED_VALUE_WITH_REVISIONS,
-        {"id": sv["id"], "dimensionIds": [env1["id"]]},
+        {"ids": [sv["id"]], "dimensionIds": [env1["id"]]},
     )
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions).described_as(
         "revisions filtered by production env"
     ).is_length(1)
@@ -539,8 +556,8 @@ async def test_shared_value_name_with_underscore_allowed(client):
 
 
 REVISION_WITH_TYPED_DIMENSIONS = """
-query SharedValueWithRevisions($id: ID!) {
-    sharedValue(id: $id) {
+query SharedValueWithRevisions($ids: [ID!]!) {
+    sharedValuesByIds(ids: $ids) {
         id name
         revisions {
             edges {
@@ -563,8 +580,8 @@ async def test_revision_dimensions_include_type(client):
     env = await create_environment(client)
     await create_revision(client, sv["id"], [svc["id"], env["id"]], "val")
 
-    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"ids": [sv["id"]]})
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions).is_length(1)
     for dim in revisions[0]["dimensions"]:
         assert_that(dim["type"]).described_as("dimension has type").contains_key(
@@ -582,8 +599,8 @@ async def test_revision_shared_value_resolved(client):
     env = await create_environment(client)
     await create_revision(client, sv["id"], [svc["id"], env["id"]], "val")
 
-    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"ids": [sv["id"]]})
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions[0]["sharedValue"]["id"]).described_as(
         "revision -> sv id"
     ).is_equal_to(sv["id"])
@@ -616,8 +633,8 @@ async def test_base_revision_appears_in_unfiltered_list(client):
     sv = await create_shared_value(client)
     rev = await create_revision(client, sv["id"], [], "base-val")
 
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]]})
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions).described_as("unfiltered revisions include base").is_length(
         1
     )
@@ -638,9 +655,9 @@ async def test_base_revision_appears_with_include_base(client):
     body = await gql(
         client,
         SHARED_VALUE_WITH_REVISIONS_INCLUDE_BASE,
-        {"id": sv["id"], "dimensionIds": [svc["id"]], "includeBase": True},
+        {"ids": [sv["id"]], "dimensionIds": [svc["id"]], "includeBase": True},
     )
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     values = [r["value"] for r in revisions]
     assert_that(values).described_as(
         "includeBase=true should return both base and specific revisions"
@@ -659,9 +676,9 @@ async def test_base_revision_excluded_without_include_base(client):
     body = await gql(
         client,
         SHARED_VALUE_WITH_REVISIONS_INCLUDE_BASE,
-        {"id": sv["id"], "dimensionIds": [svc["id"]], "includeBase": False},
+        {"ids": [sv["id"]], "dimensionIds": [svc["id"]], "includeBase": False},
     )
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     values = [r["value"] for r in revisions]
     assert_that(values).described_as(
         "includeBase=false should exclude base revision"
@@ -678,8 +695,8 @@ async def test_new_base_revision_replaces_current_base(client):
         "new base revision is current"
     ).is_true()
 
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]]})
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     by_id = {r["id"]: r for r in revisions}
     assert_that(by_id[rev1["id"]]["isCurrent"]).described_as(
         "old base revision no longer current"
@@ -703,8 +720,8 @@ async def test_new_dimension_type_backfills_base_into_revisions(client):
     await create_dimension_type(client, "region")
 
     # Old revision should now have 3 dimensions (all globals)
-    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"ids": [sv["id"]]})
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions).described_as("revision still visible").is_length(1)
     assert_that(revisions[0]["id"]).is_equal_to(rev_before["id"])
     type_names = sorted(d["type"]["name"] for d in revisions[0]["dimensions"])
@@ -718,8 +735,8 @@ async def test_new_dimension_type_backfills_base_into_revisions(client):
         "new revision is current"
     ).is_true()
 
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]]})
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     by_id = {r["id"]: r for r in revisions}
     assert_that(by_id[rev_before["id"]]["isCurrent"]).described_as(
         "old base revision replaced as current"
@@ -738,8 +755,8 @@ async def test_new_dimension_type_backfills_scoped_revisions(client):
 
     await create_dimension_type(client, "region")
 
-    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]})
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    body = await gql(client, REVISION_WITH_TYPED_DIMENSIONS, {"ids": [sv["id"]]})
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     assert_that(revisions).is_length(1)
     type_names = sorted(d["type"]["name"] for d in revisions[0]["dimensions"])
     assert_that(type_names).described_as(
@@ -770,9 +787,9 @@ async def test_partial_dimensions_env_only(client):
     await create_revision(client, sv["id"], [env["id"]], "env-only")
 
     body = await gql(
-        client, REVISION_WITH_TYPED_DIMENSIONS, {"id": sv["id"]}
+        client, REVISION_WITH_TYPED_DIMENSIONS, {"ids": [sv["id"]]}
     )
-    revisions = nodes(body["data"]["sharedValue"]["revisions"]["edges"])
+    revisions = nodes(body["data"]["sharedValuesByIds"][0]["revisions"]["edges"])
     dims = revisions[0]["dimensions"]
     by_type = {d["type"]["name"]: d["name"] for d in dims}
     assert_that(by_type).described_as("types covered").contains_key(
@@ -813,8 +830,8 @@ async def test_set_noncurrent_revision_to_current(client):
     assert_that(result["isCurrent"]).described_as("rev1 now current").is_true()
 
     # Verify rev2 is no longer current
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
-    by_id = {e["node"]["id"]: e["node"] for e in body["data"]["sharedValue"]["revisions"]["edges"]}
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]]})
+    by_id = {e["node"]["id"]: e["node"] for e in body["data"]["sharedValuesByIds"][0]["revisions"]["edges"]}
     assert_that(by_id[rev1["id"]]["isCurrent"]).described_as("rev1 is current").is_true()
     assert_that(by_id[rev2["id"]]["isCurrent"]).described_as("rev2 no longer current").is_false()
 
@@ -833,9 +850,9 @@ async def test_deactivate_current_revision(client):
 
     # currentOnly should return nothing
     body = await gql(
-        client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"], "currentOnly": True}
+        client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]], "currentOnly": True}
     )
-    current_revs = body["data"]["sharedValue"]["revisions"]["edges"]
+    current_revs = body["data"]["sharedValuesByIds"][0]["revisions"]["edges"]
     assert_that(current_revs).described_as("no current revisions").is_empty()
 
 
@@ -858,8 +875,8 @@ async def test_set_current_only_affects_same_scope(client):
     await gql(client, SET_REVISION_CURRENT, {"id": rev_prod["id"], "isCurrent": True})
 
     # Staging should still be current
-    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"id": sv["id"]})
-    by_id = {e["node"]["id"]: e["node"] for e in body["data"]["sharedValue"]["revisions"]["edges"]}
+    body = await gql(client, SHARED_VALUE_WITH_REVISIONS, {"ids": [sv["id"]]})
+    by_id = {e["node"]["id"]: e["node"] for e in body["data"]["sharedValuesByIds"][0]["revisions"]["edges"]}
     assert_that(by_id[rev_staging["id"]]["isCurrent"]).described_as(
         "staging unaffected"
     ).is_true()
@@ -1048,6 +1065,45 @@ async def test_resolve_for_scope_specificity_tiebreaker(client, pool):
     ).is_equal_to(rev_specific["id"])
 
 
+# -- Data-layer tests for SharedValues.get_by_ids --
+
+
+async def test_get_by_ids_multiple(client, pool):
+    """get_by_ids returns multiple shared values by their IDs."""
+    from lanterna_magica.data.shared_values import SharedValues
+
+    sv_a = await create_shared_value(client, "sv_alpha")
+    sv_b = await create_shared_value(client, "sv_beta")
+    sv_c = await create_shared_value(client, "sv_gamma")
+
+    shared_values = SharedValues(pool)
+    result = await shared_values.get_by_ids(ids=[sv_a["id"], sv_c["id"]])
+
+    assert_that(result).described_as("returns two shared values").is_length(2)
+    returned_ids = {str(r["id"]) for r in result}
+    assert_that(returned_ids).described_as("correct ids returned").is_equal_to(
+        {sv_a["id"], sv_c["id"]}
+    )
+    assert_that(sv_b["id"]).described_as("unrequested sv absent").is_not_in(returned_ids)
+
+
+async def test_get_by_ids_empty_list(pool):
+    """get_by_ids returns an empty list when given no IDs."""
+    from lanterna_magica.data.shared_values import SharedValues
+
+    shared_values = SharedValues(pool)
+    result = await shared_values.get_by_ids(ids=[])
+    assert_that(result).described_as("empty list for empty ids").is_equal_to([])
+
+
+async def test_get_by_ids_unknown_ids(pool):
+    """get_by_ids returns an empty list when no IDs match."""
+    from lanterna_magica.data.shared_values import SharedValues
+
+    shared_values = SharedValues(pool)
+    result = await shared_values.get_by_ids(ids=["00000000-0000-0000-0000-ffffffffffff"])
+    assert_that(result).described_as("empty list for unknown ids").is_equal_to([])
+
 # -- resolveSharedValue query tests --
 
 RESOLVE_SHARED_VALUE = """
@@ -1140,3 +1196,182 @@ async def test_create_revision_duplicate_dimension_type_raises_error(client):
     assert_that(error_message).described_as(
         "error mentions duplicate type"
     ).contains("multiple dimensions of the same type")
+
+
+# -- DataLoader: SharedValue.usedBy --
+
+_CREATE_CONFIGURATION_FOR_LOADER = """
+mutation CreateConfigurationForLoader($input: CreateConfigurationInput!) {
+    createConfiguration(input: $input) {
+        id body isCurrent
+        substitutions { id jsonpath sharedValue { id } }
+    }
+}
+"""
+
+_SHARED_VALUES_BY_IDS_WITH_USED_BY = """
+query SharedValuesByIdsWithUsedBy($ids: [ID!]!) {
+    sharedValuesByIds(ids: $ids) {
+        id name
+        usedBy {
+            edges {
+                node { id isCurrent }
+            }
+            pageInfo { hasNextPage endCursor }
+        }
+    }
+}
+"""
+
+
+async def _create_configuration_with_substitution(client, dimension_ids, body_json, substitutions):
+    variables = {
+        "input": {
+            "dimensionIds": dimension_ids,
+            "body": body_json,
+            "substitutions": substitutions,
+        }
+    }
+    result = await gql(client, _CREATE_CONFIGURATION_FOR_LOADER, variables)
+    return result["data"]["createConfiguration"]
+
+
+async def test_used_by_dataloader_single_shared_value(client):
+    """usedBy via DataLoader returns configurations referencing the shared value."""
+    svc = await create_service(client, "loader-svc-single")
+    env = await create_environment(client, "loader-env-single")
+    sv = await create_shared_value(client, "loader_single_secret")
+
+    cfg = await _create_configuration_with_substitution(
+        client,
+        [svc["id"], env["id"]],
+        {"key": "_"},
+        [{"jsonpath": "$.key", "sharedValueId": sv["id"]}],
+    )
+
+    body = await gql(client, _SHARED_VALUES_BY_IDS_WITH_USED_BY, {"ids": [sv["id"]]})
+    result = body["data"]["sharedValuesByIds"][0]
+    config_ids = [e["node"]["id"] for e in result["usedBy"]["edges"]]
+
+    assert_that(config_ids).described_as(
+        "configuration referencing shared value should appear in usedBy via DataLoader"
+    ).contains(cfg["id"])
+
+
+async def test_used_by_dataloader_multiple_shared_values_batched(client):
+    """Fetching usedBy for multiple shared values in one query uses the DataLoader."""
+    svc = await create_service(client, "loader-svc-batch")
+    env = await create_environment(client, "loader-env-batch")
+    sv1 = await create_shared_value(client, "loader_batch_secret_1")
+    sv2 = await create_shared_value(client, "loader_batch_secret_2")
+
+    cfg1 = await _create_configuration_with_substitution(
+        client,
+        [svc["id"], env["id"]],
+        {"key1": "_"},
+        [{"jsonpath": "$.key1", "sharedValueId": sv1["id"]}],
+    )
+    # Create a different scope for sv2 so configs don't conflict
+    env2 = await create_environment(client, "loader-env-batch-2")
+    cfg2 = await _create_configuration_with_substitution(
+        client,
+        [svc["id"], env2["id"]],
+        {"key2": "_"},
+        [{"jsonpath": "$.key2", "sharedValueId": sv2["id"]}],
+    )
+
+    body = await gql(
+        client,
+        _SHARED_VALUES_BY_IDS_WITH_USED_BY,
+        {"ids": [sv1["id"], sv2["id"]]},
+    )
+    results = {r["id"]: r for r in body["data"]["sharedValuesByIds"]}
+
+    ids_for_sv1 = [e["node"]["id"] for e in results[sv1["id"]]["usedBy"]["edges"]]
+    ids_for_sv2 = [e["node"]["id"] for e in results[sv2["id"]]["usedBy"]["edges"]]
+
+    assert_that(ids_for_sv1).described_as(
+        "cfg1 should appear in sv1.usedBy"
+    ).contains(cfg1["id"])
+    assert_that(ids_for_sv2).described_as(
+        "cfg2 should appear in sv2.usedBy"
+    ).contains(cfg2["id"])
+    assert_that(ids_for_sv1).described_as(
+        "cfg2 should not appear in sv1.usedBy"
+    ).does_not_contain(cfg2["id"])
+    assert_that(ids_for_sv2).described_as(
+        "cfg1 should not appear in sv2.usedBy"
+    ).does_not_contain(cfg1["id"])
+
+
+async def test_used_by_dataloader_excludes_archived_by_default(client, pool):
+    """usedBy via DataLoader (default path) excludes archived configurations."""
+    svc = await create_service(client, "loader-svc-archived")
+    env = await create_environment(client, "loader-env-archived")
+    sv = await create_shared_value(client, "loader_archived_secret")
+
+    cfg = await _create_configuration_with_substitution(
+        client,
+        [svc["id"], env["id"]],
+        {"secret": "_"},
+        [{"jsonpath": "$.secret", "sharedValueId": sv["id"]}],
+    )
+
+    # Archive the configuration directly via DB
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE configurations SET archived_at = now() WHERE id = $1",
+            cfg["id"],
+        )
+
+    body = await gql(client, _SHARED_VALUES_BY_IDS_WITH_USED_BY, {"ids": [sv["id"]]})
+    result = body["data"]["sharedValuesByIds"][0]
+    config_ids = [e["node"]["id"] for e in result["usedBy"]["edges"]]
+
+    assert_that(config_ids).described_as(
+        "archived config should not appear in usedBy via DataLoader default path"
+    ).does_not_contain(cfg["id"])
+
+
+async def test_used_by_dataloader_empty_for_unreferenced_shared_value(client):
+    """usedBy returns empty connection for a shared value with no configurations."""
+    sv = await create_shared_value(client, "loader_unreferenced")
+
+    body = await gql(client, _SHARED_VALUES_BY_IDS_WITH_USED_BY, {"ids": [sv["id"]]})
+    result = body["data"]["sharedValuesByIds"][0]
+
+    assert_that(result["usedBy"]["edges"]).described_as(
+        "unreferenced shared value should have empty usedBy"
+    ).is_empty()
+    assert_that(result["usedBy"]["pageInfo"]["hasNextPage"]).described_as(
+        "hasNextPage should be false for empty usedBy"
+    ).is_false()
+
+
+async def test_used_by_dataloader_deduplicates_multiple_substitutions(client):
+    """A configuration with two substitutions referencing the same shared value at different
+    JSONPaths should appear exactly once in usedBy, not once per substitution."""
+    svc = await create_service(client, "loader-svc-dedup")
+    env = await create_environment(client, "loader-env-dedup")
+    sv = await create_shared_value(client, "loader_dedup_secret")
+
+    cfg = await _create_configuration_with_substitution(
+        client,
+        [svc["id"], env["id"]],
+        {"db": {"host": "_", "replica": "_"}},
+        [
+            {"jsonpath": "$.db.host", "sharedValueId": sv["id"]},
+            {"jsonpath": "$.db.replica", "sharedValueId": sv["id"]},
+        ],
+    )
+
+    body = await gql(client, _SHARED_VALUES_BY_IDS_WITH_USED_BY, {"ids": [sv["id"]]})
+    result = body["data"]["sharedValuesByIds"][0]
+    config_ids = [e["node"]["id"] for e in result["usedBy"]["edges"]]
+
+    assert_that(config_ids).described_as(
+        "configuration should appear in usedBy"
+    ).contains(cfg["id"])
+    assert_that(config_ids.count(cfg["id"])).described_as(
+        "configuration with two substitutions to same shared value should appear exactly once"
+    ).is_equal_to(1)

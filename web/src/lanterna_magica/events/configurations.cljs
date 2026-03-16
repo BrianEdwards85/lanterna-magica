@@ -302,7 +302,7 @@
                    (h/start-loading :configuration-detail))
      :dispatch [::re-graph/query
                 {:query     gql/configuration-query
-                 :variables {:id id}
+                 :variables {:ids [id]}
                  :callback  [::events/on-configuration-detail]}]}))
 
 (rf/reg-event-db
@@ -329,7 +329,7 @@
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
     (let [{:keys [data errors]} response
-          configuration (:configuration data)]
+          configuration (first (:configurationsByIds data))]
       (if (and (nil? configuration) (nil? errors))
         {:db       (-> db
                        (assoc-in [:configurations-page :selected-id] nil)

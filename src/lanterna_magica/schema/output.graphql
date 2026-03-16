@@ -39,7 +39,7 @@ input CreateOutputInput {
 
 extend type Query {
   outputs(includeArchived: Boolean, first: Int, after: String): OutputConnection!
-  output(id: ID!): Output
+  outputsByIds(ids: [ID!]!): [Output!]!
 }
 
 extend type Mutation {

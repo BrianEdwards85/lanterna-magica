@@ -26,8 +26,12 @@ class ConfigurationsResolver:
             after=after,
         )
 
-    async def resolve_configuration(self, _obj, info, *, id):
-        return await info.context["configuration_loader"].load(id)
+    async def resolve_configurations_by_ids(self, _obj, info, *, ids):
+        rows = await self.configurations.get_by_ids(ids=ids)
+        loader = info.context["configuration_loader"]
+        for r in rows:
+            loader.prime(str(r["id"]), r)
+        return rows
 
     async def resolve_create_configuration(self, _obj, info, *, input):
         return await self.orchestrator.create_configuration(
@@ -98,7 +102,7 @@ def get_configuration_resolvers(
     substitution_type = ObjectType("ConfigSubstitution")
 
     query.set_field("configurations", resolver.resolve_configurations)
-    query.set_field("configuration", resolver.resolve_configuration)
+    query.set_field("configurationsByIds", resolver.resolve_configurations_by_ids)
     query.set_field("configurationsByScope", resolver.resolve_configurations_by_scope)
     query.set_field("extractSentinelPaths", resolver.resolve_extract_sentinel_paths)
     mutation.set_field("createConfiguration", resolver.resolve_create_configuration)

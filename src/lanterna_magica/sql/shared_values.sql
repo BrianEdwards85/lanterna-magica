@@ -10,7 +10,8 @@ limit :page_limit;
 -- name: get_shared_values_by_ids(ids)
 select id, name, created_at, updated_at, archived_at
 from shared_values
-where id = any(:ids::uuid[]);
+where id = any(:ids::uuid[])
+order by id;
 
 -- name: create_shared_value(name)^
 insert into shared_values (name)
@@ -89,7 +90,8 @@ order by rs.revision_id, d.type_id;
 -- name: get_revision_by_ids(ids)
 select id, shared_value_id, scope_hash, value, is_current, created_at
 from shared_value_revisions
-where id = any(:ids::uuid[]);
+where id = any(:ids::uuid[])
+order by id;
 
 -- name: set_revision_current(id)^
 update shared_value_revisions

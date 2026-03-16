@@ -1,6 +1,7 @@
 import pytest
 from assertpy import assert_that
 
+from lanterna_magica.data.loaders import OutputDimensionsLoader, OutputResultsLoader
 from lanterna_magica.data.outputs import Outputs
 from lanterna_magica.errors import NotFoundError
 
@@ -109,6 +110,42 @@ async def test_get_output_not_found(pool):
     outputs = Outputs(pool)
     result = await outputs.get(id="00000000-0000-0000-0000-ffffffffffff")
     assert_that(result).described_as("not found returns None").is_none()
+
+
+async def test_get_by_ids_multiple(pool):
+    """get_by_ids returns multiple outputs by their IDs."""
+    outputs = Outputs(pool)
+    a = await outputs.create(path_template="/a.json", format="json", dimension_ids=[])
+    b = await outputs.create(path_template="/b.json", format="json", dimension_ids=[])
+    c = await outputs.create(path_template="/c.json", format="json", dimension_ids=[])
+
+    result = await outputs.get_by_ids(ids=[str(a["id"]), str(c["id"])])
+
+    assert_that(result).described_as("returns two outputs").is_length(2)
+    returned_ids = {str(r["id"]) for r in result}
+    assert_that(returned_ids).described_as("correct ids returned").is_equal_to(
+        {str(a["id"]), str(c["id"])}
+    )
+    returned_templates = {r["path_template"] for r in result}
+    assert_that(returned_templates).described_as("correct templates").is_equal_to(
+        {"/a.json", "/c.json"}
+    )
+    # b was not requested and should not be present
+    assert_that(str(b["id"])).described_as("unrequested output absent").is_not_in(returned_ids)
+
+
+async def test_get_by_ids_empty_list(pool):
+    """get_by_ids returns an empty list when given no IDs."""
+    outputs = Outputs(pool)
+    result = await outputs.get_by_ids(ids=[])
+    assert_that(result).described_as("empty list for empty ids").is_equal_to([])
+
+
+async def test_get_by_ids_unknown_ids(pool):
+    """get_by_ids returns an empty list when no IDs match."""
+    outputs = Outputs(pool)
+    result = await outputs.get_by_ids(ids=["00000000-0000-0000-0000-ffffffffffff"])
+    assert_that(result).described_as("empty list for unknown ids").is_equal_to([])
 
 
 async def test_list_outputs_basic(pool):
@@ -281,3 +318,91 @@ async def test_get_results(pool):
     assert_that(paths).described_as("ordered by path asc").is_equal_to(
         ["/a/r.json", "/b/r.json"]
     )
+
+
+async def test_output_dimensions_loader_batches_multiple_outputs(pool):
+    """OutputDimensionsLoader loads dimensions for multiple outputs in one batch."""
+    svc_id = await _create_service_dim(pool)
+    env_id = await _create_env_dim(pool)
+    outputs = Outputs(pool)
+
+    out_a = await outputs.create(
+        path_template="/a.json", format="json", dimension_ids=[svc_id]
+    )
+    out_b = await outputs.create(
+        path_template="/b.json", format="json", dimension_ids=[env_id]
+    )
+    out_c = await outputs.create(
+        path_template="/c.json", format="json", dimension_ids=[]
+    )
+
+    loader = OutputDimensionsLoader(pool)
+    id_a = str(out_a["id"])
+    id_b = str(out_b["id"])
+    id_c = str(out_c["id"])
+
+    dims_a, dims_b, dims_c = await loader.load_many([id_a, id_b, id_c])
+
+    assert_that(dims_a).described_as("output_a has one dimension").is_length(1)
+    assert_that(str(dims_a[0]["id"])).described_as(
+        "output_a dimension matches svc_id"
+    ).is_equal_to(svc_id)
+
+    assert_that(dims_b).described_as("output_b has one dimension").is_length(1)
+    assert_that(str(dims_b[0]["id"])).described_as(
+        "output_b dimension matches env_id"
+    ).is_equal_to(env_id)
+
+    assert_that(dims_c).described_as("output_c has no dimensions").is_length(0)
+
+
+async def test_output_results_loader_batches_multiple_outputs(pool):
+    """OutputResultsLoader loads results for multiple outputs in one batch."""
+    outputs = Outputs(pool)
+
+    out_a = await outputs.create(path_template="/a.json", format="json", dimension_ids=[])
+    out_b = await outputs.create(path_template="/b.json", format="json", dimension_ids=[])
+    out_c = await outputs.create(path_template="/c.json", format="json", dimension_ids=[])
+
+    await outputs.upsert_result(
+        output_id=str(out_a["id"]),
+        scope_hash="00000000-0000-0000-0000-000000000020",
+        path="/a/1.json",
+        content="{}",
+        succeeded=True,
+    )
+    await outputs.upsert_result(
+        output_id=str(out_a["id"]),
+        scope_hash="00000000-0000-0000-0000-000000000021",
+        path="/a/2.json",
+        content="{}",
+        succeeded=True,
+    )
+    await outputs.upsert_result(
+        output_id=str(out_b["id"]),
+        scope_hash="00000000-0000-0000-0000-000000000022",
+        path="/b/1.json",
+        content="{}",
+        succeeded=False,
+        error="oops",
+    )
+
+    loader = OutputResultsLoader(pool)
+    id_a = str(out_a["id"])
+    id_b = str(out_b["id"])
+    id_c = str(out_c["id"])
+
+    results_a, results_b, results_c = await loader.load_many([id_a, id_b, id_c])
+
+    assert_that(results_a).described_as("output_a has two results").is_length(2)
+    paths_a = [r["path"] for r in results_a]
+    assert_that(paths_a).described_as("output_a results ordered by path").is_equal_to(
+        ["/a/1.json", "/a/2.json"]
+    )
+
+    assert_that(results_b).described_as("output_b has one result").is_length(1)
+    assert_that(results_b[0]["error"]).described_as(
+        "output_b result has error"
+    ).is_equal_to("oops")
+
+    assert_that(results_c).described_as("output_c has no results").is_length(0)

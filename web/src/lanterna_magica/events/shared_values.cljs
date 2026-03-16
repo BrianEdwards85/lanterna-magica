@@ -143,7 +143,7 @@
       {:db       (h/start-loading db :revisions)
        :dispatch [::re-graph/query
                   {:query     gql/shared-value-query
-                   :variables {:id          shared-value-id
+                   :variables {:ids         [shared-value-id]
                                :currentOnly (boolean current-only)
                                :first       config/page-size}
                    :callback  [::events/on-revisions-fresh]}]})))
@@ -153,7 +153,7 @@
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
     (let [{:keys [data errors]} response
-          shared-value (get data :sharedValue)
+          shared-value (first (:sharedValuesByIds data))
           connection   (:revisions shared-value)]
       (if (and (nil? shared-value) (nil? errors))
         {:db       (-> db
@@ -181,7 +181,7 @@
       {:db       (h/start-loading db :revisions)
        :dispatch [::re-graph/query
                   {:query     gql/shared-value-query
-                   :variables {:id          sv-id
+                   :variables {:ids         [sv-id]
                                :currentOnly (boolean current-only)
                                :first       config/page-size
                                :after       cursor}
@@ -192,7 +192,7 @@
   [rf/unwrap]
   (fn [{:keys [db]} {:keys [response]}]
     (let [{:keys [data errors]} response
-          connection (get-in data [:sharedValue :revisions])]
+          connection (get-in (first (:sharedValuesByIds data)) [:revisions])]
       {:db (-> db
                (update-in [:shared-values-page :revisions :edges] into (:edges connection))
                (assoc-in [:shared-values-page :revisions-page-info] (:pageInfo connection))

@@ -43,7 +43,7 @@ class Configurations:
         ]
         return build_connection(rows, "id", limit)
 
-    async def get_configurations_by_ids(self, ids: list[str]) -> list[dict]:
+    async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
         rows = [
             dict(r) async for r in queries.get_configurations_by_ids(self.pool, ids=ids)
         ]

@@ -52,7 +52,7 @@ extend type Query {
     first: Int
     after: String
   ): ConfigurationConnection!
-  configuration(id: ID!): Configuration
+  configurationsByIds(ids: [ID!]!): [Configuration!]!
   configurationsByScope(
     scopeHash: String!
     first: Int

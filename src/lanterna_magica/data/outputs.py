@@ -48,6 +48,13 @@ class Outputs:
         ]
         return rows[0] if rows else None
 
+    async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
+        rows = [
+            dict(r)
+            async for r in queries.get_outputs_by_ids(self.pool, ids=ids)
+        ]
+        return rows
+
     async def list(
         self,
         *,

@@ -6,7 +6,8 @@ returning id, path_template, format, created_at, updated_at, archived_at;
 -- name: get_outputs_by_ids(ids)
 select id, path_template, format, created_at, updated_at, archived_at
 from outputs
-where id = any(:ids::uuid[]);
+where id = any(:ids::uuid[])
+order by id;
 
 -- name: get_outputs(include_archived, after_id, page_limit)
 select id, path_template, format, created_at, updated_at, archived_at
@@ -51,3 +52,16 @@ select id, output_id, scope_hash, path, content, succeeded, error, written_at, w
 from output_results
 where output_id = :output_id
 order by path asc;
+
+-- name: get_dimensions_for_outputs(ids)
+select od.output_id, d.id, d.type_id, d.name, d.description, d.base, d.created_at, d.updated_at, d.archived_at
+from dimensions d
+join output_dimensions od on od.dimension_id = d.id
+where od.output_id = any(:ids::uuid[])
+order by od.output_id;
+
+-- name: get_results_for_outputs(ids)
+select id, output_id, scope_hash, path, content, succeeded, error, written_at, written_by
+from output_results
+where output_id = any(:ids::uuid[])
+order by output_id, path asc;

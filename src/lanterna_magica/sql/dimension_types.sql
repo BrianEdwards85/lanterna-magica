@@ -7,7 +7,8 @@ order by priority;
 -- name: get_dimension_types_by_ids(ids)
 select id, name, priority, created_at, archived_at
 from dimension_types
-where id = any(:ids::uuid[]);
+where id = any(:ids::uuid[])
+order by id;
 
 -- name: create_dimension_type(name)^
 insert into dimension_types (name, priority)
