@@ -9,9 +9,7 @@ class OutputsResolver:
         self.outputs = outputs
         self.writer = writer
 
-    async def resolve_outputs(
-        self, _obj, info, *, include_archived=False, first=None, after=None
-    ):
+    async def resolve_outputs(self, _obj, info, *, include_archived=False, first=None, after=None):
         return await self.outputs.list(
             include_archived=include_archived,
             first=first,

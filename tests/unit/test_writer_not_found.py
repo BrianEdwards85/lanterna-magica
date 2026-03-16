@@ -58,9 +58,7 @@ async def test_write_two_types_two_values_each_produces_four_combinations():
         upsert_calls.append(kwargs)
         return {"succeeded": True, **kwargs}
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._outputs.upsert_result = fake_upsert
 
     with patch("builtins.open", MagicMock()), patch("os.makedirs"):
@@ -82,9 +80,7 @@ async def test_write_single_dimension_single_value_produces_one_combination():
         upsert_calls.append(kwargs)
         return {"succeeded": True}
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._outputs.upsert_result = fake_upsert
 
     with patch("builtins.open", MagicMock()), patch("os.makedirs"):

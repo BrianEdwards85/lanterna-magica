@@ -25,9 +25,7 @@ async def test_trigger_output_no_configs_for_combination(client):
     env_no_config = await create_environment(client, "no-config")
 
     # Only create a config for env_has_config
-    await create_configuration(
-        client, [svc["id"], env_has_config["id"]], {"env": "has-config"}
-    )
+    await create_configuration(client, [svc["id"], env_has_config["id"]], {"env": "has-config"})
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Use two separate outputs with fixed placeholder-free paths so that
@@ -48,36 +46,22 @@ async def test_trigger_output_no_configs_for_combination(client):
         result_has = await trigger_output(client, output_has["id"])
         result_no = await trigger_output(client, output_no["id"])
 
-        assert_that(result_has["results"]).described_as(
-            "one result for has-config output"
-        ).is_length(1)
-        assert_that(result_no["results"]).described_as(
-            "one result for no-config output"
-        ).is_length(1)
+        assert_that(result_has["results"]).described_as("one result for has-config output").is_length(1)
+        assert_that(result_no["results"]).described_as("one result for no-config output").is_length(1)
 
         succeeded_results = [
-            r
-            for results in (result_has["results"], result_no["results"])
-            for r in results
-            if r["succeeded"]
+            r for results in (result_has["results"], result_no["results"]) for r in results if r["succeeded"]
         ]
         failed_results = [
-            r
-            for results in (result_has["results"], result_no["results"])
-            for r in results
-            if not r["succeeded"]
+            r for results in (result_has["results"], result_no["results"]) for r in results if not r["succeeded"]
         ]
 
         assert_that(succeeded_results).described_as("one success").is_length(1)
         assert_that(failed_results).described_as("one failure").is_length(1)
 
         failed_res = failed_results[0]
-        assert_that(failed_res["error"]).described_as(
-            "error message present"
-        ).is_not_none()
-        assert_that(failed_res["error"]).described_as(
-            "error is non-empty"
-        ).is_not_empty()
+        assert_that(failed_res["error"]).described_as("error message present").is_not_none()
+        assert_that(failed_res["error"]).described_as("error is non-empty").is_not_empty()
 
 
 async def test_trigger_output_oserror_on_write(client):
@@ -107,17 +91,13 @@ async def test_trigger_archived_output_returns_error(client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "config.json")
-        output = await create_output(
-            client, path_template, "json", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "json", [svc["id"], env["id"]])
 
         # Archive the output
         await gql(client, ARCHIVE_OUTPUT, {"id": output["id"]})
 
         # Triggering an archived output must return an error
-        body = await gql(
-            client, TRIGGER_OUTPUT, {"id": output["id"]}, expect_errors=True
-        )
+        body = await gql(client, TRIGGER_OUTPUT, {"id": output["id"]}, expect_errors=True)
         assert_that(body).described_as("error returned").contains_key("errors")
         assert_that(body["errors"]).described_as("errors list not empty").is_not_empty()
 
@@ -144,9 +124,7 @@ async def test_outputs_list_query(client):
         body = await gql(client, OUTPUTS_QUERY)
         items = nodes(body["data"]["outputs"]["edges"])
         ids = [item["id"] for item in items]
-        assert_that(ids).described_as("both outputs in list").contains(
-            out1["id"], out2["id"]
-        )
+        assert_that(ids).described_as("both outputs in list").contains(out1["id"], out2["id"])
 
 
 async def test_outputs_list_excludes_archived_by_default(client):
@@ -172,12 +150,8 @@ async def test_outputs_list_excludes_archived_by_default(client):
         body = await gql(client, OUTPUTS_QUERY)
         items = nodes(body["data"]["outputs"]["edges"])
         ids = [item["id"] for item in items]
-        assert_that(ids).described_as("active output in list").contains(
-            out_active["id"]
-        )
-        assert_that(ids).described_as("archived output excluded").does_not_contain(
-            out_archived["id"]
-        )
+        assert_that(ids).described_as("active output in list").contains(out_active["id"])
+        assert_that(ids).described_as("archived output excluded").does_not_contain(out_archived["id"])
 
 
 async def test_outputs_list_include_archived(client):
@@ -203,6 +177,6 @@ async def test_outputs_list_include_archived(client):
         body = await gql(client, OUTPUTS_QUERY, {"includeArchived": True})
         items = nodes(body["data"]["outputs"]["edges"])
         ids = [item["id"] for item in items]
-        assert_that(ids).described_as(
-            "both outputs shown with includeArchived"
-        ).contains(out_active["id"], out_archived["id"])
+        assert_that(ids).described_as("both outputs shown with includeArchived").contains(
+            out_active["id"], out_archived["id"]
+        )

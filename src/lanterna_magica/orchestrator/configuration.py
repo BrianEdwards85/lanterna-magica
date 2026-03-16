@@ -81,16 +81,12 @@ class ConfigurationOrchestrator:
         missing = sentinel_paths - substitution_paths
         if missing:
             missing_list = ", ".join(sorted(missing))
-            raise ValidationError(
-                f"Sentinel paths missing substitutions: {missing_list}"
-            )
+            raise ValidationError(f"Sentinel paths missing substitutions: {missing_list}")
 
         extra = substitution_paths - sentinel_paths
         if extra:
             extra_list = ", ".join(sorted(extra))
-            raise ValidationError(
-                f"Substitution paths have no sentinel in body: {extra_list}"
-            )
+            raise ValidationError(f"Substitution paths have no sentinel in body: {extra_list}")
 
         return await self._configurations.create_configuration(
             body=body,
@@ -187,15 +183,10 @@ class ConfigurationOrchestrator:
         Raises ValueError (via resolve_scope) if no configurations found for scope.
         """
         if self._dimension_types is None or self._dimensions is None:
-            raise RuntimeError(
-                "resolve_from_names requires dimension_types and dimensions "
-                "to be injected"
-            )
+            raise RuntimeError("resolve_from_names requires dimension_types and dimensions to be injected")
 
         # Load and sort dimension types by priority ascending
-        dim_types = await self._dimension_types.get_dimension_types(
-            include_archived=False
-        )
+        dim_types = await self._dimension_types.get_dimension_types(include_archived=False)
         dim_types_sorted = sorted(dim_types, key=lambda dt: dt["priority"])
 
         if not dim_types_sorted:
@@ -219,18 +210,14 @@ class ConfigurationOrchestrator:
             slug_type = dim_types_sorted[0]
 
         # Resolve slug dimension
-        slug_dim = await self._dimensions.get_by_type_and_name(
-            type_id=str(slug_type["id"]), name=slug_name
-        )
+        slug_dim = await self._dimensions.get_by_type_and_name(type_id=str(slug_type["id"]), name=slug_name)
         if slug_dim is None:
             raise NotFoundError(f"Dimension '{slug_name}' not found")
 
         dimension_ids = [str(slug_dim["id"])]
 
         # Build name->type mapping for non-slug types
-        name_to_type = {
-            dt["name"]: dt for dt in dim_types_sorted if dt["id"] != slug_type["id"]
-        }
+        name_to_type = {dt["name"]: dt for dt in dim_types_sorted if dt["id"] != slug_type["id"]}
 
         # Resolve extra dimensions matching known dimension type names
         for key, value in extra_dimensions.items():
@@ -238,17 +225,13 @@ class ConfigurationOrchestrator:
                 # Silently ignore unrecognised keys
                 continue
             dt = name_to_type[key]
-            dim = await self._dimensions.get_by_type_and_name(
-                type_id=str(dt["id"]), name=value
-            )
+            dim = await self._dimensions.get_by_type_and_name(type_id=str(dt["id"]), name=value)
             if dim is None:
                 raise NotFoundError(f"Dimension '{value}' not found for type '{key}'")
             dimension_ids.append(str(dim["id"]))
 
         # Fetch configs for the resolved scope
-        configs = await self._configurations.get_for_rest_scope(
-            dimension_ids=dimension_ids
-        )
+        configs = await self._configurations.get_for_rest_scope(dimension_ids=dimension_ids)
 
         return await self.resolve_scope(configs=configs, dimension_ids=dimension_ids)
 

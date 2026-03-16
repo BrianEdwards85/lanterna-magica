@@ -20,9 +20,7 @@ async def test_create_dimension(client):
     type_id = await _get_type_id(client, "service")
     dim = await create_dimension(client, type_id, "traefik", "reverse proxy")
     assert_that(dim["name"]).described_as("dimension name").is_equal_to("traefik")
-    assert_that(dim["description"]).described_as("dimension description").is_equal_to(
-        "reverse proxy"
-    )
+    assert_that(dim["description"]).described_as("dimension description").is_equal_to("reverse proxy")
     assert_that(dim["base"]).described_as("not a base dimension").is_false()
     assert_that(dim["type"]["id"]).described_as("type reference").is_equal_to(type_id)
     assert_that(dim["id"]).described_as("dimension id").is_not_none()
@@ -34,9 +32,7 @@ async def test_create_dimension_minimal(client):
     type_id = await _get_type_id(client, "service")
     dim = await create_dimension(client, type_id, "nginx")
     assert_that(dim["name"]).described_as("dimension name").is_equal_to("nginx")
-    assert_that(dim["description"]).described_as(
-        "description when not provided"
-    ).is_none()
+    assert_that(dim["description"]).described_as("description when not provided").is_none()
 
 
 async def test_create_dimension_duplicate_name_same_type(client):
@@ -48,9 +44,7 @@ async def test_create_dimension_duplicate_name_same_type(client):
         {"input": {"typeId": type_id, "name": "traefik"}},
         expect_errors=True,
     )
-    assert_that(body).described_as("duplicate name within type rejected").contains_key(
-        "errors"
-    )
+    assert_that(body).described_as("duplicate name within type rejected").contains_key("errors")
 
 
 async def test_create_dimension_same_name_different_type(client):
@@ -60,9 +54,7 @@ async def test_create_dimension_same_name_different_type(client):
 
     await create_dimension(client, type_id, "shared-name")
     dim2 = await create_dimension(client, env_type["id"], "shared-name")
-    assert_that(dim2["name"]).described_as("same name different type").is_equal_to(
-        "shared-name"
-    )
+    assert_that(dim2["name"]).described_as("same name different type").is_equal_to("shared-name")
 
 
 async def test_dimensions_by_ids(client):
@@ -74,9 +66,7 @@ async def test_dimensions_by_ids(client):
     found = body["data"]["dimensionsByIds"]
     assert_that(found).described_as("fetched dimensions count").is_length(2)
     ids = [d["id"] for d in found]
-    assert_that(ids).described_as("fetched dimension ids").contains(
-        dim1["id"], dim2["id"]
-    )
+    assert_that(ids).described_as("fetched dimension ids").contains(dim1["id"], dim2["id"])
 
 
 async def test_dimensions_by_ids_empty(client):
@@ -86,9 +76,7 @@ async def test_dimensions_by_ids_empty(client):
 
 
 async def test_dimensions_by_ids_unknown(client):
-    body = await gql(
-        client, DIMENSIONS_BY_IDS, {"ids": ["00000000-0000-0000-0000-ffffffffffff"]}
-    )
+    body = await gql(client, DIMENSIONS_BY_IDS, {"ids": ["00000000-0000-0000-0000-ffffffffffff"]})
     found = body["data"]["dimensionsByIds"]
     assert_that(found).described_as("unknown id returns empty list").is_empty()
 
@@ -100,9 +88,7 @@ async def test_dimensions_list(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id})
     items = nodes(body["data"]["dimensions"]["edges"])
-    assert_that(items).described_as("dimensions list").extracting("name").contains(
-        "traefik", "nginx"
-    )
+    assert_that(items).described_as("dimensions list").extracting("name").contains("traefik", "nginx")
 
 
 async def test_dimensions_includes_base_by_default(client):
@@ -112,9 +98,7 @@ async def test_dimensions_includes_base_by_default(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id})
     items = nodes(body["data"]["dimensions"]["edges"])
-    assert_that(items).described_as("base dimension included").extracting(
-        "name"
-    ).contains("global")
+    assert_that(items).described_as("base dimension included").extracting("name").contains("global")
 
 
 async def test_dimensions_excludes_base_when_false(client):
@@ -124,9 +108,7 @@ async def test_dimensions_excludes_base_when_false(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id, "includeBase": False})
     items = nodes(body["data"]["dimensions"]["edges"])
-    assert_that(items).described_as("base dimension excluded").extracting(
-        "name"
-    ).does_not_contain("global")
+    assert_that(items).described_as("base dimension excluded").extracting("name").does_not_contain("global")
 
 
 async def test_base_dimension_fields(client):
@@ -173,9 +155,7 @@ async def test_base_dimension_not_updatable(client):
         {"input": {"id": base["id"], "name": "renamed"}},
         expect_errors=True,
     )
-    assert_that(body).described_as("base dimension update rejected").contains_key(
-        "errors"
-    )
+    assert_that(body).described_as("base dimension update rejected").contains_key("errors")
 
 
 async def test_base_dimension_not_archivable(client):
@@ -187,9 +167,7 @@ async def test_base_dimension_not_archivable(client):
     base = next(d for d in items if d["base"])
 
     body = await gql(client, ARCHIVE_DIMENSION, {"id": base["id"]}, expect_errors=True)
-    assert_that(body).described_as("base dimension archive rejected").contains_key(
-        "errors"
-    )
+    assert_that(body).described_as("base dimension archive rejected").contains_key("errors")
 
 
 async def test_each_type_has_base_dimension(client):
@@ -199,9 +177,7 @@ async def test_each_type_has_base_dimension(client):
         body = await gql(client, DIMENSIONS, {"typeId": dt["id"]})
         items = nodes(body["data"]["dimensions"]["edges"])
         base_dims = [d for d in items if d["base"]]
-        assert_that(base_dims).described_as(
-            f"base dimension for type {dt['name']}"
-        ).is_length(1)
+        assert_that(base_dims).described_as(f"base dimension for type {dt['name']}").is_length(1)
 
 
 async def test_dimensions_filtered_by_type(client):
@@ -214,6 +190,6 @@ async def test_dimensions_filtered_by_type(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id})
     items = nodes(body["data"]["dimensions"]["edges"])
-    assert_that(items).described_as("only service dimensions").extracting(
-        "name"
-    ).contains("traefik").does_not_contain("us-east-1")
+    assert_that(items).described_as("only service dimensions").extracting("name").contains("traefik").does_not_contain(
+        "us-east-1"
+    )

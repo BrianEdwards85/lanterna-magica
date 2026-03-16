@@ -10,9 +10,7 @@ class SharedValuesResolver:
         self.shared_values = shared_values
         self.configurations = configurations
 
-    async def resolve_shared_values(
-        self, _obj, info, *, include_archived=False, search=None, first=None, after=None
-    ):
+    async def resolve_shared_values(self, _obj, info, *, include_archived=False, search=None, first=None, after=None):
         return await self.shared_values.get_shared_values(
             include_archived=include_archived,
             search=search,
@@ -31,9 +29,7 @@ class SharedValuesResolver:
         return await self.shared_values.create_shared_value(name=input["name"])
 
     async def resolve_update_shared_value(self, _obj, info, *, input):
-        return await self.shared_values.update_shared_value(
-            id=input["id"], name=input.get("name")
-        )
+        return await self.shared_values.update_shared_value(id=input["id"], name=input.get("name"))
 
     async def resolve_archive_shared_value(self, _obj, info, *, id):
         return await self.shared_values.archive_shared_value(id)
@@ -48,22 +44,16 @@ class SharedValuesResolver:
             value=input["value"],
         )
 
-    async def resolve_resolve_shared_value(
-        self, _obj, info, *, shared_value_id, dimension_ids
-    ):
+    async def resolve_resolve_shared_value(self, _obj, info, *, shared_value_id, dimension_ids):
         return await self.shared_values.resolve_for_scope(
             shared_value_id=shared_value_id,
             dimension_ids=dimension_ids,
         )
 
-    async def resolve_used_by(
-        self, obj, info, *, include_archived=False, first=None, after=None
-    ):
+    async def resolve_used_by(self, obj, info, *, include_archived=False, first=None, after=None):
         # Use DataLoader for default case (no filtering, no pagination)
         if not include_archived and first is None and after is None:
-            rows = await info.context["configs_by_shared_value_loader"].load(
-                str(obj["id"])
-            )
+            rows = await info.context["configs_by_shared_value_loader"].load(str(obj["id"]))
             return build_connection(rows, "id", len(rows))
         return await self.configurations.get_configurations_by_shared_value(
             shared_value_id=str(obj["id"]),
@@ -99,17 +89,13 @@ class SharedValuesResolver:
         )
 
     async def resolve_revision_shared_value(self, obj, info):
-        return await info.context["shared_value_loader"].load(
-            str(obj["shared_value_id"])
-        )
+        return await info.context["shared_value_loader"].load(str(obj["shared_value_id"]))
 
     async def resolve_revision_dimensions(self, obj, info):
         return await info.context["revision_scopes_loader"].load(str(obj["id"]))
 
 
-def get_shared_value_resolvers(
-    shared_values: SharedValues, configurations: Configurations
-) -> list:
+def get_shared_value_resolvers(shared_values: SharedValues, configurations: Configurations) -> list:
     resolver = SharedValuesResolver(shared_values, configurations)
 
     query = QueryType()
@@ -124,9 +110,7 @@ def get_shared_value_resolvers(
     mutation.set_field("updateSharedValue", resolver.resolve_update_shared_value)
     mutation.set_field("archiveSharedValue", resolver.resolve_archive_shared_value)
     mutation.set_field("unarchiveSharedValue", resolver.resolve_unarchive_shared_value)
-    mutation.set_field(
-        "createSharedValueRevision", resolver.resolve_create_shared_value_revision
-    )
+    mutation.set_field("createSharedValueRevision", resolver.resolve_create_shared_value_revision)
     mutation.set_field("setRevisionCurrent", resolver.resolve_set_revision_current)
     shared_value_type.set_field("revisions", resolver.resolve_revisions)
     shared_value_type.set_field("usedBy", resolver.resolve_used_by)

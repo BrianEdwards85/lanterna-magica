@@ -44,9 +44,7 @@ class Configurations:
         return build_connection(rows, "id", limit)
 
     async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
-        rows = [
-            dict(r) async for r in queries.get_configurations_by_ids(self.pool, ids=ids)
-        ]
+        rows = [dict(r) async for r in queries.get_configurations_by_ids(self.pool, ids=ids)]
         return rows
 
     async def get_configurations_by_shared_value(
@@ -88,10 +86,7 @@ class Configurations:
         ]
         effective_ids.extend(str(d["id"]) for d in missing)
 
-        dims = [
-            dict(r)
-            async for r in queries.get_dimensions_by_ids(self.pool, ids=effective_ids)
-        ]
+        dims = [dict(r) async for r in queries.get_dimensions_by_ids(self.pool, ids=effective_ids)]
         type_ids = [str(d["type_id"]) for d in dims]
         if len(type_ids) != len(set(type_ids)):
             raise ValidationError("Scope contains multiple dimensions of the same type")
@@ -100,9 +95,7 @@ class Configurations:
 
         async with self.pool.acquire() as conn, conn.transaction():
             await queries.unset_current_configuration(conn, scope_hash=scope_hash)
-            row = await queries.create_configuration(
-                conn, scope_hash=scope_hash, body=body
-            )
+            row = await queries.create_configuration(conn, scope_hash=scope_hash, body=body)
             config = dict(row)
 
             for dim_id in effective_ids:
@@ -129,10 +122,7 @@ class Configurations:
 
     async def set_configuration_current(self, *, id: str, is_current: bool) -> dict:
         if is_current:
-            rows = [
-                dict(r)
-                async for r in queries.get_configurations_by_ids(self.pool, ids=[id])
-            ]
+            rows = [dict(r) async for r in queries.get_configurations_by_ids(self.pool, ids=[id])]
             if not rows:
                 raise NotFoundError("Configuration not found")
             config = rows[0]
@@ -192,20 +182,12 @@ class Configurations:
 
     async def get_substitutions(self, *, configuration_id: str) -> list[dict]:
         rows = [
-            dict(r)
-            async for r in queries.get_substitutions_for_config(
-                self.pool, configuration_id=configuration_id
-            )
+            dict(r) async for r in queries.get_substitutions_for_config(self.pool, configuration_id=configuration_id)
         ]
         return rows
 
     async def get_for_rest_scope(self, *, dimension_ids: list[str]) -> list[dict]:
-        configs = [
-            dict(r)
-            async for r in queries.get_configs_for_rest_scope(
-                self.pool, dimension_ids=dimension_ids
-            )
-        ]
+        configs = [dict(r) async for r in queries.get_configs_for_rest_scope(self.pool, dimension_ids=dimension_ids)]
         ids = [str(c["id"]) for c in configs]
         by_config: defaultdict[str, list] = defaultdict(list)
         async for r in queries.get_substitutions_by_config_ids(self.pool, ids=ids):

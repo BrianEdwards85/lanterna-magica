@@ -42,9 +42,7 @@ async def test_used_by_config_with_substitution_appears(client):
     used_by = body["data"]["sharedValuesByIds"][0]["usedBy"]
     config_ids = [e["node"]["id"] for e in used_by["edges"]]
 
-    assert_that(config_ids).described_as(
-        "config with substitution to sv should appear in usedBy"
-    ).contains(cfg["id"])
+    assert_that(config_ids).described_as("config with substitution to sv should appear in usedBy").contains(cfg["id"])
 
 
 async def test_used_by_config_without_substitution_excluded(client):
@@ -89,21 +87,13 @@ async def test_used_by_cross_value_isolation(client):
     body_y = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv_y["id"]]})
     body_z = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv_z["id"]]})
 
-    ids_for_y = [
-        e["node"]["id"]
-        for e in body_y["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
-    ]
-    ids_for_z = [
-        e["node"]["id"]
-        for e in body_z["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
-    ]
+    ids_for_y = [e["node"]["id"] for e in body_y["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
+    ids_for_z = [e["node"]["id"] for e in body_z["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
-    assert_that(ids_for_y).described_as(
-        "config referencing Y should appear in Y.usedBy"
-    ).contains(cfg_y["id"])
-    assert_that(ids_for_z).described_as(
-        "config referencing Y should not appear in Z.usedBy"
-    ).does_not_contain(cfg_y["id"])
+    assert_that(ids_for_y).described_as("config referencing Y should appear in Y.usedBy").contains(cfg_y["id"])
+    assert_that(ids_for_z).described_as("config referencing Y should not appear in Z.usedBy").does_not_contain(
+        cfg_y["id"]
+    )
 
 
 async def test_used_by_include_archived_false_excludes_archived(client, pool):
@@ -123,21 +113,15 @@ async def test_used_by_include_archived_false_excludes_archived(client, pool):
 
     # Default (includeArchived not set — defaults to false)
     body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]]})
-    config_ids = [
-        e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
-    ]
+    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
     assert_that(config_ids).described_as(
         "archived config should not appear in usedBy with default includeArchived"
     ).does_not_contain(cfg["id"])
 
     # Explicit includeArchived=false
-    body = await gql(
-        client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": False}
-    )
-    config_ids = [
-        e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
-    ]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": False})
+    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
     assert_that(config_ids).described_as(
         "archived config should not appear in usedBy with includeArchived=false"
@@ -159,16 +143,12 @@ async def test_used_by_include_archived_true_includes_archived(client, pool):
 
     await _archive_configuration(pool, cfg["id"])
 
-    body = await gql(
-        client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True}
-    )
-    config_ids = [
-        e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]
-    ]
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True})
+    config_ids = [e["node"]["id"] for e in body["data"]["sharedValuesByIds"][0]["usedBy"]["edges"]]
 
-    assert_that(config_ids).described_as(
-        "archived config should appear in usedBy with includeArchived=true"
-    ).contains(cfg["id"])
+    assert_that(config_ids).described_as("archived config should appear in usedBy with includeArchived=true").contains(
+        cfg["id"]
+    )
 
 
 async def test_used_by_pagination_has_next_page(client):
@@ -217,9 +197,7 @@ async def test_used_by_no_duplicate_when_multiple_substitutions_point_to_same_va
     )
 
     # Force the SQL code path (not DataLoader) by passing includeArchived=True
-    body = await gql(
-        client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True}
-    )
+    body = await gql(client, SHARED_VALUE_USED_BY, {"ids": [sv["id"]], "includeArchived": True})
     used_by = body["data"]["sharedValuesByIds"][0]["usedBy"]
     config_ids = [e["node"]["id"] for e in used_by["edges"]]
 
@@ -250,9 +228,7 @@ async def test_used_by_pagination_after_cursor(client):
     page1 = body["data"]["sharedValuesByIds"][0]["usedBy"]
     page1_ids = [e["node"]["id"] for e in page1["edges"]]
 
-    assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
-        "page 1 has next page"
-    ).is_true()
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as("page 1 has next page").is_true()
 
     # Get page 2 using cursor
     body = await gql(
@@ -264,11 +240,7 @@ async def test_used_by_pagination_after_cursor(client):
     page2_ids = [e["node"]["id"] for e in page2["edges"]]
 
     assert_that(page2["edges"]).described_as("page 2 should have 1 edge").is_length(1)
-    assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
-        "page 2 has no next page"
-    ).is_false()
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as("page 2 has no next page").is_false()
 
     # Pages should not overlap
-    assert_that(page1_ids).described_as(
-        "page 1 and page 2 ids should not overlap"
-    ).does_not_contain(*page2_ids)
+    assert_that(page1_ids).described_as("page 1 and page 2 ids should not overlap").does_not_contain(*page2_ids)

@@ -24,18 +24,14 @@ async def test_trigger_output_writes_file(client):
     """
     svc = await create_service(client, "myapp")
     env = await create_environment(client, "staging")
-    await create_configuration(
-        client, [svc["id"], env["id"]], {"host": "localhost", "port": 8080}
-    )
+    await create_configuration(client, [svc["id"], env["id"]], {"host": "localhost", "port": 8080})
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Use a fixed filename — the writer writes exactly here when there is
         # only one combination (one value per dimension type) and no unresolved
         # placeholders remain.
         path_template = os.path.join(tmpdir, "config.json")
-        output = await create_output(
-            client, path_template, "json", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "json", [svc["id"], env["id"]])
 
         result = await trigger_output(client, output["id"])
 
@@ -46,15 +42,11 @@ async def test_trigger_output_writes_file(client):
 
         # The path returned in the result is where the file was written.
         written_path = res["path"]
-        assert_that(os.path.exists(written_path)).described_as(
-            "file exists at the result path"
-        ).is_true()
+        assert_that(os.path.exists(written_path)).described_as("file exists at the result path").is_true()
 
         with open(written_path) as fh:
             content = json.load(fh)
-        assert_that(content).described_as("file content correct").is_equal_to(
-            {"host": "localhost", "port": 8080}
-        )
+        assert_that(content).described_as("file content correct").is_equal_to({"host": "localhost", "port": 8080})
 
 
 async def test_trigger_output_json_format(client):
@@ -66,9 +58,7 @@ async def test_trigger_output_json_format(client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "out.json")
-        output = await create_output(
-            client, path_template, "json", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "json", [svc["id"], env["id"]])
         result = await trigger_output(client, output["id"])
 
         res = result["results"][0]
@@ -88,9 +78,7 @@ async def test_trigger_output_yml_format(client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "out.yml")
-        output = await create_output(
-            client, path_template, "yml", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "yml", [svc["id"], env["id"]])
         result = await trigger_output(client, output["id"])
 
         res = result["results"][0]
@@ -110,9 +98,7 @@ async def test_trigger_output_toml_format(client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "out.toml")
-        output = await create_output(
-            client, path_template, "toml", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "toml", [svc["id"], env["id"]])
         result = await trigger_output(client, output["id"])
 
         res = result["results"][0]
@@ -127,15 +113,11 @@ async def test_trigger_output_env_format(client):
     """env format produces a parseable env file with correct content."""
     svc = await create_service(client, "env-svc")
     env = await create_environment(client, "env-env")
-    await create_configuration(
-        client, [svc["id"], env["id"]], {"KEY": "value", "NUM": "42"}
-    )
+    await create_configuration(client, [svc["id"], env["id"]], {"KEY": "value", "NUM": "42"})
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "out.env")
-        output = await create_output(
-            client, path_template, "env", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "env", [svc["id"], env["id"]])
         result = await trigger_output(client, output["id"])
 
         res = result["results"][0]

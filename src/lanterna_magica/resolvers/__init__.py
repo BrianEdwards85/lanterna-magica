@@ -46,12 +46,8 @@ def create_gql(pool) -> GraphQL:
     dimensions = Dimensions(pool)
     shared_values = SharedValues(pool)
     outputs = Outputs(pool)
-    configuration_orchestrator = ConfigurationOrchestrator(
-        configurations, shared_values
-    )
-    writer = OutputWriter(
-        outputs, configurations, configuration_orchestrator, dimension_types
-    )
+    configuration_orchestrator = ConfigurationOrchestrator(configurations, shared_values)
+    writer = OutputWriter(outputs, configurations, configuration_orchestrator, dimension_types)
 
     type_defs = load_schema_from_path(str(SCHEMA_DIR))
     schema = make_executable_schema(

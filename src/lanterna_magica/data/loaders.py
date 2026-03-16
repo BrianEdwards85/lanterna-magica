@@ -92,9 +92,7 @@ class SubstitutionsByConfigLoader(DataLoader):
 
     async def batch_load_fn(self, config_ids):
         by_config = defaultdict(list)
-        async for r in queries.get_substitutions_by_config_ids(
-            self.pool, ids=list(config_ids)
-        ):
+        async for r in queries.get_substitutions_by_config_ids(self.pool, ids=list(config_ids)):
             d = dict(r)
             by_config[str(d["configuration_id"])].append(d)
         return [by_config.get(str(cid), []) for cid in config_ids]

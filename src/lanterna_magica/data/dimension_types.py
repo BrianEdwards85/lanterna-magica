@@ -9,22 +9,12 @@ class DimensionTypes:
     def __init__(self, pool: Pool):
         self.pool = pool
 
-    async def get_dimension_types(
-        self, *, include_archived: bool = False
-    ) -> list[dict]:
-        rows = [
-            dict(r)
-            async for r in queries.get_dimension_types(
-                self.pool, include_archived=include_archived
-            )
-        ]
+    async def get_dimension_types(self, *, include_archived: bool = False) -> list[dict]:
+        rows = [dict(r) async for r in queries.get_dimension_types(self.pool, include_archived=include_archived)]
         return rows
 
     async def get_dimension_types_by_ids(self, ids: list[str]) -> list[dict]:
-        rows = [
-            dict(r)
-            async for r in queries.get_dimension_types_by_ids(self.pool, ids=ids)
-        ]
+        rows = [dict(r) async for r in queries.get_dimension_types_by_ids(self.pool, ids=ids)]
         return rows
 
     async def create_dimension_type(self, *, name: str) -> dict:
@@ -56,9 +46,7 @@ class DimensionTypes:
             name=name,
         )
 
-    async def swap_dimension_type_priorities(
-        self, *, id_a: str, id_b: str
-    ) -> list[dict]:
+    async def swap_dimension_type_priorities(self, *, id_a: str, id_b: str) -> list[dict]:
         if id_a == id_b:
             raise ValidationError("Cannot swap a dimension type with itself")
         async with self.pool.acquire() as conn, conn.transaction():
@@ -72,12 +60,7 @@ class DimensionTypes:
             await queries.set_dimension_type_priority(conn, id=id_a, priority=-1)
             await queries.set_dimension_type_priority(conn, id=id_b, priority=pri_a)
             await queries.set_dimension_type_priority(conn, id=id_a, priority=pri_b)
-        rows = [
-            dict(r)
-            async for r in queries.get_dimension_types_by_ids(
-                self.pool, ids=[id_a, id_b]
-            )
-        ]
+        rows = [dict(r) async for r in queries.get_dimension_types_by_ids(self.pool, ids=[id_a, id_b])]
         return rows
 
     async def archive_dimension_type(self, id: str) -> dict:

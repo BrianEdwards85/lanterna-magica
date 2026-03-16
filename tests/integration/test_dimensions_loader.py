@@ -24,15 +24,9 @@ async def test_dimension_types_with_dimensions_via_loader(client):
 
     service_type = next(t for t in types if t["name"] == "service")
     dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
-    assert_that(dim_names).described_as("service dimensions include traefik").contains(
-        "traefik"
-    )
-    assert_that(dim_names).described_as("service dimensions include nginx").contains(
-        "nginx"
-    )
-    assert_that(dim_names).described_as("service dimensions include base").contains(
-        "global"
-    )
+    assert_that(dim_names).described_as("service dimensions include traefik").contains("traefik")
+    assert_that(dim_names).described_as("service dimensions include nginx").contains("nginx")
+    assert_that(dim_names).described_as("service dimensions include base").contains("global")
 
 
 async def test_dimension_types_loader_returns_correct_dimensions_per_type(client):
@@ -52,12 +46,8 @@ async def test_dimension_types_loader_returns_correct_dimensions_per_type(client
     service_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
     region_names = [e["node"]["name"] for e in region_type_data["dimensions"]["edges"]]
 
-    assert_that(service_names).described_as("service dims").contains(
-        "traefik"
-    ).does_not_contain("us-east-1")
-    assert_that(region_names).described_as("region dims").contains(
-        "us-east-1"
-    ).does_not_contain("traefik")
+    assert_that(service_names).described_as("service dims").contains("traefik").does_not_contain("us-east-1")
+    assert_that(region_names).described_as("region dims").contains("us-east-1").does_not_contain("traefik")
 
 
 async def test_dimension_types_loader_excludes_archived(client):
@@ -70,9 +60,7 @@ async def test_dimension_types_loader_excludes_archived(client):
     types = body["data"]["dimensionTypes"]
     service_type = next(t for t in types if t["name"] == "service")
     dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
-    assert_that(dim_names).described_as(
-        "archived dim not visible via loader"
-    ).does_not_contain("traefik")
+    assert_that(dim_names).described_as("archived dim not visible via loader").does_not_contain("traefik")
 
 
 async def test_dimension_types_loader_fallback_with_include_archived(client):
@@ -81,15 +69,11 @@ async def test_dimension_types_loader_fallback_with_include_archived(client):
     dim = await create_dimension(client, type_id, "traefik")
     await gql(client, ARCHIVE_DIMENSION, {"id": dim["id"]})
 
-    body = await gql(
-        client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"includeArchived": True}
-    )
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"includeArchived": True})
     types = body["data"]["dimensionTypes"]
     service_type = next(t for t in types if t["name"] == "service")
     dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
-    assert_that(dim_names).described_as(
-        "archived dim visible with includeArchived=True"
-    ).contains("traefik")
+    assert_that(dim_names).described_as("archived dim visible with includeArchived=True").contains("traefik")
 
 
 async def test_dimension_types_loader_fallback_with_search(client):
@@ -98,15 +82,11 @@ async def test_dimension_types_loader_fallback_with_search(client):
     await create_dimension(client, type_id, "traefik")
     await create_dimension(client, type_id, "nginx")
 
-    body = await gql(
-        client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"search": "traefik"}
-    )
+    body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"search": "traefik"})
     types = body["data"]["dimensionTypes"]
     service_type = next(t for t in types if t["name"] == "service")
     dim_names = [e["node"]["name"] for e in service_type["dimensions"]["edges"]]
-    assert_that(dim_names).described_as("search filters to traefik only").contains(
-        "traefik"
-    ).does_not_contain("nginx")
+    assert_that(dim_names).described_as("search filters to traefik only").contains("traefik").does_not_contain("nginx")
 
 
 async def test_dimension_types_loader_fallback_with_pagination(client):
@@ -118,9 +98,5 @@ async def test_dimension_types_loader_fallback_with_pagination(client):
     body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED, {"first": 2})
     types = body["data"]["dimensionTypes"]
     service_type = next(t for t in types if t["name"] == "service")
-    assert_that(service_type["dimensions"]["edges"]).described_as(
-        "paginated result"
-    ).is_length(2)
-    assert_that(service_type["dimensions"]["pageInfo"]["hasNextPage"]).described_as(
-        "has next page"
-    ).is_true()
+    assert_that(service_type["dimensions"]["edges"]).described_as("paginated result").is_length(2)
+    assert_that(service_type["dimensions"]["pageInfo"]["hasNextPage"]).described_as("has next page").is_true()

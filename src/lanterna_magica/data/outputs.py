@@ -19,9 +19,7 @@ class Outputs:
         dimension_ids: list[str],
     ) -> dict:
         async with self.pool.acquire() as conn, conn.transaction():
-            row = await queries.create_output(
-                conn, path_template=path_template, format=format
-            )
+            row = await queries.create_output(conn, path_template=path_template, format=format)
             output = dict(row)
 
             for dim_id in dimension_ids:
@@ -31,12 +29,7 @@ class Outputs:
                     dimension_id=dim_id,
                 )
 
-            dims = [
-                dict(r)
-                async for r in queries.get_dimensions_for_output(
-                    conn, output_id=str(output["id"])
-                )
-            ]
+            dims = [dict(r) async for r in queries.get_dimensions_for_output(conn, output_id=str(output["id"]))]
             output["dimensions"] = dims
 
         return output
@@ -77,12 +70,7 @@ class Outputs:
         return dict(row)
 
     async def get_dimensions(self, *, output_id: str) -> list[dict]:
-        rows = [
-            dict(r)
-            async for r in queries.get_dimensions_for_output(
-                self.pool, output_id=output_id
-            )
-        ]
+        rows = [dict(r) async for r in queries.get_dimensions_for_output(self.pool, output_id=output_id)]
         return rows
 
     async def upsert_result(
@@ -109,10 +97,5 @@ class Outputs:
         return dict(row)
 
     async def get_results(self, *, output_id: str) -> list[dict]:
-        rows = [
-            dict(r)
-            async for r in queries.get_results_for_output(
-                self.pool, output_id=output_id
-            )
-        ]
+        rows = [dict(r) async for r in queries.get_results_for_output(self.pool, output_id=output_id)]
         return rows

@@ -26,12 +26,8 @@ async def test_update_dimension(client):
     )
     updated = body["data"]["updateDimension"]
     assert_that(updated["name"]).described_as("name unchanged").is_equal_to("traefik")
-    assert_that(updated["description"]).described_as("description updated").is_equal_to(
-        "reverse proxy"
-    )
-    assert_that(parse_dt(updated["updatedAt"])).described_as(
-        "updatedAt advanced"
-    ).is_after(parse_dt(dim["updatedAt"]))
+    assert_that(updated["description"]).described_as("description updated").is_equal_to("reverse proxy")
+    assert_that(parse_dt(updated["updatedAt"])).described_as("updatedAt advanced").is_after(parse_dt(dim["updatedAt"]))
 
 
 async def test_update_dimension_partial(client):
@@ -45,9 +41,7 @@ async def test_update_dimension_partial(client):
     )
     updated = body["data"]["updateDimension"]
     assert_that(updated["name"]).described_as("name updated").is_equal_to("traefik-v2")
-    assert_that(updated["description"]).described_as(
-        "description preserved"
-    ).is_equal_to("original description")
+    assert_that(updated["description"]).described_as("description preserved").is_equal_to("original description")
 
 
 async def test_update_dimension_no_fields_fails(client):
@@ -82,9 +76,7 @@ async def test_archive_dimension(client):
 
     body = await gql(client, ARCHIVE_DIMENSION, {"id": dim["id"]})
     archived = body["data"]["archiveDimension"]
-    assert_that(archived["archivedAt"]).described_as(
-        "archivedAt should be set"
-    ).is_not_none()
+    assert_that(archived["archivedAt"]).described_as("archivedAt should be set").is_not_none()
 
 
 async def test_archive_hides_from_list(client):
@@ -94,9 +86,7 @@ async def test_archive_hides_from_list(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id})
     items = nodes(body["data"]["dimensions"]["edges"])
-    assert_that(items).described_as("archived dimension hidden").extracting(
-        "id"
-    ).does_not_contain(dim["id"])
+    assert_that(items).described_as("archived dimension hidden").extracting("id").does_not_contain(dim["id"])
 
 
 async def test_include_archived(client):
@@ -106,9 +96,7 @@ async def test_include_archived(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id, "includeArchived": True})
     items = nodes(body["data"]["dimensions"]["edges"])
-    assert_that(items).described_as("archived dimension visible").extracting(
-        "id"
-    ).contains(dim["id"])
+    assert_that(items).described_as("archived dimension visible").extracting("id").contains(dim["id"])
 
 
 async def test_unarchive_dimension(client):
@@ -122,9 +110,7 @@ async def test_unarchive_dimension(client):
 
     body = await gql(client, DIMENSIONS, {"typeId": type_id})
     items = nodes(body["data"]["dimensions"]["edges"])
-    assert_that(items).described_as("unarchived dimension visible").extracting(
-        "id"
-    ).contains(dim["id"])
+    assert_that(items).described_as("unarchived dimension visible").extracting("id").contains(dim["id"])
 
 
 async def test_search_by_name(client):
@@ -157,9 +143,7 @@ async def test_pagination(client):
     body = await gql(client, DIMENSIONS, {"typeId": type_id, "first": 2})
     page1 = body["data"]["dimensions"]
     assert_that(page1["edges"]).described_as("page 1 edge count").is_length(2)
-    assert_that(page1["pageInfo"]["hasNextPage"]).described_as(
-        "page 1 has next page"
-    ).is_true()
+    assert_that(page1["pageInfo"]["hasNextPage"]).described_as("page 1 has next page").is_true()
 
     body = await gql(
         client,
@@ -168,9 +152,7 @@ async def test_pagination(client):
     )
     page2 = body["data"]["dimensions"]
     assert_that(page2["edges"]).described_as("page 2 edge count").is_length(2)
-    assert_that(page2["pageInfo"]["hasNextPage"]).described_as(
-        "page 2 has next page"
-    ).is_true()
+    assert_that(page2["pageInfo"]["hasNextPage"]).described_as("page 2 has next page").is_true()
 
     body = await gql(
         client,
@@ -179,9 +161,7 @@ async def test_pagination(client):
     )
     page3 = body["data"]["dimensions"]
     assert_that(page3["edges"]).described_as("page 3 edge count").is_length(2)
-    assert_that(page3["pageInfo"]["hasNextPage"]).described_as(
-        "page 3 has no next page"
-    ).is_false()
+    assert_that(page3["pageInfo"]["hasNextPage"]).described_as("page 3 has no next page").is_false()
 
 
 # -- Data layer tests --
@@ -213,9 +193,7 @@ async def test_get_by_ids_multi(client, pool):
     results = await dims.get_by_ids(ids=[dim1["id"], dim2["id"]])
     assert_that(results).described_as("multi-ID fetch count").is_length(2)
     result_ids = [str(r["id"]) for r in results]
-    assert_that(result_ids).described_as("multi-ID fetch ids").contains(
-        dim1["id"], dim2["id"]
-    )
+    assert_that(result_ids).described_as("multi-ID fetch ids").contains(dim1["id"], dim2["id"])
 
 
 async def test_get_by_ids_empty(pool):

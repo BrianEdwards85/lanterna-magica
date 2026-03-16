@@ -66,14 +66,10 @@ class ConfigurationsResolver:
         return await info.context["substitution_loader"].load(str(obj["id"]))
 
     async def resolve_substitution_configuration(self, obj, info):
-        return await info.context["configuration_loader"].load(
-            str(obj["configuration_id"])
-        )
+        return await info.context["configuration_loader"].load(str(obj["configuration_id"]))
 
     async def resolve_substitution_shared_value(self, obj, info):
-        return await info.context["shared_value_loader"].load(
-            str(obj["shared_value_id"])
-        )
+        return await info.context["shared_value_loader"].load(str(obj["shared_value_id"]))
 
     async def resolve_config_projection(self, obj, info):
         substitutions = await info.context["substitution_loader"].load(str(obj["id"]))
@@ -85,9 +81,7 @@ class ConfigurationsResolver:
             dimension_ids=dimension_ids,
         )
 
-    async def resolve_configurations_by_scope(
-        self, _obj, info, *, scope_hash, first=None, after=None
-    ):
+    async def resolve_configurations_by_scope(self, _obj, info, *, scope_hash, first=None, after=None):
         return await self.configurations.get_configurations_by_scope(
             scope_hash=scope_hash,
             first=first,
@@ -117,21 +111,13 @@ def get_configuration_resolvers(
     query.set_field("configurationsByScope", resolver.resolve_configurations_by_scope)
     query.set_field("extractSentinelPaths", resolver.resolve_extract_sentinel_paths)
     mutation.set_field("createConfiguration", resolver.resolve_create_configuration)
-    mutation.set_field(
-        "updateConfigSubstitution", resolver.resolve_update_config_substitution
-    )
-    mutation.set_field(
-        "setConfigurationCurrent", resolver.resolve_set_configuration_current
-    )
+    mutation.set_field("updateConfigSubstitution", resolver.resolve_update_config_substitution)
+    mutation.set_field("setConfigurationCurrent", resolver.resolve_set_configuration_current)
     configuration_type.set_field("dimensions", resolver.resolve_config_dimensions)
     configuration_type.set_field("substitutions", resolver.resolve_config_substitutions)
     configuration_type.set_field("projection", resolver.resolve_config_projection)
     configuration_type.set_field("scopeHash", resolver.resolve_config_scope_hash)
-    substitution_type.set_field(
-        "configuration", resolver.resolve_substitution_configuration
-    )
-    substitution_type.set_field(
-        "sharedValue", resolver.resolve_substitution_shared_value
-    )
+    substitution_type.set_field("configuration", resolver.resolve_substitution_configuration)
+    substitution_type.set_field("sharedValue", resolver.resolve_substitution_shared_value)
 
     return [query, mutation, configuration_type, substitution_type]

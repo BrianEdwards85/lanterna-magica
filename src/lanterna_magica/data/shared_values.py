@@ -40,9 +40,7 @@ class SharedValues:
         return build_connection(rows, "id", limit)
 
     async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
-        rows = [
-            dict(r) async for r in queries.get_shared_values_by_ids(self.pool, ids=ids)
-        ]
+        rows = [dict(r) async for r in queries.get_shared_values_by_ids(self.pool, ids=ids)]
         return rows
 
     async def create_shared_value(self, *, name: str) -> dict:
@@ -122,10 +120,7 @@ class SharedValues:
         ]
         effective_ids.extend(str(d["id"]) for d in missing)
 
-        dims = [
-            dict(r)
-            async for r in queries.get_dimensions_by_ids(self.pool, ids=effective_ids)
-        ]
+        dims = [dict(r) async for r in queries.get_dimensions_by_ids(self.pool, ids=effective_ids)]
         type_ids = [str(d["type_id"]) for d in dims]
         if len(type_ids) != len(set(type_ids)):
             raise ValidationError("Scope contains multiple dimensions of the same type")
@@ -172,9 +167,7 @@ class SharedValues:
 
     async def set_revision_current(self, *, id: str, is_current: bool) -> dict:
         if is_current:
-            rows = [
-                dict(r) async for r in queries.get_revision_by_ids(self.pool, ids=[id])
-            ]
+            rows = [dict(r) async for r in queries.get_revision_by_ids(self.pool, ids=[id])]
             if not rows:
                 raise NotFoundError("Revision not found")
             rev = rows[0]

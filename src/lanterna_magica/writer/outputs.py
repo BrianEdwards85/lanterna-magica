@@ -62,13 +62,9 @@ class OutputWriter:
         # Build type_id -> type_name mapping by fetching dimension type names.
         unique_type_ids = list(dict.fromkeys(str(dim["type_id"]) for dim in dimensions))
         fetched_types = (
-            await self._dimension_types.get_dimension_types_by_ids(unique_type_ids)
-            if unique_type_ids
-            else []
+            await self._dimension_types.get_dimension_types_by_ids(unique_type_ids) if unique_type_ids else []
         )
-        type_id_to_name: dict[str, str] = {
-            str(dt["id"]): dt["name"] for dt in fetched_types
-        }
+        type_id_to_name: dict[str, str] = {str(dt["id"]): dt["name"] for dt in fetched_types}
 
         # Step 3: Group dimensions by type_id and compute cartesian product.
         groups: dict[str, list[dict]] = defaultdict(list)
@@ -82,8 +78,7 @@ class OutputWriter:
             type_ids = list(groups.keys())
             dimension_lists = [groups[tid] for tid in type_ids]
             combinations = [
-                {type_ids[i]: dim for i, dim in enumerate(combo)}
-                for combo in itertools.product(*dimension_lists)
+                {type_ids[i]: dim for i, dim in enumerate(combo)} for combo in itertools.product(*dimension_lists)
             ]
 
         results: list[dict] = []
@@ -93,27 +88,17 @@ class OutputWriter:
             dimension_ids = [str(dim["id"]) for dim in combination.values()]
 
             # Step 5b: Compute scope_hash.
-            scope_hash = (
-                compute_scope_hash(dimension_ids)
-                if dimension_ids
-                else compute_scope_hash([])
-            )
+            scope_hash = compute_scope_hash(dimension_ids) if dimension_ids else compute_scope_hash([])
 
             # Step 5c: Fetch configs for this scope.
-            configs = await self._configurations.get_for_rest_scope(
-                dimension_ids=dimension_ids
-            )
+            configs = await self._configurations.get_for_rest_scope(dimension_ids=dimension_ids)
 
             # Step 5d: Resolve scope.
             try:
-                resolved = await self._orchestrator.resolve_scope(
-                    configs=configs, dimension_ids=dimension_ids
-                )
+                resolved = await self._orchestrator.resolve_scope(configs=configs, dimension_ids=dimension_ids)
             except ValueError:
                 # No configs for this scope — record failure and continue.
-                path = _render_path(
-                    output["path_template"], combination, type_id_to_name
-                )
+                path = _render_path(output["path_template"], combination, type_id_to_name)
                 result = await self._outputs.upsert_result(
                     output_id=output_id,
                     scope_hash=scope_hash,
@@ -129,9 +114,7 @@ class OutputWriter:
             path = _render_path(output["path_template"], combination, type_id_to_name)
 
             # Step 5f: Serialize.
-            content, _media_type = self._orchestrator.serialize(
-                resolved, output["format"]
-            )
+            content, _media_type = self._orchestrator.serialize(resolved, output["format"])
 
             # Step 5g: Write to disk.
             try:

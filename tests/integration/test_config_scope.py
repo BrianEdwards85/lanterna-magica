@@ -49,9 +49,7 @@ async def test_get_by_type_and_name_wrong_type(client, pool):
     env_type_id = await _get_type_id(client, "environment")
 
     dims = Dimensions(pool)
-    result = await dims.get_by_type_and_name(
-        type_id=env_type_id, name="cross-type-check"
-    )
+    result = await dims.get_by_type_and_name(type_id=env_type_id, name="cross-type-check")
 
     assert_that(result).described_as("wrong type returns None").is_none()
 
@@ -80,13 +78,9 @@ async def test_get_for_rest_scope_single_matching_config(client, pool):
     assert_that(results).described_as("one config returned").is_length(1)
     cfg = results[0]
     assert_that(cfg).described_as("config has body").contains_key("body")
-    assert_that(cfg).described_as("config has substitutions key").contains_key(
-        "substitutions"
-    )
+    assert_that(cfg).described_as("config has substitutions key").contains_key("substitutions")
     assert_that(cfg["substitutions"]).described_as("one substitution").is_length(1)
-    assert_that(cfg["substitutions"][0]["jsonpath"]).described_as(
-        "substitution jsonpath"
-    ).is_equal_to("$.host")
+    assert_that(cfg["substitutions"][0]["jsonpath"]).described_as("substitution jsonpath").is_equal_to("$.host")
 
 
 async def test_get_for_rest_scope_no_matching_configs(client, pool):
@@ -112,21 +106,15 @@ async def test_get_for_rest_scope_ordered_least_specific_first(client, pool):
     # Global config (no non-base dims — assigned to base dims only)
     await create_configuration(client, [], {"specificity": "global"})
     # Specific config (two non-base dims)
-    await create_configuration(
-        client, [svc["id"], env["id"]], {"specificity": "specific"}
-    )
+    await create_configuration(client, [svc["id"], env["id"]], {"specificity": "specific"})
 
     configs = Configurations(pool)
     results = await configs.get_for_rest_scope(dimension_ids=[svc["id"], env["id"]])
 
     assert_that(results).described_as("two configs returned").is_length(2)
     specificities = [r["body"]["specificity"] for r in results]
-    assert_that(specificities[0]).described_as(
-        "least specific (global) comes first"
-    ).is_equal_to("global")
-    assert_that(specificities[1]).described_as("most specific comes last").is_equal_to(
-        "specific"
-    )
+    assert_that(specificities[0]).described_as("least specific (global) comes first").is_equal_to("global")
+    assert_that(specificities[1]).described_as("most specific comes last").is_equal_to("specific")
 
 
 async def test_get_for_rest_scope_substitutions_empty_when_none(client, pool):
@@ -140,6 +128,4 @@ async def test_get_for_rest_scope_substitutions_empty_when_none(client, pool):
     results = await configs.get_for_rest_scope(dimension_ids=[svc["id"], env["id"]])
 
     assert_that(results).described_as("one config returned").is_length(1)
-    assert_that(results[0]["substitutions"]).described_as(
-        "substitutions list is empty"
-    ).is_empty()
+    assert_that(results[0]["substitutions"]).described_as("substitutions list is empty").is_empty()

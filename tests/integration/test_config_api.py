@@ -31,9 +31,7 @@ async def test_json_format_200(client):
     resp = await client.get("/config/json-svc.json?environment=json-env")
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
-    assert_that(resp.headers["content-type"]).described_as("content-type").contains(
-        "application/json"
-    )
+    assert_that(resp.headers["content-type"]).described_as("content-type").contains("application/json")
     assert_that(resp.json()).described_as("response body").is_equal_to(config_body)
 
 
@@ -47,9 +45,7 @@ async def test_yaml_format_200(client):
     resp = await client.get("/config/yaml-svc.yml?environment=yaml-env")
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
-    assert_that(resp.headers["content-type"]).described_as("content-type").contains(
-        "text/yaml"
-    )
+    assert_that(resp.headers["content-type"]).described_as("content-type").contains("text/yaml")
     parsed = yaml.safe_load(resp.text)
     assert_that(parsed).described_as("parsed YAML body").is_equal_to(config_body)
 
@@ -64,9 +60,7 @@ async def test_toml_format_200(client):
     resp = await client.get("/config/toml-svc.toml?environment=toml-env")
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
-    assert_that(resp.headers["content-type"]).described_as("content-type").contains(
-        "application/toml"
-    )
+    assert_that(resp.headers["content-type"]).described_as("content-type").contains("application/toml")
     parsed = tomllib.loads(resp.text)
     assert_that(parsed).described_as("parsed TOML body").is_equal_to(config_body)
 
@@ -123,9 +117,7 @@ async def test_shared_value_substitution(client):
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
     body = resp.json()
-    assert_that(body["database"]["password"]).described_as(
-        "sentinel replaced by shared value"
-    ).is_equal_to("s3cr3t")
+    assert_that(body["database"]["password"]).described_as("sentinel replaced by shared value").is_equal_to("s3cr3t")
 
 
 async def test_404_unknown_slug(client):
@@ -164,9 +156,7 @@ async def test_400_unknown_format(client):
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(400)
     detail = resp.json()
-    assert_that(detail).described_as("error response has detail key").contains_key(
-        "detail"
-    )
+    assert_that(detail).described_as("error response has detail key").contains_key("detail")
 
 
 async def test_400_no_dot_in_slug(client):
@@ -175,9 +165,7 @@ async def test_400_no_dot_in_slug(client):
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(400)
     detail = resp.json()
-    assert_that(detail).described_as("error response has detail key").contains_key(
-        "detail"
-    )
+    assert_that(detail).described_as("error response has detail key").contains_key("detail")
 
 
 async def test_scope_merge_with_query_param_dimension(client):
@@ -199,6 +187,4 @@ async def test_scope_merge_with_query_param_dimension(client):
 
     assert_that(resp.status_code).described_as("status code").is_equal_to(200)
     body = resp.json()
-    assert_that(body).described_as("merged result").is_equal_to(
-        {"log_level": "debug", "timeout": 30}
-    )
+    assert_that(body).described_as("merged result").is_equal_to({"log_level": "debug", "timeout": 30})

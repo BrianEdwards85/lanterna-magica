@@ -19,14 +19,10 @@ class DimensionTypesResolver:
         return await self.dimension_types.create_dimension_type(name=input["name"])
 
     async def resolve_update_dimension_type(self, _obj, info, *, input):
-        return await self.dimension_types.update_dimension_type(
-            id=input["id"], name=input["name"]
-        )
+        return await self.dimension_types.update_dimension_type(id=input["id"], name=input["name"])
 
     async def resolve_swap_dimension_type_priorities(self, _obj, info, *, id_a, id_b):
-        return await self.dimension_types.swap_dimension_type_priorities(
-            id_a=id_a, id_b=id_b
-        )
+        return await self.dimension_types.swap_dimension_type_priorities(id_a=id_a, id_b=id_b)
 
     async def resolve_archive_dimension_type(self, _obj, info, *, id):
         return await self.dimension_types.archive_dimension_type(id)
@@ -47,13 +43,7 @@ class DimensionTypesResolver:
     ):
         # Use DataLoader for the default case (no filtering, no pagination, no search)
         # to avoid N+1 queries when listing dimension types with their dimensions.
-        if (
-            include_base
-            and not include_archived
-            and first is None
-            and after is None
-            and search is None
-        ):
+        if include_base and not include_archived and first is None and after is None and search is None:
             rows = await info.context["dimensions_by_type_loader"].load(str(obj["id"]))
             return build_connection(rows, "id", len(rows))
         return await self.dimensions.get_dimensions(
@@ -66,9 +56,7 @@ class DimensionTypesResolver:
         )
 
 
-def get_dimension_type_resolvers(
-    dimension_types: DimensionTypes, dimensions: Dimensions
-) -> list:
+def get_dimension_type_resolvers(dimension_types: DimensionTypes, dimensions: Dimensions) -> list:
     resolver = DimensionTypesResolver(dimension_types, dimensions)
 
     query = QueryType()
@@ -78,13 +66,9 @@ def get_dimension_type_resolvers(
     query.set_field("dimensionTypes", resolver.resolve_dimension_types)
     mutation.set_field("createDimensionType", resolver.resolve_create_dimension_type)
     mutation.set_field("updateDimensionType", resolver.resolve_update_dimension_type)
-    mutation.set_field(
-        "swapDimensionTypePriorities", resolver.resolve_swap_dimension_type_priorities
-    )
+    mutation.set_field("swapDimensionTypePriorities", resolver.resolve_swap_dimension_type_priorities)
     mutation.set_field("archiveDimensionType", resolver.resolve_archive_dimension_type)
-    mutation.set_field(
-        "unarchiveDimensionType", resolver.resolve_unarchive_dimension_type
-    )
+    mutation.set_field("unarchiveDimensionType", resolver.resolve_unarchive_dimension_type)
     dimension_type_type.set_field("dimensions", resolver.resolve_dimensions_for_type)
 
     return [query, mutation, dimension_type_type]

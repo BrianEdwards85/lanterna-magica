@@ -9,16 +9,12 @@ def test_flat_dict_sentinel_found():
 
 
 def test_flat_dict_no_sentinel():
-    result = ConfigurationOrchestrator.find_sentinel_paths(
-        {"host": "localhost", "port": 5432}
-    )
+    result = ConfigurationOrchestrator.find_sentinel_paths({"host": "localhost", "port": 5432})
     assert result == []
 
 
 def test_flat_dict_mixed():
-    result = ConfigurationOrchestrator.find_sentinel_paths(
-        {"host": "localhost", "password": "_"}
-    )
+    result = ConfigurationOrchestrator.find_sentinel_paths({"host": "localhost", "password": "_"})
     assert result == ["$.password"]
 
 
@@ -26,23 +22,17 @@ def test_flat_dict_mixed():
 
 
 def test_nested_dict_sentinel_found():
-    result = ConfigurationOrchestrator.find_sentinel_paths(
-        {"db": {"host": "localhost", "password": "_"}}
-    )
+    result = ConfigurationOrchestrator.find_sentinel_paths({"db": {"host": "localhost", "password": "_"}})
     assert result == ["$.db.password"]
 
 
 def test_nested_dict_multiple_sentinels():
-    result = ConfigurationOrchestrator.find_sentinel_paths(
-        {"db": {"password": "_"}, "cache": {"secret": "_"}}
-    )
+    result = ConfigurationOrchestrator.find_sentinel_paths({"db": {"password": "_"}, "cache": {"secret": "_"}})
     assert set(result) == {"$.db.password", "$.cache.secret"}
 
 
 def test_nested_dict_no_sentinel():
-    result = ConfigurationOrchestrator.find_sentinel_paths(
-        {"db": {"host": "localhost", "port": 5432}}
-    )
+    result = ConfigurationOrchestrator.find_sentinel_paths({"db": {"host": "localhost", "port": 5432}})
     assert result == []
 
 
@@ -68,9 +58,7 @@ def test_array_of_scalars_multiple_sentinels():
 
 
 def test_array_of_objects_sentinel_found():
-    result = ConfigurationOrchestrator.find_sentinel_paths(
-        {"servers": [{"host": "localhost", "password": "_"}]}
-    )
+    result = ConfigurationOrchestrator.find_sentinel_paths({"servers": [{"host": "localhost", "password": "_"}]})
     assert result == ["$.servers[0].password"]
 
 
@@ -157,9 +145,7 @@ def test_underscore_string_only_not_empty_string():
 
 
 def test_sentinel_is_exact_string_underscore():
-    result = ConfigurationOrchestrator.find_sentinel_paths(
-        {"a": "_", "b": "__", "c": None}
-    )
+    result = ConfigurationOrchestrator.find_sentinel_paths({"a": "_", "b": "__", "c": None})
     assert result == ["$.a"]
 
 

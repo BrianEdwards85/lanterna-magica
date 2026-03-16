@@ -20,9 +20,7 @@ def test_render_path_replaces_type_name_placeholders():
         "type-svc": _make_dim("svc-api", "type-svc", "api"),
     }
     type_id_to_name = {"type-env": "environment", "type-svc": "service"}
-    path = _render_path(
-        "/etc/{environment}/{service}.json", combination, type_id_to_name
-    )
+    path = _render_path("/etc/{environment}/{service}.json", combination, type_id_to_name)
     assert path == "/etc/prod/api.json"
 
 
@@ -58,9 +56,7 @@ async def test_write_path_rendered_correctly_in_upsert():
         upsert_calls.append(kwargs)
         return {"succeeded": True}
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._outputs.upsert_result = fake_upsert
 
     with patch("builtins.open", MagicMock()), patch("os.makedirs"):
@@ -83,17 +79,13 @@ async def test_write_calls_serialize_with_correct_format():
         dimensions = [_make_dim("env-prod", "type-env", "prod")]
         dimension_types = [{"id": "type-env", "name": "env"}]
 
-        writer = _make_writer(
-            output=output, dimensions=dimensions, dimension_types=dimension_types
-        )
+        writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
         writer._outputs.upsert_result = AsyncMock(return_value={"succeeded": True})
 
         with patch("builtins.open", MagicMock()), patch("os.makedirs"):
             await writer.write(output_id="out-1")
 
-        writer._orchestrator.serialize.assert_called_with(
-            writer._orchestrator.resolve_scope.return_value, fmt
-        )
+        writer._orchestrator.serialize.assert_called_with(writer._orchestrator.resolve_scope.return_value, fmt)
 
 
 # ---------------------------------------------------------------------------
@@ -121,9 +113,7 @@ async def test_upsert_result_called_for_every_combination():
         upsert_calls.append(kwargs)
         return {"succeeded": True}
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._outputs.upsert_result = fake_upsert
 
     with patch("builtins.open", MagicMock()), patch("os.makedirs"):
@@ -151,9 +141,7 @@ async def test_makedirs_called_before_each_write():
         {"id": "type-svc", "name": "svc"},
     ]
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._outputs.upsert_result = AsyncMock(return_value={"succeeded": True})
 
     makedirs_calls = []

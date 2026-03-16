@@ -10,9 +10,7 @@ from lanterna_magica.data.outputs import Outputs
 async def test_upsert_result_insert(pool):
     """upsert_result inserts a new result row."""
     outputs = Outputs(pool)
-    created = await outputs.create(
-        path_template="/r.json", format="json", dimension_ids=[]
-    )
+    created = await outputs.create(path_template="/r.json", format="json", dimension_ids=[])
 
     result = await outputs.upsert_result(
         output_id=str(created["id"]),
@@ -33,9 +31,7 @@ async def test_upsert_result_insert(pool):
 async def test_upsert_result_update(pool):
     """upsert_result updates an existing result on conflict."""
     outputs = Outputs(pool)
-    created = await outputs.create(
-        path_template="/r.json", format="json", dimension_ids=[]
-    )
+    created = await outputs.create(path_template="/r.json", format="json", dimension_ids=[])
     scope_hash = "00000000-0000-0000-0000-000000000002"
 
     first = await outputs.upsert_result(
@@ -56,9 +52,7 @@ async def test_upsert_result_update(pool):
         error="disk full",
     )
 
-    assert_that(str(second["id"])).described_as("same row updated").is_equal_to(
-        str(first["id"])
-    )
+    assert_that(str(second["id"])).described_as("same row updated").is_equal_to(str(first["id"]))
     assert_that(second["path"]).is_equal_to("/tmp/r-v2.json")
     assert_that(second["content"]).is_equal_to('{"v": 2}')
     assert_that(second["succeeded"]).is_false()
@@ -68,9 +62,7 @@ async def test_upsert_result_update(pool):
 async def test_get_results(pool):
     """get_results returns all results for an output ordered by path."""
     outputs = Outputs(pool)
-    created = await outputs.create(
-        path_template="/r.json", format="json", dimension_ids=[]
-    )
+    created = await outputs.create(path_template="/r.json", format="json", dimension_ids=[])
 
     await outputs.upsert_result(
         output_id=str(created["id"]),
@@ -90,9 +82,7 @@ async def test_get_results(pool):
     results = await outputs.get_results(output_id=str(created["id"]))
     assert_that(results).described_as("two results").is_length(2)
     paths = [r["path"] for r in results]
-    assert_that(paths).described_as("ordered by path asc").is_equal_to(
-        ["/a/r.json", "/b/r.json"]
-    )
+    assert_that(paths).described_as("ordered by path asc").is_equal_to(["/a/r.json", "/b/r.json"])
 
 
 async def test_output_dimensions_loader_batches_multiple_outputs(pool):
@@ -101,15 +91,9 @@ async def test_output_dimensions_loader_batches_multiple_outputs(pool):
     env_id = await _create_env_dim(pool)
     outputs = Outputs(pool)
 
-    out_a = await outputs.create(
-        path_template="/a.json", format="json", dimension_ids=[svc_id]
-    )
-    out_b = await outputs.create(
-        path_template="/b.json", format="json", dimension_ids=[env_id]
-    )
-    out_c = await outputs.create(
-        path_template="/c.json", format="json", dimension_ids=[]
-    )
+    out_a = await outputs.create(path_template="/a.json", format="json", dimension_ids=[svc_id])
+    out_b = await outputs.create(path_template="/b.json", format="json", dimension_ids=[env_id])
+    out_c = await outputs.create(path_template="/c.json", format="json", dimension_ids=[])
 
     loader = OutputDimensionsLoader(pool)
     id_a = str(out_a["id"])
@@ -119,14 +103,10 @@ async def test_output_dimensions_loader_batches_multiple_outputs(pool):
     dims_a, dims_b, dims_c = await loader.load_many([id_a, id_b, id_c])
 
     assert_that(dims_a).described_as("output_a has one dimension").is_length(1)
-    assert_that(str(dims_a[0]["id"])).described_as(
-        "output_a dimension matches svc_id"
-    ).is_equal_to(svc_id)
+    assert_that(str(dims_a[0]["id"])).described_as("output_a dimension matches svc_id").is_equal_to(svc_id)
 
     assert_that(dims_b).described_as("output_b has one dimension").is_length(1)
-    assert_that(str(dims_b[0]["id"])).described_as(
-        "output_b dimension matches env_id"
-    ).is_equal_to(env_id)
+    assert_that(str(dims_b[0]["id"])).described_as("output_b dimension matches env_id").is_equal_to(env_id)
 
     assert_that(dims_c).described_as("output_c has no dimensions").is_length(0)
 
@@ -135,15 +115,9 @@ async def test_output_results_loader_batches_multiple_outputs(pool):
     """OutputResultsLoader loads results for multiple outputs in one batch."""
     outputs = Outputs(pool)
 
-    out_a = await outputs.create(
-        path_template="/a.json", format="json", dimension_ids=[]
-    )
-    out_b = await outputs.create(
-        path_template="/b.json", format="json", dimension_ids=[]
-    )
-    out_c = await outputs.create(
-        path_template="/c.json", format="json", dimension_ids=[]
-    )
+    out_a = await outputs.create(path_template="/a.json", format="json", dimension_ids=[])
+    out_b = await outputs.create(path_template="/b.json", format="json", dimension_ids=[])
+    out_c = await outputs.create(path_template="/c.json", format="json", dimension_ids=[])
 
     await outputs.upsert_result(
         output_id=str(out_a["id"]),
@@ -177,13 +151,9 @@ async def test_output_results_loader_batches_multiple_outputs(pool):
 
     assert_that(results_a).described_as("output_a has two results").is_length(2)
     paths_a = [r["path"] for r in results_a]
-    assert_that(paths_a).described_as("output_a results ordered by path").is_equal_to(
-        ["/a/1.json", "/a/2.json"]
-    )
+    assert_that(paths_a).described_as("output_a results ordered by path").is_equal_to(["/a/1.json", "/a/2.json"])
 
     assert_that(results_b).described_as("output_b has one result").is_length(1)
-    assert_that(results_b[0]["error"]).described_as(
-        "output_b result has error"
-    ).is_equal_to("oops")
+    assert_that(results_b[0]["error"]).described_as("output_b result has error").is_equal_to("oops")
 
     assert_that(results_c).described_as("output_c has no results").is_length(0)

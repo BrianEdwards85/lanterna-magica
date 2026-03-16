@@ -70,9 +70,7 @@ def decode_cursor(cursor: str, *, search: str | None = None) -> str:
     return payload["id"]
 
 
-def build_connection(
-    rows: list[dict], cursor_key: str, limit: int, *, search: str | None = None
-) -> dict:
+def build_connection(rows: list[dict], cursor_key: str, limit: int, *, search: str | None = None) -> dict:
     has_next = len(rows) > limit
     nodes = rows[:limit]
     edges = [

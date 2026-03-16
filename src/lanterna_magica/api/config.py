@@ -50,13 +50,9 @@ async def get_config(slug: str, request: Request) -> Response:
         slug_dimension_type_name=settings.get("rest.slug_dimension_type_name", ""),
     )
     try:
-        result = await orchestrator.resolve_from_names(
-            slug_name=name, extra_dimensions=dict(request.query_params)
-        )
+        result = await orchestrator.resolve_from_names(slug_name=name, extra_dimensions=dict(request.query_params))
     except (NotFoundError, ValueError) as exc:
-        return Response(
-            json.dumps({"detail": str(exc)}), 404, media_type="application/json"
-        )
+        return Response(json.dumps({"detail": str(exc)}), 404, media_type="application/json")
 
     body, media_type = orchestrator.serialize(result, fmt)
     return Response(content=body, media_type=media_type)

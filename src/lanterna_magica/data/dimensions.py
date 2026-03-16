@@ -46,9 +46,7 @@ class Dimensions:
         return build_connection(rows, "id", limit, search=search)
 
     async def get_by_ids(self, *, ids: list[str]) -> list[dict]:
-        rows = [
-            dict(r) async for r in queries.get_dimensions_by_ids(self.pool, ids=ids)
-        ]
+        rows = [dict(r) async for r in queries.get_dimensions_by_ids(self.pool, ids=ids)]
         return rows
 
     async def get_base_dimension(self, type_id: str) -> dict:
@@ -59,18 +57,12 @@ class Dimensions:
             type_id=type_id,
         )
 
-    async def create_dimension(
-        self, *, type_id: str, name: str, description: str | None = None
-    ) -> dict:
+    async def create_dimension(self, *, type_id: str, name: str, description: str | None = None) -> dict:
         validate_name(name)
-        row = await queries.create_dimension(
-            self.pool, type_id=type_id, name=name, description=description
-        )
+        row = await queries.create_dimension(self.pool, type_id=type_id, name=name, description=description)
         return dict(row)
 
-    async def update_dimension(
-        self, *, id: str, name: str | None = None, description: str | None = None
-    ) -> dict:
+    async def update_dimension(self, *, id: str, name: str | None = None, description: str | None = None) -> dict:
         if name is None and description is None:
             raise ValidationError("At least one field must be provided")
         if name is not None:
@@ -101,9 +93,7 @@ class Dimensions:
         )
 
     async def get_by_type_and_name(self, *, type_id: str, name: str) -> dict | None:
-        row = await queries.get_dimension_by_type_and_name(
-            self.pool, type_id=type_id, name=name
-        )
+        row = await queries.get_dimension_by_type_and_name(self.pool, type_id=type_id, name=name)
         if row is None:
             return None
         return dict(row)

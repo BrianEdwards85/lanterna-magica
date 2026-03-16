@@ -41,12 +41,8 @@ async def test_update_config_substitution(client):
         },
     )
     updated = body["data"]["updateConfigSubstitution"]
-    assert_that(updated["sharedValue"]["id"]).described_as(
-        "substitution shared value updated"
-    ).is_equal_to(sv2["id"])
-    assert_that(updated["jsonpath"]).described_as("jsonpath unchanged").is_equal_to(
-        "$.database.password"
-    )
+    assert_that(updated["sharedValue"]["id"]).described_as("substitution shared value updated").is_equal_to(sv2["id"])
+    assert_that(updated["jsonpath"]).described_as("jsonpath unchanged").is_equal_to("$.database.password")
 
 
 async def test_update_config_substitution_targets_single_jsonpath(client):
@@ -80,9 +76,7 @@ async def test_update_config_substitution_targets_single_jsonpath(client):
         },
     )
     updated = body["data"]["updateConfigSubstitution"]
-    assert_that(updated["sharedValue"]["id"]).described_as(
-        "host substitution updated"
-    ).is_equal_to(sv_host_v2["id"])
+    assert_that(updated["sharedValue"]["id"]).described_as("host substitution updated").is_equal_to(sv_host_v2["id"])
 
     # Verify the port substitution was NOT changed
     body = await gql(client, CONFIGURATIONS)
@@ -120,9 +114,9 @@ async def test_configuration_substitutions_field(client):
     config_node = next(n for n in items if n["id"] == cfg["id"])
     subs = config_node["substitutions"]
     assert_that(subs).described_as("substitutions count").is_length(2)
-    assert_that(subs).extracting("jsonpath").described_as(
-        "substitution jsonpaths"
-    ).contains("$.database.host", "$.database.port")
+    assert_that(subs).extracting("jsonpath").described_as("substitution jsonpaths").contains(
+        "$.database.host", "$.database.port"
+    )
 
 
 async def test_configuration_dimensions_include_type(client):
@@ -134,12 +128,8 @@ async def test_configuration_dimensions_include_type(client):
     body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"ids": [cfg["id"]]})
     config = body["data"]["configurationsByIds"][0]
     for dim in config["dimensions"]:
-        assert_that(dim["type"]).described_as("dimension has type").contains_key(
-            "id", "name"
-        )
-        assert_that(dim["type"]["name"]).described_as("type name").is_in(
-            "service", "environment"
-        )
+        assert_that(dim["type"]).described_as("dimension has type").contains_key("id", "name")
+        assert_that(dim["type"]["name"]).described_as("type name").is_in("service", "environment")
 
 
 async def test_configuration_substitutions_resolve_nested(client):
@@ -158,15 +148,9 @@ async def test_configuration_substitutions_resolve_nested(client):
     body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"ids": [cfg["id"]]})
     subs = body["data"]["configurationsByIds"][0]["substitutions"]
     assert_that(subs).described_as("substitutions count").is_length(1)
-    assert_that(subs[0]["configuration"]["id"]).described_as(
-        "sub -> config id"
-    ).is_equal_to(cfg["id"])
-    assert_that(subs[0]["sharedValue"]["id"]).described_as(
-        "sub -> shared value id"
-    ).is_equal_to(sv["id"])
-    assert_that(subs[0]["sharedValue"]["name"]).described_as(
-        "sub -> shared value name"
-    ).is_equal_to("db_host")
+    assert_that(subs[0]["configuration"]["id"]).described_as("sub -> config id").is_equal_to(cfg["id"])
+    assert_that(subs[0]["sharedValue"]["id"]).described_as("sub -> shared value id").is_equal_to(sv["id"])
+    assert_that(subs[0]["sharedValue"]["name"]).described_as("sub -> shared value name").is_equal_to("db_host")
 
 
 async def test_update_config_substitution_not_found(client):
@@ -184,9 +168,7 @@ async def test_update_config_substitution_not_found(client):
         },
         expect_errors=True,
     )
-    assert_that(body).described_as("not-found substitution update").contains_key(
-        "errors"
-    )
+    assert_that(body).described_as("not-found substitution update").contains_key("errors")
 
 
 # -- Data layer substitution tests --
@@ -206,23 +188,15 @@ async def test_create_configuration_data_layer_returns_substitutions(client, poo
         substitutions=[{"jsonpath": "$.key", "shared_value_id": sv["id"]}],
     )
 
-    assert_that(result).described_as("result has substitutions key").contains_key(
-        "substitutions"
-    )
-    assert_that(result["substitutions"]).described_as("substitutions count").is_length(
-        1
-    )
-    assert_that(result["substitutions"][0]["jsonpath"]).described_as(
-        "substitution jsonpath"
-    ).is_equal_to("$.key")
+    assert_that(result).described_as("result has substitutions key").contains_key("substitutions")
+    assert_that(result["substitutions"]).described_as("substitutions count").is_length(1)
+    assert_that(result["substitutions"][0]["jsonpath"]).described_as("substitution jsonpath").is_equal_to("$.key")
     assert_that(str(result["substitutions"][0]["shared_value_id"])).described_as(
         "substitution shared_value_id"
     ).is_equal_to(sv["id"])
 
 
-async def test_create_configuration_data_layer_returns_empty_substitutions(
-    client, pool
-):
+async def test_create_configuration_data_layer_returns_empty_substitutions(client, pool):
     """When no substitutions are provided, the data layer returns an empty list."""
     configs = Configurations(pool)
 
@@ -234,9 +208,5 @@ async def test_create_configuration_data_layer_returns_empty_substitutions(
         body={"key": "value"},
     )
 
-    assert_that(result).described_as("result has substitutions key").contains_key(
-        "substitutions"
-    )
-    assert_that(result["substitutions"]).described_as(
-        "substitutions is empty"
-    ).is_empty()
+    assert_that(result).described_as("result has substitutions key").contains_key("substitutions")
+    assert_that(result["substitutions"]).described_as("substitutions is empty").is_empty()

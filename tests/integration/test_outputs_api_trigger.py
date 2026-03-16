@@ -54,27 +54,15 @@ async def test_trigger_output_multiple_combinations(client):
         result_dev = await trigger_output(client, output_dev["id"])
 
         # Each output has exactly one combination.
-        assert_that(result_prod["results"]).described_as(
-            "one result for prod"
-        ).is_length(1)
-        assert_that(result_dev["results"]).described_as("one result for dev").is_length(
-            1
-        )
+        assert_that(result_prod["results"]).described_as("one result for prod").is_length(1)
+        assert_that(result_dev["results"]).described_as("one result for dev").is_length(1)
 
-        assert_that(result_prod["results"][0]["succeeded"]).described_as(
-            "prod write succeeded"
-        ).is_true()
-        assert_that(result_dev["results"][0]["succeeded"]).described_as(
-            "dev write succeeded"
-        ).is_true()
+        assert_that(result_prod["results"][0]["succeeded"]).described_as("prod write succeeded").is_true()
+        assert_that(result_dev["results"][0]["succeeded"]).described_as("dev write succeeded").is_true()
 
         # Both distinct files must exist on disk.
-        assert_that(os.path.exists(prod_path)).described_as(
-            "prod file exists on disk"
-        ).is_true()
-        assert_that(os.path.exists(dev_path)).described_as(
-            "dev file exists on disk"
-        ).is_true()
+        assert_that(os.path.exists(prod_path)).described_as("prod file exists on disk").is_true()
+        assert_that(os.path.exists(dev_path)).described_as("dev file exists on disk").is_true()
 
 
 async def test_trigger_output_results_stored_in_db(client):
@@ -85,9 +73,7 @@ async def test_trigger_output_results_stored_in_db(client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "config.json")
-        output = await create_output(
-            client, path_template, "json", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "json", [svc["id"], env["id"]])
 
         trigger_result = await trigger_output(client, output["id"])
         written_path = trigger_result["results"][0]["path"]
@@ -99,9 +85,7 @@ async def test_trigger_output_results_stored_in_db(client):
         assert_that(fetched["results"]).described_as("results present").is_length(1)
         res = fetched["results"][0]
         assert_that(res["succeeded"]).described_as("succeeded is true").is_true()
-        assert_that(res["path"]).described_as("path is stored correctly").is_equal_to(
-            written_path
-        )
+        assert_that(res["path"]).described_as("path is stored correctly").is_equal_to(written_path)
         assert_that(res["content"]).described_as("content is non-empty").is_not_empty()
         assert_that(res["error"]).described_as("error is null").is_none()
 
@@ -125,9 +109,7 @@ async def test_trigger_output_substitution(client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "config.json")
-        output = await create_output(
-            client, path_template, "json", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "json", [svc["id"], env["id"]])
 
         result = await trigger_output(client, output["id"])
 
@@ -136,9 +118,7 @@ async def test_trigger_output_substitution(client):
 
         with open(res["path"]) as fh:
             data = json.load(fh)
-        assert_that(data["api_key"]).described_as(
-            "sentinel replaced by shared value"
-        ).is_equal_to("my-secret-value")
+        assert_that(data["api_key"]).described_as("sentinel replaced by shared value").is_equal_to("my-secret-value")
 
 
 async def test_trigger_output_scope_merge(client):
@@ -161,9 +141,7 @@ async def test_trigger_output_scope_merge(client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path_template = os.path.join(tmpdir, "config.json")
-        output = await create_output(
-            client, path_template, "json", [svc["id"], env["id"]]
-        )
+        output = await create_output(client, path_template, "json", [svc["id"], env["id"]])
 
         result = await trigger_output(client, output["id"])
 
@@ -174,12 +152,6 @@ async def test_trigger_output_scope_merge(client):
             data = json.load(fh)
 
         # Specific config overrides base; base keys that are not overridden survive.
-        assert_that(data["base_key"]).described_as("base key present").is_equal_to(
-            "base_value"
-        )
-        assert_that(data["override_key"]).described_as(
-            "specific config overrides base"
-        ).is_equal_to("from_specific")
-        assert_that(data["specific_key"]).described_as(
-            "specific key present"
-        ).is_equal_to("specific_value")
+        assert_that(data["base_key"]).described_as("base key present").is_equal_to("base_value")
+        assert_that(data["override_key"]).described_as("specific config overrides base").is_equal_to("from_specific")
+        assert_that(data["specific_key"]).described_as("specific key present").is_equal_to("specific_value")

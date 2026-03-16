@@ -30,12 +30,8 @@ async def test_resolve_for_scope_exact_match(client, pool):
     )
 
     assert_that(result).described_as("result should not be None").is_not_none()
-    assert_that(str(result["id"])).described_as("matched revision id").is_equal_to(
-        rev["id"]
-    )
-    assert_that(result["value"]).described_as("matched revision value").is_equal_to(
-        "scoped-val"
-    )
+    assert_that(str(result["id"])).described_as("matched revision id").is_equal_to(rev["id"])
+    assert_that(result["value"]).described_as("matched revision value").is_equal_to("scoped-val")
     assert_that(result["is_current"]).described_as("revision is current").is_true()
 
 
@@ -62,12 +58,10 @@ async def test_resolve_for_scope_priority_tiebreaking(client, pool):
     )
 
     assert_that(result).described_as("result should not be None").is_not_none()
-    assert_that(result["value"]).described_as(
-        "service revision wins due to lower priority number"
-    ).is_equal_to("service-val")
-    assert_that(str(result["id"])).described_as(
-        "service-scoped revision id returned"
-    ).is_equal_to(rev_svc["id"])
+    assert_that(result["value"]).described_as("service revision wins due to lower priority number").is_equal_to(
+        "service-val"
+    )
+    assert_that(str(result["id"])).described_as("service-scoped revision id returned").is_equal_to(rev_svc["id"])
 
 
 async def test_resolve_for_scope_global_fallback(client, pool):
@@ -86,12 +80,8 @@ async def test_resolve_for_scope_global_fallback(client, pool):
     )
 
     assert_that(result).described_as("global fallback should be returned").is_not_none()
-    assert_that(result["value"]).described_as("global revision value").is_equal_to(
-        "global-val"
-    )
-    assert_that(str(result["id"])).described_as(
-        "global revision id returned"
-    ).is_equal_to(rev_global["id"])
+    assert_that(result["value"]).described_as("global revision value").is_equal_to("global-val")
+    assert_that(str(result["id"])).described_as("global revision id returned").is_equal_to(rev_global["id"])
 
 
 async def test_resolve_for_scope_no_match_returns_none(client, pool):
@@ -143,9 +133,7 @@ async def test_resolve_for_scope_specificity_tiebreaker(client, pool):
     # Less specific: scoped to service only (global env auto-filled)
     await create_revision(client, sv["id"], [svc["id"]], "svc-only-val")
     # More specific: scoped to service AND env
-    rev_specific = await create_revision(
-        client, sv["id"], [svc["id"], env["id"]], "svc-and-env-val"
-    )
+    rev_specific = await create_revision(client, sv["id"], [svc["id"], env["id"]], "svc-and-env-val")
 
     shared_values = SharedValues(pool)
     result = await shared_values.resolve_for_scope(
@@ -154,12 +142,10 @@ async def test_resolve_for_scope_specificity_tiebreaker(client, pool):
     )
 
     assert_that(result).described_as("result should not be None").is_not_none()
-    assert_that(result["value"]).described_as(
-        "more specific revision wins over less specific"
-    ).is_equal_to("svc-and-env-val")
-    assert_that(str(result["id"])).described_as(
-        "specific revision id returned"
-    ).is_equal_to(rev_specific["id"])
+    assert_that(result["value"]).described_as("more specific revision wins over less specific").is_equal_to(
+        "svc-and-env-val"
+    )
+    assert_that(str(result["id"])).described_as("specific revision id returned").is_equal_to(rev_specific["id"])
 
 
 # -- resolveSharedValue query tests --
@@ -181,15 +167,11 @@ async def test_resolve_shared_value_match(client):
     result = body["data"]["resolveSharedValue"]
 
     assert_that(result).described_as("result should not be null").is_not_none()
-    assert_that(result["id"]).described_as("returned revision id").is_equal_to(
-        rev["id"]
+    assert_that(result["id"]).described_as("returned revision id").is_equal_to(rev["id"])
+    assert_that(result["value"]).described_as("returned revision value").is_equal_to("gql-secret")
+    assert_that(result["sharedValue"]["id"]).described_as("revision belongs to correct shared value").is_equal_to(
+        sv["id"]
     )
-    assert_that(result["value"]).described_as("returned revision value").is_equal_to(
-        "gql-secret"
-    )
-    assert_that(result["sharedValue"]["id"]).described_as(
-        "revision belongs to correct shared value"
-    ).is_equal_to(sv["id"])
     assert_that(result["isCurrent"]).described_as("revision is current").is_true()
 
 
@@ -210,15 +192,11 @@ async def test_resolve_shared_value_no_match(client):
     )
     result = body["data"]["resolveSharedValue"]
 
-    assert_that(result).described_as(
-        "no matching revision should return null"
-    ).is_none()
+    assert_that(result).described_as("no matching revision should return null").is_none()
 
 
 async def test_create_shared_value_with_percent_in_name_fails(client):
-    body = await gql(
-        client, CREATE_SHARED_VALUE, {"input": {"name": "bad%name"}}, expect_errors=True
-    )
+    body = await gql(client, CREATE_SHARED_VALUE, {"input": {"name": "bad%name"}}, expect_errors=True)
     assert_that(body).described_as("percent in name rejected").contains_key("errors")
 
 

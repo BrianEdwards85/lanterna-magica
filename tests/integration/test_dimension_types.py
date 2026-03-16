@@ -20,26 +20,20 @@ async def test_seed_dimension_types_exist(client):
     body = await gql(client, DIMENSION_TYPES)
     types = body["data"]["dimensionTypes"]
     names = [t["name"] for t in types]
-    assert_that(names).described_as("seed dimension types").contains(
-        "service", "environment"
-    )
+    assert_that(names).described_as("seed dimension types").contains("service", "environment")
 
 
 async def test_seed_types_ordered_by_priority(client):
     body = await gql(client, DIMENSION_TYPES)
     types = body["data"]["dimensionTypes"]
     priorities = [t["priority"] for t in types]
-    assert_that(priorities).described_as("types ordered by priority").is_equal_to(
-        sorted(priorities)
-    )
+    assert_that(priorities).described_as("types ordered by priority").is_equal_to(sorted(priorities))
 
 
 async def test_create_dimension_type(client):
     dt = await create_dimension_type(client, "region")
     assert_that(dt["name"]).described_as("dimension type name").is_equal_to("region")
-    assert_that(dt["priority"]).described_as("auto-assigned priority").is_greater_than(
-        0
-    )
+    assert_that(dt["priority"]).described_as("auto-assigned priority").is_greater_than(0)
     assert_that(dt["id"]).described_as("dimension type id").is_not_none()
     assert_that(dt["createdAt"]).described_as("createdAt timestamp").is_not_none()
     assert_that(dt["archivedAt"]).described_as("new type not archived").is_none()
@@ -48,9 +42,7 @@ async def test_create_dimension_type(client):
 async def test_create_dimension_type_priority_is_max_plus_one(client):
     a = await create_dimension_type(client, "region")
     b = await create_dimension_type(client, "tenant")
-    assert_that(b["priority"]).described_as("priority is exactly max + 1").is_equal_to(
-        a["priority"] + 1
-    )
+    assert_that(b["priority"]).described_as("priority is exactly max + 1").is_equal_to(a["priority"] + 1)
 
 
 async def test_create_dimension_type_duplicate_name(client):
@@ -69,9 +61,7 @@ async def test_archive_dimension_type(client):
 
     body = await gql(client, ARCHIVE_DIMENSION_TYPE, {"id": dt["id"]})
     archived = body["data"]["archiveDimensionType"]
-    assert_that(archived["archivedAt"]).described_as(
-        "archivedAt should be set"
-    ).is_not_none()
+    assert_that(archived["archivedAt"]).described_as("archivedAt should be set").is_not_none()
 
 
 async def test_archive_hides_from_list(client):
@@ -89,9 +79,7 @@ async def test_include_archived(client):
 
     body = await gql(client, DIMENSION_TYPES, {"includeArchived": True})
     names = [t["name"] for t in body["data"]["dimensionTypes"]]
-    assert_that(names).described_as(
-        "archived type visible with includeArchived"
-    ).contains("region")
+    assert_that(names).described_as("archived type visible with includeArchived").contains("region")
 
 
 async def test_unarchive_dimension_type(client):
@@ -112,9 +100,7 @@ async def test_dimension_type_has_dimensions_field(client):
     body = await gql(client, DIMENSION_TYPES_WITH_DIMENSIONS)
     types = body["data"]["dimensionTypes"]
     for t in types:
-        assert_that(t).described_as("type has dimensions field").contains_key(
-            "dimensions"
-        )
+        assert_that(t).described_as("type has dimensions field").contains_key("dimensions")
 
 
 async def test_create_dimension_type_creates_base_dimension(client):
@@ -125,21 +111,15 @@ async def test_create_dimension_type_creates_base_dimension(client):
     items = [e["node"] for e in body["data"]["dimensions"]["edges"]]
     base_dims = [d for d in items if d["base"]]
     assert_that(base_dims).described_as("new type has base dimension").is_length(1)
-    assert_that(base_dims[0]["name"]).described_as("base dimension name").is_equal_to(
-        "global"
-    )
+    assert_that(base_dims[0]["name"]).described_as("base dimension name").is_equal_to("global")
 
 
 async def test_update_dimension_type_name(client):
     dt = await create_dimension_type(client, "region")
-    body = await gql(
-        client, UPDATE_DIMENSION_TYPE, {"input": {"id": dt["id"], "name": "zone"}}
-    )
+    body = await gql(client, UPDATE_DIMENSION_TYPE, {"input": {"id": dt["id"], "name": "zone"}})
     updated = body["data"]["updateDimensionType"]
     assert_that(updated["name"]).described_as("updated name").is_equal_to("zone")
-    assert_that(updated["priority"]).described_as("priority unchanged").is_equal_to(
-        dt["priority"]
-    )
+    assert_that(updated["priority"]).described_as("priority unchanged").is_equal_to(dt["priority"])
 
 
 async def test_update_dimension_type_not_found(client):
@@ -161,25 +141,17 @@ async def test_update_archived_dimension_type_rejected(client):
         {"input": {"id": dt["id"], "name": "region"}},
         expect_errors=True,
     )
-    assert_that(body).described_as("archived type cannot be updated").contains_key(
-        "errors"
-    )
+    assert_that(body).described_as("archived type cannot be updated").contains_key("errors")
 
 
 async def test_swap_dimension_type_priorities(client):
     a = await create_dimension_type(client, "region")
     b = await create_dimension_type(client, "tenant")
-    body = await gql(
-        client, SWAP_DIMENSION_TYPE_PRIORITIES, {"idA": a["id"], "idB": b["id"]}
-    )
+    body = await gql(client, SWAP_DIMENSION_TYPE_PRIORITIES, {"idA": a["id"], "idB": b["id"]})
     swapped = body["data"]["swapDimensionTypePriorities"]
     by_id = {s["id"]: s for s in swapped}
-    assert_that(by_id[a["id"]]["priority"]).described_as(
-        "a got b's priority"
-    ).is_equal_to(b["priority"])
-    assert_that(by_id[b["id"]]["priority"]).described_as(
-        "b got a's priority"
-    ).is_equal_to(a["priority"])
+    assert_that(by_id[a["id"]]["priority"]).described_as("a got b's priority").is_equal_to(b["priority"])
+    assert_that(by_id[b["id"]]["priority"]).described_as("b got a's priority").is_equal_to(a["priority"])
 
 
 async def test_swap_reorders_list(client):
@@ -224,9 +196,5 @@ async def test_swap_is_reversible(client):
     await gql(client, SWAP_DIMENSION_TYPE_PRIORITIES, {"idA": a["id"], "idB": b["id"]})
     body = await gql(client, DIMENSION_TYPES)
     by_name = {t["name"]: t for t in body["data"]["dimensionTypes"]}
-    assert_that(by_name["region"]["priority"]).described_as(
-        "region priority restored"
-    ).is_equal_to(a["priority"])
-    assert_that(by_name["tenant"]["priority"]).described_as(
-        "tenant priority restored"
-    ).is_equal_to(b["priority"])
+    assert_that(by_name["region"]["priority"]).described_as("region priority restored").is_equal_to(a["priority"])
+    assert_that(by_name["tenant"]["priority"]).described_as("tenant priority restored").is_equal_to(b["priority"])

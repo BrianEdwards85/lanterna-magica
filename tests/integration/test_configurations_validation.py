@@ -24,18 +24,14 @@ async def test_set_noncurrent_configuration_to_current(client):
     cfg2 = await create_configuration(client, [svc["id"], env["id"]], {"v": 2})
 
     # cfg1 is not current, cfg2 is current — make cfg1 current again
-    body = await gql(
-        client, SET_CONFIGURATION_CURRENT, {"id": cfg1["id"], "isCurrent": True}
-    )
+    body = await gql(client, SET_CONFIGURATION_CURRENT, {"id": cfg1["id"], "isCurrent": True})
     result = body["data"]["setConfigurationCurrent"]
     assert_that(result["id"]).is_equal_to(cfg1["id"])
     assert_that(result["isCurrent"]).described_as("cfg1 now current").is_true()
 
     # Verify cfg2 is no longer current
     body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg2["id"]]})
-    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as(
-        "cfg2 no longer current"
-    ).is_false()
+    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as("cfg2 no longer current").is_false()
 
 
 async def test_deactivate_current_configuration(client):
@@ -45,13 +41,9 @@ async def test_deactivate_current_configuration(client):
 
     cfg = await create_configuration(client, [svc["id"], env["id"]], {"v": 1})
 
-    body = await gql(
-        client, SET_CONFIGURATION_CURRENT, {"id": cfg["id"], "isCurrent": False}
-    )
+    body = await gql(client, SET_CONFIGURATION_CURRENT, {"id": cfg["id"], "isCurrent": False})
     result = body["data"]["setConfigurationCurrent"]
-    assert_that(result["isCurrent"]).described_as(
-        "configuration deactivated"
-    ).is_false()
+    assert_that(result["isCurrent"]).described_as("configuration deactivated").is_false()
 
 
 async def test_set_current_only_affects_same_scope_configurations(client):
@@ -60,12 +52,8 @@ async def test_set_current_only_affects_same_scope_configurations(client):
     env1 = await create_environment(client, "production")
     env2 = await create_environment(client, "staging")
 
-    cfg_prod = await create_configuration(
-        client, [svc["id"], env1["id"]], {"env": "prod"}
-    )
-    cfg_staging = await create_configuration(
-        client, [svc["id"], env2["id"]], {"env": "staging"}
-    )
+    cfg_prod = await create_configuration(client, [svc["id"], env1["id"]], {"env": "prod"})
+    cfg_staging = await create_configuration(client, [svc["id"], env2["id"]], {"env": "staging"})
 
     # Both should be current (different scopes)
     assert_that(cfg_prod["isCurrent"]).is_true()
@@ -73,15 +61,11 @@ async def test_set_current_only_affects_same_scope_configurations(client):
 
     # Add a second prod config, then re-activate the first
     await create_configuration(client, [svc["id"], env1["id"]], {"env": "prod2"})
-    await gql(
-        client, SET_CONFIGURATION_CURRENT, {"id": cfg_prod["id"], "isCurrent": True}
-    )
+    await gql(client, SET_CONFIGURATION_CURRENT, {"id": cfg_prod["id"], "isCurrent": True})
 
     # Staging should still be current
     body = await gql(client, CONFIGURATIONS_BY_IDS, {"ids": [cfg_staging["id"]]})
-    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as(
-        "staging unaffected"
-    ).is_true()
+    assert_that(body["data"]["configurationsByIds"][0]["isCurrent"]).described_as("staging unaffected").is_true()
 
 
 async def test_set_configuration_current_not_found(client):
@@ -112,9 +96,7 @@ async def test_create_configuration_with_sentinel_and_substitution_succeeds(clie
     )
     assert_that(cfg["id"]).described_as("configuration id").is_not_none()
     assert_that(cfg["substitutions"]).described_as("substitutions count").is_length(1)
-    assert_that(cfg["substitutions"][0]["jsonpath"]).described_as(
-        "substitution jsonpath"
-    ).is_equal_to("$.x")
+    assert_that(cfg["substitutions"][0]["jsonpath"]).described_as("substitution jsonpath").is_equal_to("$.x")
 
 
 async def test_create_configuration_missing_substitution_for_sentinel_raises_error(
@@ -137,9 +119,7 @@ async def test_create_configuration_missing_substitution_for_sentinel_raises_err
     )
     assert_that(body).described_as("validation error response").contains_key("errors")
     error_message = body["errors"][0]["message"]
-    assert_that(error_message).described_as("error mentions missing path").contains(
-        "$.x"
-    )
+    assert_that(error_message).described_as("error mentions missing path").contains("$.x")
 
 
 async def test_create_configuration_extra_substitution_path_raises_error(client):
@@ -186,12 +166,10 @@ async def test_projection_with_resolved_substitution(client):
 
     body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"ids": [cfg["id"]]})
     config = body["data"]["configurationsByIds"][0]
-    assert_that(config["projection"]).described_as(
-        "projection replaces sentinel with resolved value"
-    ).is_equal_to({"database": {"password": "s3cr3t"}})
-    assert_that(config["body"]).described_as("original body unchanged").is_equal_to(
-        {"database": {"password": "_"}}
+    assert_that(config["projection"]).described_as("projection replaces sentinel with resolved value").is_equal_to(
+        {"database": {"password": "s3cr3t"}}
     )
+    assert_that(config["body"]).described_as("original body unchanged").is_equal_to({"database": {"password": "_"}})
 
 
 async def test_projection_with_no_substitutions(client):
@@ -207,9 +185,9 @@ async def test_projection_with_no_substitutions(client):
 
     body = await gql(client, CONFIGURATION_WITH_PROJECTION, {"ids": [cfg["id"]]})
     config = body["data"]["configurationsByIds"][0]
-    assert_that(config["projection"]).described_as(
-        "projection equals body when no substitutions"
-    ).is_equal_to({"host": "localhost", "port": 5432})
+    assert_that(config["projection"]).described_as("projection equals body when no substitutions").is_equal_to(
+        {"host": "localhost", "port": 5432}
+    )
 
 
 async def test_projection_with_unresolvable_substitution_leaves_sentinel(client):
@@ -252,9 +230,7 @@ async def test_create_configuration_duplicate_dimension_type_raises_error(client
         },
         expect_errors=True,
     )
-    assert_that(body).described_as("duplicate type error response").contains_key(
-        "errors"
-    )
+    assert_that(body).described_as("duplicate type error response").contains_key("errors")
     error_message = body["errors"][0]["message"]
     assert_that(error_message).described_as("error mentions duplicate type").contains(
         "multiple dimensions of the same type"

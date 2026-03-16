@@ -33,9 +33,7 @@ async def test_configurations_include_base_default(client, pool):
     body = await gql(client, CONFIGURATIONS, {"dimensionIds": [svc["id"]]})
     items = nodes(body["data"]["configurations"]["edges"])
     bodies = [i["body"] for i in items]
-    assert_that(bodies).described_as("default includes base").contains(
-        {"scope": "specific"}, {"scope": "base"}
-    )
+    assert_that(bodies).described_as("default includes base").contains({"scope": "specific"}, {"scope": "base"})
 
 
 async def test_configurations_exclude_base(client, pool):
@@ -54,9 +52,7 @@ async def test_configurations_exclude_base(client, pool):
     await create_configuration(client, [svc["id"], env["id"]], {"scope": "specific"})
     await create_configuration(client, [base_svc_id, env["id"]], {"scope": "base"})
 
-    body = await gql(
-        client, CONFIGURATIONS, {"dimensionIds": [svc["id"]], "includeBase": False}
-    )
+    body = await gql(client, CONFIGURATIONS, {"dimensionIds": [svc["id"]], "includeBase": False})
     items = nodes(body["data"]["configurations"]["edges"])
     assert_that(items).described_as("exclude base").is_length(1)
     assert_that(items[0]["body"]).is_equal_to({"scope": "specific"})
@@ -87,17 +83,11 @@ async def test_create_configuration_empty_dimensions_assigns_base(client):
     """Creating a config with no dimensions should auto-assign all base dimensions."""
     cfg = await create_configuration(client, [], {"key": "value"})
 
-    assert_that(cfg["body"]).described_as("configuration body").is_equal_to(
-        {"key": "value"}
-    )
+    assert_that(cfg["body"]).described_as("configuration body").is_equal_to({"key": "value"})
     assert_that(cfg["isCurrent"]).described_as("configuration is current").is_true()
     dim_names = [d["name"] for d in cfg["dimensions"]]
-    assert_that(dim_names).described_as(
-        "empty dimensionIds should resolve to base dimensions"
-    ).contains("global")
-    assert_that(cfg["dimensions"]).described_as(
-        "should have one base dimension per type"
-    ).is_length(2)
+    assert_that(dim_names).described_as("empty dimensionIds should resolve to base dimensions").contains("global")
+    assert_that(cfg["dimensions"]).described_as("should have one base dimension per type").is_length(2)
 
 
 async def test_base_configuration_appears_in_unfiltered_list(client):
@@ -129,14 +119,12 @@ async def test_new_dimension_type_backfills_base_into_configurations(client):
 
     await create_dimension_type(client, "region")
 
-    body = await gql(
-        client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"ids": [cfg_before["id"]]}
-    )
+    body = await gql(client, CONFIGURATION_WITH_TYPED_DIMENSIONS, {"ids": [cfg_before["id"]]})
     config = body["data"]["configurationsByIds"][0]
     type_names = sorted(d["type"]["name"] for d in config["dimensions"])
-    assert_that(type_names).described_as(
-        "old configuration now includes all base dimensions"
-    ).is_equal_to(["environment", "region", "service"])
+    assert_that(type_names).described_as("old configuration now includes all base dimensions").is_equal_to(
+        ["environment", "region", "service"]
+    )
 
     # A new empty-dimensions config should replace the old one as current (same scope)
     cfg_after = await create_configuration(client, [], {"after": True})
@@ -157,9 +145,9 @@ async def test_partial_dimensions_fills_missing_with_global(client):
 
     cfg = await create_configuration(client, [svc["id"]], {"k": "v"})
     dim_names = {d["name"] for d in cfg["dimensions"]}
-    assert_that(dim_names).described_as(
-        "should include specified service and global environment"
-    ).contains(svc["name"], "global")
+    assert_that(dim_names).described_as("should include specified service and global environment").contains(
+        svc["name"], "global"
+    )
     assert_that(cfg["dimensions"]).described_as("one per dimension type").is_length(2)
 
 
@@ -176,12 +164,6 @@ async def test_partial_dimensions_env_only(client):
     )
     config = body["data"]["configurationsByIds"][0]
     by_type = {d["type"]["name"]: d["name"] for d in config["dimensions"]}
-    assert_that(by_type).described_as("types covered").contains_key(
-        "service", "environment"
-    )
-    assert_that(by_type["service"]).described_as(
-        "service auto-filled with global"
-    ).is_equal_to("global")
-    assert_that(by_type["environment"]).described_as(
-        "environment is the one we specified"
-    ).is_equal_to(env["name"])
+    assert_that(by_type).described_as("types covered").contains_key("service", "environment")
+    assert_that(by_type["service"]).described_as("service auto-filled with global").is_equal_to("global")
+    assert_that(by_type["environment"]).described_as("environment is the one we specified").is_equal_to(env["name"])

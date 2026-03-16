@@ -28,9 +28,7 @@ async def test_write_oserror_records_failed_result_and_continues():
         upsert_calls.append(kwargs)
         return {**kwargs}
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._outputs.upsert_result = fake_upsert
 
     # First open raises OSError, second succeeds.
@@ -74,9 +72,7 @@ async def test_write_oserror_does_not_abort_all_combinations():
         upsert_calls.append(kwargs)
         return {**kwargs}
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._outputs.upsert_result = fake_upsert
 
     open_calls = [0]
@@ -128,13 +124,9 @@ async def test_write_value_error_records_failed_result_and_continues():
             raise ValueError("No configurations found for scope")
         return {"key": "value"}
 
-    writer = _make_writer(
-        output=output, dimensions=dimensions, dimension_types=dimension_types
-    )
+    writer = _make_writer(output=output, dimensions=dimensions, dimension_types=dimension_types)
     writer._orchestrator.resolve_scope = fake_resolve_scope
-    writer._orchestrator.serialize = MagicMock(
-        return_value=('{"key": "value"}', "application/json")
-    )
+    writer._orchestrator.serialize = MagicMock(return_value=('{"key": "value"}', "application/json"))
     writer._outputs.upsert_result = fake_upsert
 
     with patch("builtins.open", MagicMock()), patch("os.makedirs"):

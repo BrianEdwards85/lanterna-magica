@@ -6,9 +6,7 @@ from lanterna_magica.writer.outputs import OutputWriter
 
 def _make_orchestrator():
     mock_configs = AsyncMock()
-    mock_configs.create_configuration = AsyncMock(
-        return_value={"id": "fake-id", "substitutions": []}
-    )
+    mock_configs.create_configuration = AsyncMock(return_value={"id": "fake-id", "substitutions": []})
     mock_shared_values = AsyncMock()
     return ConfigurationOrchestrator(mock_configs, mock_shared_values)
 
@@ -85,9 +83,7 @@ def _make_writer(
     mock_outputs = AsyncMock()
     mock_outputs.get = AsyncMock(return_value=output)
     mock_outputs.get_dimensions = AsyncMock(return_value=dimensions or [])
-    mock_outputs.upsert_result = AsyncMock(
-        return_value=upsert_result or {"succeeded": True}
-    )
+    mock_outputs.upsert_result = AsyncMock(return_value=upsert_result or {"succeeded": True})
 
     mock_configurations = AsyncMock()
     mock_configurations.get_for_rest_scope = AsyncMock(return_value=configs or [])
@@ -96,18 +92,10 @@ def _make_writer(
     if resolve_raises is not None:
         mock_orchestrator.resolve_scope = AsyncMock(side_effect=resolve_raises)
     else:
-        mock_orchestrator.resolve_scope = AsyncMock(
-            return_value=resolve_return or {"key": "value"}
-        )
-    mock_orchestrator.serialize = MagicMock(
-        return_value=('{"key": "value"}', "application/json")
-    )
+        mock_orchestrator.resolve_scope = AsyncMock(return_value=resolve_return or {"key": "value"})
+    mock_orchestrator.serialize = MagicMock(return_value=('{"key": "value"}', "application/json"))
 
     mock_dimension_types = AsyncMock()
-    mock_dimension_types.get_dimension_types_by_ids = AsyncMock(
-        return_value=dimension_types or []
-    )
+    mock_dimension_types.get_dimension_types_by_ids = AsyncMock(return_value=dimension_types or [])
 
-    return OutputWriter(
-        mock_outputs, mock_configurations, mock_orchestrator, mock_dimension_types
-    )
+    return OutputWriter(mock_outputs, mock_configurations, mock_orchestrator, mock_dimension_types)
