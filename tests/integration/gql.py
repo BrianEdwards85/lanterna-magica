@@ -106,13 +106,25 @@ mutation UnarchiveDimension($id: ID!) {
 """
 
 DIMENSIONS = """
-query Dimensions($typeId: ID!, $includeBase: Boolean, $includeArchived: Boolean, $first: Int, $after: String, $search: String) {
-    dimensions(typeId: $typeId, includeBase: $includeBase, includeArchived: $includeArchived, first: $first, after: $after, search: $search) {
-        edges {
-            node { id type { id } name description base createdAt updatedAt archivedAt }
-            cursor
-        }
-        pageInfo { hasNextPage endCursor }
+query Dimensions(
+    $typeId: ID!,
+    $includeBase: Boolean,
+    $includeArchived: Boolean,
+    $first: Int,
+    $after: String,
+    $search: String) {
+        dimensions(
+            typeId: $typeId,
+            includeBase: $includeBase,
+            includeArchived: $includeArchived,
+            first: $first,
+            after: $after,
+            search: $search) {
+                edges {
+                    node { id type { id } name description base createdAt updatedAt archivedAt }
+                    cursor
+                }
+            pageInfo { hasNextPage endCursor }
     }
 }
 """
@@ -126,17 +138,27 @@ query DimensionsByIds($ids: [ID!]!) {
 """
 
 DIMENSION_TYPES_WITH_DIMENSIONS_FILTERED = """
-query DimensionTypesWithDimensionsFiltered($includeBase: Boolean, $includeArchived: Boolean, $search: String, $first: Int, $after: String) {
-    dimensionTypes {
-        id
-        name
-        dimensions(includeBase: $includeBase, includeArchived: $includeArchived, search: $search, first: $first, after: $after) {
-            edges {
-                node { id name base archivedAt }
+query DimensionTypesWithDimensionsFiltered(
+    $includeBase: Boolean,
+    $includeArchived: Boolean,
+    $search: String,
+    $first: Int,
+    $after: String) {
+        dimensionTypes {
+            id
+            name
+            dimensions(
+                includeBase: $includeBase,
+                includeArchived:$includeArchived,
+                search: $search,
+                first: $first,
+                after: $after) {
+                    edges {
+                        node { id name base archivedAt }
+                    }
+                pageInfo { hasNextPage endCursor }
             }
-            pageInfo { hasNextPage endCursor }
         }
-    }
 }
 """
 

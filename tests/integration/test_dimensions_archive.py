@@ -9,9 +9,10 @@ from gql import (
     _get_type_id,
     create_dimension,
 )
+from utils import nodes, parse_dt
+
 from lanterna_magica.data.dimensions import Dimensions
 from lanterna_magica.errors import NotFoundError
-from utils import nodes, parse_dt
 
 
 async def test_update_dimension(client):

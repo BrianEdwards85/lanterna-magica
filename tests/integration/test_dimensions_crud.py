@@ -13,7 +13,6 @@ from gql import (
 )
 from utils import nodes
 
-
 # -- Tests --
 
 

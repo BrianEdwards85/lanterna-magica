@@ -56,7 +56,7 @@ async def get_config(slug: str, request: Request) -> Response:
     except (NotFoundError, ValueError) as exc:
         return Response(
             json.dumps({"detail": str(exc)}), 404, media_type="application/json"
-        )  # noqa: E501
+        )
 
     body, media_type = orchestrator.serialize(result, fmt)
     return Response(content=body, media_type=media_type)

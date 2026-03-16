@@ -5,6 +5,7 @@ shared value substitution, and 404/400 error cases.
 """
 
 import tomllib
+
 import yaml
 from assertpy import assert_that
 from gql import (

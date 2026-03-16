@@ -9,7 +9,6 @@ from gql import (
     create_dimension_type,
 )
 
-
 # -- DataLoader tests --
 
 
