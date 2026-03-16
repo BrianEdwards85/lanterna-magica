@@ -1,6 +1,8 @@
+import json
 from unittest.mock import AsyncMock
 
 import pytest
+import yaml
 
 from lanterna_magica.errors import ValidationError
 from lanterna_magica.orchestrator.configuration import ConfigurationOrchestrator
@@ -525,5 +527,93 @@ async def test_resolve_scope_config_with_no_substitutions_field():
     result = await orch.resolve_scope(configs=configs, dimension_ids=["dim-1"])
     assert result == {"key": "value"}
     orch._shared_values.resolve_for_scope.assert_not_awaited()
+
+
+# -- serialize --
+
+
+@pytest.mark.unit
+def test_serialize_json_format():
+    orch = _make_orchestrator()
+    result = {"host": "localhost", "port": 5432}
+    body, media_type = orch.serialize(result, "json")
+    assert media_type == "application/json"
+    parsed = json.loads(body)
+    assert parsed == result
+
+
+@pytest.mark.unit
+def test_serialize_yml_format():
+    orch = _make_orchestrator()
+    result = {"host": "localhost", "port": 5432}
+    body, media_type = orch.serialize(result, "yml")
+    assert media_type == "text/yaml"
+    parsed = yaml.safe_load(body)
+    assert parsed == result
+
+
+@pytest.mark.unit
+def test_serialize_toml_format_basic():
+    orch = _make_orchestrator()
+    result = {"host": "localhost", "port": 5432}
+    body, media_type = orch.serialize(result, "toml")
+    assert media_type == "application/toml"
+    assert "host" in body
+    assert "port" in body
+
+
+@pytest.mark.unit
+def test_serialize_toml_null_value_dropped():
+    orch = _make_orchestrator()
+    result = {"host": "localhost", "password": None, "port": 5432}
+    body, media_type = orch.serialize(result, "toml")
+    assert media_type == "application/toml"
+    assert "host" in body
+    assert "port" in body
+    assert "password" not in body
+
+
+@pytest.mark.unit
+def test_serialize_toml_mixed_type_array_stringified():
+    """After _sanitize_for_toml, None elements are dropped from arrays."""
+    orch = _make_orchestrator()
+    result = {"tags": ["alpha", None, "beta"]}
+    body, media_type = orch.serialize(result, "toml")
+    assert media_type == "application/toml"
+    assert "alpha" in body
+    assert "beta" in body
+
+
+@pytest.mark.unit
+def test_serialize_env_format_scalar_values():
+    orch = _make_orchestrator()
+    result = {"HOST": "localhost", "PORT": 5432, "DEBUG": True, "RATIO": 1.5}
+    body, media_type = orch.serialize(result, "env")
+    assert media_type == "text/plain"
+    lines = body.splitlines()
+    assert "HOST=localhost" in lines
+    assert "PORT=5432" in lines
+    assert "DEBUG=True" in lines
+    assert "RATIO=1.5" in lines
+
+
+@pytest.mark.unit
+def test_serialize_env_format_non_scalar_json_encoded():
+    orch = _make_orchestrator()
+    result = {"TAGS": ["a", "b"], "DB": {"host": "localhost"}}
+    body, media_type = orch.serialize(result, "env")
+    assert media_type == "text/plain"
+    lines = body.splitlines()
+    tags_line = next(line for line in lines if line.startswith("TAGS="))
+    db_line = next(line for line in lines if line.startswith("DB="))
+    assert json.loads(tags_line[len("TAGS="):]) == ["a", "b"]
+    assert json.loads(db_line[len("DB="):]) == {"host": "localhost"}
+
+
+@pytest.mark.unit
+def test_serialize_unknown_format_raises_value_error():
+    orch = _make_orchestrator()
+    with pytest.raises(ValueError, match="Unknown format"):
+        orch.serialize({"key": "value"}, "xml")
 
 

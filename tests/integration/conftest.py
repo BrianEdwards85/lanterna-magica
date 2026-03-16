@@ -81,7 +81,8 @@ async def _clean_db(pool):
         await conn.execute(
             "TRUNCATE dimension_types, dimensions, configurations,"
             " configuration_scopes, revision_scopes,"
-            " shared_values, shared_value_revisions, config_substitutions"
+            " shared_values, shared_value_revisions, config_substitutions,"
+            " outputs"
             " CASCADE"
         )
         await conn.execute(

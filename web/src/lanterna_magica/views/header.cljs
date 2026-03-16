@@ -32,4 +32,10 @@
                   :minimal  true
                   :active   (= route-name :route/configurations)
                   :class    "mobile-icon-only"
-                  :on-click #(routes/navigate! :route/configurations)}]]]))
+                  :on-click #(routes/navigate! :route/configurations)}]
+      [bp/button {:icon     "export"
+                  :text     "Outputs"
+                  :minimal  true
+                  :active   (contains? #{:route/outputs :route/output} route-name)
+                  :class    "mobile-icon-only"
+                  :on-click #(routes/navigate! :route/outputs)}]]]))

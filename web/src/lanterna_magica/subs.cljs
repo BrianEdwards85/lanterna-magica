@@ -55,6 +55,7 @@
 
 (rf/reg-sub ::shared-values-page  (fn [db _] (:shared-values-page db)))
 (rf/reg-sub ::configurations-page (fn [db _] (:configurations-page db)))
+(rf/reg-sub ::outputs-page        (fn [db _] (:outputs-page db)))
 
 (rf/reg-sub ::shared-value-used-by
   (fn [db _] (get-in db [:shared-values-page :used-by])))
@@ -66,6 +67,11 @@
 (rf/reg-sub ::shared-value-dialog   (fn [db _] (:shared-value-dialog db)))
 (rf/reg-sub ::revision-dialog       (fn [db _] (:revision-dialog db)))
 (rf/reg-sub ::configuration-dialog  (fn [db _] (:configuration-dialog db)))
+(rf/reg-sub ::output-dialog         (fn [db _] (:output-dialog db)))
+
+;; -- Output subs ----------------------------------------------------------
+
+(rf/reg-sub ::selected-output (fn [db _] (get-in db [:outputs-page :selected])))
 
 ;; -- Configuration dialog sub-keys ----------------------------------------
 

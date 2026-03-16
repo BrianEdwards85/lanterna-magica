@@ -1,7 +1,7 @@
 import pytest
 import tomli_w
 
-from lanterna_magica.api.config import _sanitize_for_toml
+from lanterna_magica.orchestrator.configuration import _sanitize_for_toml
 
 # ---------------------------------------------------------------------------
 # _sanitize_for_toml -dict behaviour

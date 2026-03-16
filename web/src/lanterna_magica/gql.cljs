@@ -220,3 +220,60 @@
        value
      }
    }")
+
+;; ---------------------------------------------------------------------------
+;; Outputs
+;; ---------------------------------------------------------------------------
+
+(def outputs-query
+  "query Outputs($includeArchived: Boolean, $first: Int, $after: String) {
+     outputs(includeArchived: $includeArchived, first: $first, after: $after) {
+       edges {
+         cursor
+         node {
+           id pathTemplate format createdAt updatedAt archivedAt
+           dimensions { id name type { id name } }
+           results { id succeeded writtenAt }
+         }
+       }
+       pageInfo { hasNextPage endCursor }
+     }
+   }")
+
+(def output-query
+  "query Output($id: ID!) {
+     output(id: $id) {
+       id pathTemplate format createdAt updatedAt archivedAt
+       dimensions { id name type { id name } }
+       results {
+         id scopeHash path content succeeded error writtenAt writtenBy
+       }
+     }
+   }")
+
+(def create-output-mutation
+  "mutation CreateOutput($input: CreateOutputInput!) {
+     createOutput(input: $input) {
+       id pathTemplate format createdAt updatedAt archivedAt
+       dimensions { id name type { id name } }
+     }
+   }")
+
+(def archive-output-mutation
+  "mutation ArchiveOutput($id: ID!) {
+     archiveOutput(id: $id) {
+       id pathTemplate format createdAt updatedAt archivedAt
+       dimensions { id name type { id name } }
+     }
+   }")
+
+(def trigger-output-mutation
+  "mutation TriggerOutput($id: ID!) {
+     triggerOutput(id: $id) {
+       id pathTemplate format createdAt updatedAt archivedAt
+       dimensions { id name type { id name } }
+       results {
+         id scopeHash path content succeeded error writtenAt writtenBy
+       }
+     }
+   }")

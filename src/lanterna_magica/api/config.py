@@ -1,8 +1,6 @@
 import json
 import logging
 
-import tomli_w
-import yaml
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
@@ -18,24 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_FORMATS = {"json", "yml", "toml"}
-
-
-def _sanitize_for_toml(obj):
-    """Recursively make obj safe for tomli_w.dumps.
-
-    - dict: drop keys whose value is None; recurse into remaining values.
-    - list: drop None elements; recurse into remaining elements.
-    - all other values: return as-is.
-    """
-    if isinstance(obj, dict):
-        return {
-            k: _sanitize_for_toml(v) for k, v in obj.items() if v is not None
-        }
-    if isinstance(obj, list):
-        # Drop None elements, then recurse into each remaining element
-        return [_sanitize_for_toml(item) for item in obj if item is not None]
-    return obj
+_FORMATS = {"json", "yml", "toml", "env"}
 
 
 @router.get("/{slug}")
@@ -53,7 +34,7 @@ async def get_config(slug: str, request: Request) -> Response:
     fmt = slug[dot_pos + 1 :]
 
     if fmt not in _FORMATS:
-        detail = f"Unknown format '{fmt}'. Accepted: json, yml, toml"
+        detail = f"Unknown format '{fmt}'. Accepted: json, yml, toml, env"
         return Response(
             content=json.dumps({"detail": detail}),
             status_code=400,
@@ -75,15 +56,5 @@ async def get_config(slug: str, request: Request) -> Response:
     except (NotFoundError, ValueError) as exc:
         return Response(json.dumps({"detail": str(exc)}), 404, media_type="application/json")  # noqa: E501
 
-    # Serialize based on format
-    if fmt == "json":
-        body = json.dumps(result)
-        media_type = "application/json"
-    elif fmt == "yml":
-        body = yaml.dump(result)
-        media_type = "text/yaml"
-    else:  # toml
-        body = tomli_w.dumps(_sanitize_for_toml(result))
-        media_type = "application/toml"
-
+    body, media_type = orchestrator.serialize(result, fmt)
     return Response(content=body, media_type=media_type)

@@ -7,6 +7,7 @@
    [lanterna-magica.views.dimensions :as dimensions]
    [lanterna-magica.views.header :as header]
    [lanterna-magica.views.home :as home]
+   [lanterna-magica.views.outputs :as outputs]
    [lanterna-magica.views.shared-values :as shared-values]
    [re-frame.core :as rf]
    [reagent.dom.client :as rdc]))
@@ -22,6 +23,8 @@
       :route/shared-value     [shared-values/shared-values-screen]
       :route/configurations   [configurations/configurations-screen]
       :route/configuration    [configurations/configurations-screen]
+      :route/outputs          [outputs/outputs-screen]
+      :route/output           [outputs/outputs-screen]
       [home/home-screen])))
 
 (defn app []

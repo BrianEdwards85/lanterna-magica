@@ -30,7 +30,18 @@
                                           (rf/dispatch [::events/load-configuration
                                                         (get-in params [:path :id])]))
                             :stop       (fn [_]
-                                          (rf/dispatch [::events/deselect-configuration]))}]}]]])
+                                          (rf/dispatch [::events/deselect-configuration]))}]}]]
+   ["/outputs"
+    [""    {:name        :route/outputs
+            :controllers [{:start (fn [_] (rf/dispatch [::events/fetch-outputs]))}]}]
+    ["/:id" {:name        :route/output
+             :controllers [{:parameters {:path [:id]}
+                            :start      (fn [params]
+                                          (rf/dispatch [::events/fetch-outputs])
+                                          (rf/dispatch [::events/load-output
+                                                        (get-in params [:path :id])]))
+                            :stop       (fn [_]
+                                          (rf/dispatch [::events/deselect-output]))}]}]]])
 
 (defonce ^:private controllers (atom []))
 

@@ -43,7 +43,13 @@
                          :filter-dimension-ids []
                          :selected-id nil :selected nil}
 
+   ;; Outputs page
+   :outputs-page {:edges [] :page-info {:hasNextPage false :endCursor nil}
+                  :show-archived false
+                  :selected-id nil :selected nil}
+
    ;; Dialog state
+   :output-dialog       {:open? false :output nil}
    :shared-value-dialog {:open? false}
    :revision-dialog     {:open? false}
    :configuration-dialog {:open? false

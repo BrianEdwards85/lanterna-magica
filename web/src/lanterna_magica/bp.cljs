@@ -11,6 +11,7 @@
 (def dialog-body     (r/adapt-react-class bp/DialogBody))
 (def dialog-footer   (r/adapt-react-class bp/DialogFooter))
 (def icon            (r/adapt-react-class bp/Icon))
+(def html-select     (r/adapt-react-class bp/HTMLSelect))
 (def input-group     (r/adapt-react-class bp/InputGroup))
 (def navbar          (r/adapt-react-class bp/Navbar))
 (def navbar-group    (r/adapt-react-class bp/NavbarGroup))

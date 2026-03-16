@@ -1,8 +1,12 @@
 import asyncio
 import copy
+import json
 import logging
 import re
 from typing import Any
+
+import tomli_w
+import yaml
 
 from lanterna_magica.errors import NotFoundError, ValidationError
 
@@ -10,6 +14,23 @@ logger = logging.getLogger(__name__)
 
 # Matches a single path segment:  .key  or  [index]  or  [index].key ...
 _SEGMENT_RE = re.compile(r'\.([^.\[]+)|\[(\d+)\]')
+
+
+def _sanitize_for_toml(obj):
+    """Recursively make obj safe for tomli_w.dumps.
+
+    - dict: drop keys whose value is None; recurse into remaining values.
+    - list: drop None elements; recurse into remaining elements.
+    - all other values: return as-is.
+    """
+    if isinstance(obj, dict):
+        return {
+            k: _sanitize_for_toml(v) for k, v in obj.items() if v is not None
+        }
+    if isinstance(obj, list):
+        # Drop None elements, then recurse into each remaining element
+        return [_sanitize_for_toml(item) for item in obj if item is not None]
+    return obj
 
 
 def _set_path(root: dict | list, jsonpath: str, value: Any) -> None:
@@ -267,3 +288,26 @@ class ConfigurationOrchestrator:
         for projected in projections:
             result.update(projected)
         return result
+
+    def serialize(self, result: dict | list, fmt: str) -> tuple[str, str]:
+        """Serialize result to the requested format.
+
+        Returns (body, media_type).
+        Raises ValueError for unknown fmt.
+        """
+        if fmt == "json":
+            return json.dumps(result, indent=2), "application/json"
+        elif fmt == "yml":
+            return yaml.dump(result), "text/yaml"
+        elif fmt == "toml":
+            return tomli_w.dumps(_sanitize_for_toml(result)), "application/toml"
+        elif fmt == "env":
+            lines = []
+            for key, value in result.items():
+                if isinstance(value, (str, int, float, bool)):
+                    lines.append(f"{key}={value}")
+                else:
+                    lines.append(f"{key}={json.dumps(value)}")
+            return "\n".join(lines), "text/plain"
+        else:
+            raise ValueError(f"Unknown format '{fmt}'. Accepted: json, yml, toml, env")
