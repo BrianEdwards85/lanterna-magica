@@ -69,8 +69,7 @@ jobs:
       - name: Enable PostgreSQL extensions
         run: |
           PGPASSWORD=lanterna_magica_test psql -h localhost -p 5433 -U lanterna_magica_test -d lanterna_magica_test \
-            -c "CREATE EXTENSION IF NOT EXISTS pg_trgm" \
-            -c "CREATE EXTENSION IF NOT EXISTS pg_uuidv7"
+            -c "CREATE EXTENSION IF NOT EXISTS pg_trgm" 
 
       - name: Run tests
         run: uv run pytest tests/ -v
