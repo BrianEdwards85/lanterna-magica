@@ -1,0 +1,49 @@
+type Output {
+  id: ID!
+  pathTemplate: String!
+  format: String!
+  dimensions: [Dimension!]!
+  results: [OutputResult!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  archivedAt: DateTime
+}
+
+type OutputResult {
+  id: ID!
+  output: Output!
+  scopeHash: String!
+  path: String!
+  content: String!
+  succeeded: Boolean!
+  error: String
+  writtenAt: DateTime!
+  writtenBy: ID!
+}
+
+type OutputEdge {
+  node: Output!
+  cursor: String!
+}
+
+type OutputConnection {
+  edges: [OutputEdge!]!
+  pageInfo: PageInfo!
+}
+
+input CreateOutputInput {
+  pathTemplate: String!
+  format: String!
+  dimensionIds: [ID!]!
+}
+
+extend type Query {
+  outputs(includeArchived: Boolean, first: Int, after: String): OutputConnection!
+  outputsByIds(ids: [ID!]!): [Output!]!
+}
+
+extend type Mutation {
+  createOutput(input: CreateOutputInput!): Output!
+  archiveOutput(id: ID!): Output!
+  triggerOutput(id: ID!): Output!
+}

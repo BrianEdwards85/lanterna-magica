@@ -27,13 +27,23 @@ def apply_migrations() -> None:
     backend = get_backend(dsn)
     migrations = read_migrations(str(_get_migrations_dir()))
     with backend.lock():
-        backend.apply_migrations(backend.to_apply(migrations))
-    logger.info("Migrations applied")
+        to_apply = backend.to_apply(migrations)
+        if to_apply:
+            logger.info("Applying %d migration(s)", len(to_apply))
+            backend.apply_migrations(to_apply)
+        else:
+            logger.info("Database is up to date")
 
 
 async def _init_connection(conn: asyncpg.Connection):
     await conn.set_type_codec(
         "jsonb",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
+    await conn.set_type_codec(
+        "json",
         encoder=json.dumps,
         decoder=json.loads,
         schema="pg_catalog",

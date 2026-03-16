@@ -1,0 +1,124 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "web/**"
+      - "migrations/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Dockerfile"
+      - "settings.toml"
+      - ".github/workflows/build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "web/**"
+      - "migrations/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Dockerfile"
+      - "settings.toml"
+      - ".github/workflows/build.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: lanterna_magica_test
+          POSTGRES_PASSWORD: lanterna_magica_test
+          POSTGRES_DB: lanterna_magica_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U lanterna_magica_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Lint Python
+        run: |
+          uv sync --all-extras
+          uv run ruff check src/ tests/
+          uv run ruff format --check src/ tests/
+
+      - name: Enable PostgreSQL extensions
+        run: |
+          PGPASSWORD=lanterna_magica_test psql -h localhost -p 5433 -U lanterna_magica_test -d lanterna_magica_test \
+            -c "CREATE EXTENSION IF NOT EXISTS pg_trgm" 
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
+      - name: Login to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build Docker image
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}
+          IMAGE=${IMAGE,,}
+          docker build -t $IMAGE:${{ steps.version.outputs.version }} -t $IMAGE:latest .
+
+      - name: Push Docker image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}
+          IMAGE=${IMAGE,,}
+          docker push $IMAGE:${{ steps.version.outputs.version }}
+          docker push $IMAGE:latest
+
+      - name: Check if tag exists
+        if: github.ref == 'refs/heads/main'
+        id: tag_check
+        run: |
+          if git ls-remote --tags origin "${{ steps.version.outputs.tag }}" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main' && steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "lanterna-magica ${{ steps.version.outputs.tag }}" \
+            --generate-notes \
+          || true

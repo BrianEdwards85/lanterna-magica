@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from base64 import b64decode, b64encode
@@ -5,16 +6,20 @@ from pathlib import Path
 
 import aiosql
 
-from lanterna_magica.errors import ValidationError
+from lanterna_magica.errors import NotFoundError, ValidationError
 
 SQL_DIR = Path(__file__).parent.parent / "sql"
 
 queries = aiosql.from_path(str(SQL_DIR), "asyncpg")
 
-SENTINEL_UUID = "00000000-0000-0000-0000-000000000000"
-
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 100
+
+
+def compute_scope_hash(dimension_ids: list[str]) -> str:
+    joined = ",".join(sorted(dimension_ids))
+    hex_digest = hashlib.md5(joined.encode()).hexdigest()
+    return f"{hex_digest[:8]}-{hex_digest[8:12]}-{hex_digest[12:16]}-{hex_digest[16:20]}-{hex_digest[20:]}"
 
 
 def page_limit(first: int | None) -> int:
@@ -24,7 +29,8 @@ def page_limit(first: int | None) -> int:
         raise ValidationError(f"first must not exceed {MAX_PAGE_SIZE}")
     return first if first is not None else DEFAULT_PAGE_SIZE
 
-INVALID_NAME_CHARS = re.compile(r'[%\\]')
+
+INVALID_NAME_CHARS = re.compile(r"[%\\]")
 
 
 def validate_name(name: str) -> None:
@@ -33,8 +39,17 @@ def validate_name(name: str) -> None:
 
 
 def sanitize_search(search: str) -> str:
-    cleaned = INVALID_NAME_CHARS.sub('', search)
-    return cleaned.replace('_', r'\_')
+    # 1. Strip chars that are dangerous in ILIKE patterns (% and \)
+    cleaned = re.sub(r"[%\\]", "", search)
+    # 2. Escape _ so it matches literally instead of acting as single-char wildcard
+    return cleaned.replace("_", r"\_")
+
+
+async def require_row(query_fn, error_msg: str, *args, **kwargs) -> dict:
+    row = await query_fn(*args, **kwargs)
+    if not row:
+        raise NotFoundError(error_msg)
+    return dict(row)
 
 
 class InvalidCursorError(Exception):
@@ -55,9 +70,7 @@ def decode_cursor(cursor: str, *, search: str | None = None) -> str:
     return payload["id"]
 
 
-def build_connection(
-    rows: list[dict], cursor_key: str, limit: int, *, search: str | None = None
-) -> dict:
+def build_connection(rows: list[dict], cursor_key: str, limit: int, *, search: str | None = None) -> dict:
     has_next = len(rows) > limit
     nodes = rows[:limit]
     edges = [

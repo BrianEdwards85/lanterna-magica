@@ -17,6 +17,14 @@ dependencies = [
     "aiodataloader>=0.4",
     "aiosql>=12",
     "dynaconf>=3.2",
+    "httpx>=0.28",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-instrumentation-starlette",
+    "opentelemetry-instrumentation-asyncpg",
+    "opentelemetry-exporter-otlp-proto-http",
+    "pyyaml>=6.0.3",
+    "tomli-w>=1.2.0",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +32,7 @@ dev = [
     "assertpy>=1.1",
     "pytest>=8",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=6",
     "httpx>=0.28",
     "ruff>=0.8",
 ]
@@ -33,13 +42,33 @@ packages = ["src/lanterna_magica"]
 
 [tool.poe.tasks]
 dev = "uvicorn lanterna_magica.app:app --reload --host 0.0.0.0 --port 8000"
+"dev:web" = {shell = "cd web && npm run dev"}
+"build:web" = {shell = "cd web && npm run css:build && npm run cljs:release"}
 lint = "ruff check src/"
 format = "ruff format src/"
+"format:cljs" = {shell = "cd web && npm run cljs:format"}
+"lint:cljs" = {shell = "cd web && npm run cljs:format:check"}
 test = "pytest tests/ -v"
+test-unit = "pytest tests/unit -v"
+test-integration = "pytest tests/integration -v"
+test-coverage = "pytest tests/ --cov=lanterna_magica --cov-report=term-missing"
+test-coverage-html = "pytest tests/ --cov=lanterna_magica --cov-report=html"
+migrate = "python -c \"from lanterna_magica.db import apply_migrations; apply_migrations()\""
+"docker:build" = {shell = "docker build -t lanterna-magica:latest ."}
+"docker:up" = {shell = "docker compose up -d"}
+
+[tool.coverage.run]
+source = ["lanterna_magica"]
+omit = [
+    "*/migrations/*",
+]
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88
+line-length = 120
 src = ["src"]
 
 [tool.ruff.lint]
@@ -50,3 +79,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 pythonpath = ["src"]
+markers = [
+    "unit: pure unit tests (no I/O, no database)",
+    "integration: tests requiring database or server",
+]

@@ -1,4 +1,4 @@
-__pycache__/
+**/__pycache__/
 *.pyc
 .secrets.toml
 *.egg-info/
@@ -6,3 +6,12 @@ dist/
 .venv/
 .ruff_cache/
 .pytest_cache/
+**/node_modules
+**/.shadow-cljs
+web/resources/public/js/
+web/resources/public/css/
+AGENTS.md
+.beads
+.claude
+htmlcov/
+.coverage

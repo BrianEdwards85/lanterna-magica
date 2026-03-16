@@ -1,34 +1,47 @@
 from ariadne import MutationType, ObjectType, QueryType
 
 from lanterna_magica.data.configurations import Configurations
+from lanterna_magica.orchestrator import ConfigurationOrchestrator
 
 
 class ConfigurationsResolver:
-    def __init__(self, configurations: Configurations):
+    def __init__(
+        self,
+        configurations: Configurations,
+        orchestrator: ConfigurationOrchestrator,
+    ):
         self.configurations = configurations
-
-    # -- Query resolvers --
+        self.orchestrator = orchestrator
 
     async def resolve_configurations(
-        self, _obj, info, *, service_id=None, environment_id=None, include_global=None, first=None, after=None
+        self,
+        _obj,
+        info,
+        *,
+        dimension_ids=None,
+        include_base=None,
+        current_only=None,
+        first=None,
+        after=None,
     ):
         return await self.configurations.get_configurations(
-            service_id=service_id,
-            environment_id=environment_id,
-            include_global=include_global if include_global is not None else True,
+            dimension_ids=dimension_ids,
+            include_base=include_base if include_base is not None else True,
+            current_only=current_only or False,
             first=first,
             after=after,
         )
 
-    async def resolve_configuration(self, _obj, info, *, id):
-        return await info.context["configuration_loader"].load(id)
-
-    # -- Mutation resolvers --
+    async def resolve_configurations_by_ids(self, _obj, info, *, ids):
+        rows = await self.configurations.get_by_ids(ids=ids)
+        loader = info.context["configuration_loader"]
+        for r in rows:
+            loader.prime(str(r["id"]), r)
+        return rows
 
     async def resolve_create_configuration(self, _obj, info, *, input):
-        return await self.configurations.create_configuration(
-            service_id=input["service_id"],
-            environment_id=input["environment_id"],
+        return await self.orchestrator.create_configuration(
+            dimension_ids=input["dimension_ids"],
             body=input["body"],
             substitutions=input.get("substitutions"),
         )
@@ -40,18 +53,17 @@ class ConfigurationsResolver:
             shared_value_id=input["shared_value_id"],
         )
 
-    # -- Configuration field resolvers --
+    async def resolve_set_configuration_current(self, _obj, info, *, id, is_current):
+        return await self.configurations.set_configuration_current(
+            id=id,
+            is_current=is_current,
+        )
 
-    async def resolve_config_service(self, obj, info):
-        return await info.context["service_loader"].load(str(obj["service_id"]))
-
-    async def resolve_config_environment(self, obj, info):
-        return await info.context["environment_loader"].load(str(obj["environment_id"]))
+    async def resolve_config_dimensions(self, obj, info):
+        return await info.context["config_scopes_loader"].load(str(obj["id"]))
 
     async def resolve_config_substitutions(self, obj, info):
         return await info.context["substitution_loader"].load(str(obj["id"]))
-
-    # -- ConfigSubstitution field resolvers --
 
     async def resolve_substitution_configuration(self, obj, info):
         return await info.context["configuration_loader"].load(str(obj["configuration_id"]))
@@ -59,9 +71,35 @@ class ConfigurationsResolver:
     async def resolve_substitution_shared_value(self, obj, info):
         return await info.context["shared_value_loader"].load(str(obj["shared_value_id"]))
 
+    async def resolve_config_projection(self, obj, info):
+        substitutions = await info.context["substitution_loader"].load(str(obj["id"]))
+        scopes = await info.context["config_scopes_loader"].load(str(obj["id"]))
+        dimension_ids = [str(s["id"]) for s in scopes]
+        return await self.orchestrator.apply_projection(
+            body=obj["body"],
+            substitutions=substitutions,
+            dimension_ids=dimension_ids,
+        )
 
-def get_configuration_resolvers(configurations) -> list:
-    resolver = ConfigurationsResolver(configurations)
+    async def resolve_configurations_by_scope(self, _obj, info, *, scope_hash, first=None, after=None):
+        return await self.configurations.get_configurations_by_scope(
+            scope_hash=scope_hash,
+            first=first,
+            after=after,
+        )
+
+    async def resolve_config_scope_hash(self, obj, info):
+        return str(obj["scope_hash"])
+
+    async def resolve_extract_sentinel_paths(self, _obj, info, *, body):
+        return self.orchestrator.find_sentinel_paths(body)
+
+
+def get_configuration_resolvers(
+    configurations: Configurations,
+    orchestrator: ConfigurationOrchestrator,
+) -> list:
+    resolver = ConfigurationsResolver(configurations, orchestrator)
 
     query = QueryType()
     mutation = MutationType()
@@ -69,12 +107,16 @@ def get_configuration_resolvers(configurations) -> list:
     substitution_type = ObjectType("ConfigSubstitution")
 
     query.set_field("configurations", resolver.resolve_configurations)
-    query.set_field("configuration", resolver.resolve_configuration)
+    query.set_field("configurationsByIds", resolver.resolve_configurations_by_ids)
+    query.set_field("configurationsByScope", resolver.resolve_configurations_by_scope)
+    query.set_field("extractSentinelPaths", resolver.resolve_extract_sentinel_paths)
     mutation.set_field("createConfiguration", resolver.resolve_create_configuration)
     mutation.set_field("updateConfigSubstitution", resolver.resolve_update_config_substitution)
-    configuration_type.set_field("service", resolver.resolve_config_service)
-    configuration_type.set_field("environment", resolver.resolve_config_environment)
+    mutation.set_field("setConfigurationCurrent", resolver.resolve_set_configuration_current)
+    configuration_type.set_field("dimensions", resolver.resolve_config_dimensions)
     configuration_type.set_field("substitutions", resolver.resolve_config_substitutions)
+    configuration_type.set_field("projection", resolver.resolve_config_projection)
+    configuration_type.set_field("scopeHash", resolver.resolve_config_scope_hash)
     substitution_type.set_field("configuration", resolver.resolve_substitution_configuration)
     substitution_type.set_field("sharedValue", resolver.resolve_substitution_shared_value)
 

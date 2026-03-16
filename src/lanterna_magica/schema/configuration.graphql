@@ -1,11 +1,12 @@
 type Configuration {
   id: ID!
-  service: Service!
-  environment: Environment!
+  dimensions: [Dimension!]!
   body: JSON!
   isCurrent: Boolean!
   createdAt: DateTime!
   substitutions: [ConfigSubstitution!]!
+  projection: JSON
+  scopeHash: String!
 }
 
 type ConfigurationEdge {
@@ -32,8 +33,7 @@ input ConfigSubstitutionInput {
 }
 
 input CreateConfigurationInput {
-  serviceId: ID!
-  environmentId: ID!
+  dimensionIds: [ID!]!
   body: JSON!
   substitutions: [ConfigSubstitutionInput!]
 }
@@ -46,16 +46,23 @@ input SetConfigSubstitutionInput {
 
 extend type Query {
   configurations(
-    serviceId: ID
-    environmentId: ID
-    includeGlobal: Boolean
+    dimensionIds: [ID!]
+    includeBase: Boolean
+    currentOnly: Boolean
     first: Int
     after: String
   ): ConfigurationConnection!
-  configuration(id: ID!): Configuration
+  configurationsByIds(ids: [ID!]!): [Configuration!]!
+  configurationsByScope(
+    scopeHash: String!
+    first: Int
+    after: String
+  ): ConfigurationConnection!
+  extractSentinelPaths(body: JSON!): [String!]!
 }
 
 extend type Mutation {
   createConfiguration(input: CreateConfigurationInput!): Configuration!
   updateConfigSubstitution(input: SetConfigSubstitutionInput!): ConfigSubstitution!
+  setConfigurationCurrent(id: ID!, isCurrent: Boolean!): Configuration!
 }

@@ -5,13 +5,17 @@ type SharedValue {
   updatedAt: DateTime!
   archivedAt: DateTime
   revisions(
-    serviceId: ID
-    environmentId: ID
-    includeGlobal: Boolean
+    dimensionIds: [ID!]
+    includeBase: Boolean
     currentOnly: Boolean
     first: Int
     after: String
   ): SharedValueRevisionConnection!
+  usedBy(
+    includeArchived: Boolean
+    first: Int
+    after: String
+  ): ConfigurationConnection!
 }
 
 type SharedValueEdge {
@@ -27,8 +31,7 @@ type SharedValueConnection {
 type SharedValueRevision {
   id: ID!
   sharedValue: SharedValue!
-  service: Service!
-  environment: Environment!
+  dimensions: [Dimension!]!
   value: JSON!
   isCurrent: Boolean!
   createdAt: DateTime!
@@ -55,23 +58,19 @@ input UpdateSharedValueInput {
 
 input CreateSharedValueRevisionInput {
   sharedValueId: ID!
-  serviceId: ID!
-  environmentId: ID!
+  dimensionIds: [ID!]!
   value: JSON!
 }
 
 extend type Query {
   sharedValues(
     includeArchived: Boolean
+    search: String
     first: Int
     after: String
   ): SharedValueConnection!
-  searchSharedValues(
-    search: String!
-    includeArchived: Boolean
-    limit: Int
-  ): [SharedValue!]!
-  sharedValue(id: ID!): SharedValue
+  sharedValuesByIds(ids: [ID!]!): [SharedValue!]!
+  resolveSharedValue(sharedValueId: ID!, dimensionIds: [ID!]!): SharedValueRevision
 }
 
 extend type Mutation {
@@ -80,4 +79,5 @@ extend type Mutation {
   archiveSharedValue(id: ID!): SharedValue!
   unarchiveSharedValue(id: ID!): SharedValue!
   createSharedValueRevision(input: CreateSharedValueRevisionInput!): SharedValueRevision!
+  setRevisionCurrent(id: ID!, isCurrent: Boolean!): SharedValueRevision!
 }
